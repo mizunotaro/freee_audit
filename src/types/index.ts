@@ -284,3 +284,28 @@ export interface KPIResult {
   format: 'percentage' | 'currency' | 'number' | 'months' | 'ratio'
   description?: string
 }
+
+export interface ReportTableRow {
+  code?: string
+  name: string
+  rowType: 'item' | 'subtotal' | 'total'
+  indent: number
+  values: number[]
+  total?: number
+  average?: number
+}
+
+export interface ReportSection {
+  title: string
+  type: 'bs' | 'pl' | 'cf' | 'kpi'
+  rows: ReportTableRow[]
+}
+
+export interface MultiMonthReport {
+  fiscalYear: number
+  endMonth: number
+  monthCount: 3 | 6 | 12
+  months: number[]
+  companyName: string
+  sections: ReportSection[]
+}

@@ -4,6 +4,9 @@ import type {
   ProfitLoss,
   CashFlowStatement,
   MonthlyTrend,
+  MultiMonthReport,
+  ReportSection,
+  ReportTableRow,
 } from '@/types'
 import { calculateCashFlow } from '@/services/cashflow/calculator'
 import { generateCashPosition } from '@/services/cashflow/cash-position'
@@ -376,4 +379,336 @@ export function formatReportForExport(report: MonthlyReport): string {
   lines.push(`Runway: ${report.runway.runwayMonths}ヶ月`)
 
   return lines.join('\n')
+}
+
+export async function getMultiMonthReport(
+  companyId: string,
+  fiscalYear: number,
+  endMonth: number,
+  monthCount: 3 | 6 | 12
+): Promise<MultiMonthReport> {
+  const company = await prisma.company.findFirst({
+    where: { id: companyId },
+  })
+
+  if (!company) {
+    throw new Error('Company not found')
+  }
+
+  const months: number[] = []
+  for (let i = monthCount - 1; i >= 0; i--) {
+    const m = endMonth - i
+    months.push(m > 0 ? m : m + 12)
+  }
+
+  const balanceSheets: BalanceSheet[] = []
+  const profitLosses: ProfitLoss[] = []
+  const cashFlows: CashFlowStatement[] = []
+
+  for (const month of months) {
+    const bs = await getBalanceSheet(companyId, fiscalYear, month)
+    const previousBS = month > 1 ? await getBalanceSheet(companyId, fiscalYear, month - 1) : null
+    const pl = await getProfitLoss(companyId, fiscalYear, month)
+    const cf = calculateCashFlow(pl, bs, previousBS)
+
+    balanceSheets.push(bs)
+    profitLosses.push(pl)
+    cashFlows.push(cf)
+  }
+
+  const sections: ReportSection[] = []
+
+  sections.push(buildBSSection(balanceSheets, months))
+  sections.push(buildPLSection(profitLosses, months))
+  sections.push(buildCFSection(cashFlows, months))
+  sections.push(buildKPISection(balanceSheets, profitLosses, cashFlows, months))
+
+  return {
+    fiscalYear,
+    endMonth,
+    monthCount,
+    months,
+    companyName: company.name,
+    sections,
+  }
+}
+
+function buildBSSection(balanceSheets: BalanceSheet[], _months: number[]): ReportSection {
+  const rows: ReportTableRow[] = []
+
+  const addItems = (
+    items: Array<{ code: string; name: string; amount: number }>,
+    indent: number = 0
+  ) => {
+    items.forEach((item) => {
+      const values = balanceSheets.map((bs) => {
+        const found = [
+          ...bs.assets.current,
+          ...bs.assets.fixed,
+          ...bs.liabilities.current,
+          ...bs.liabilities.fixed,
+          ...bs.equity.items,
+        ].find((i) => i.code === item.code)
+        return found?.amount || 0
+      })
+      rows.push({
+        code: item.code,
+        name: item.name,
+        rowType: 'item',
+        indent,
+        values,
+        total: values.reduce((s, v) => s + v, 0),
+      })
+    })
+  }
+
+  const addSubtotal = (name: string, values: number[]) => {
+    rows.push({
+      name,
+      rowType: 'subtotal',
+      indent: 1,
+      values,
+      total: values.reduce((s, v) => s + v, 0),
+    })
+  }
+
+  const addTotal = (name: string, values: number[]) => {
+    rows.push({
+      name,
+      rowType: 'total',
+      indent: 0,
+      values,
+      total: values.reduce((s, v) => s + v, 0),
+    })
+  }
+
+  if (balanceSheets.length > 0) {
+    const bs = balanceSheets[0]
+
+    addItems(bs.assets.current, 0)
+    const currentAssetValues = balanceSheets.map((b) =>
+      b.assets.current.reduce((s, a) => s + a.amount, 0)
+    )
+    addSubtotal('流動資産計', currentAssetValues)
+
+    addItems(bs.assets.fixed, 0)
+    const fixedAssetValues = balanceSheets.map((b) =>
+      b.assets.fixed.reduce((s, a) => s + a.amount, 0)
+    )
+    addSubtotal('固定資産計', fixedAssetValues)
+
+    addTotal(
+      '資産合計',
+      balanceSheets.map((b) => b.totalAssets)
+    )
+
+    addItems(bs.liabilities.current, 0)
+    const currentLiabValues = balanceSheets.map((b) =>
+      b.liabilities.current.reduce((s, l) => s + l.amount, 0)
+    )
+    addSubtotal('流動負債計', currentLiabValues)
+
+    addItems(bs.liabilities.fixed, 0)
+    const fixedLiabValues = balanceSheets.map((b) =>
+      b.liabilities.fixed.reduce((s, l) => s + l.amount, 0)
+    )
+    addSubtotal('固定負債計', fixedLiabValues)
+
+    addTotal(
+      '負債合計',
+      balanceSheets.map((b) => b.totalLiabilities)
+    )
+
+    addItems(bs.equity.items, 0)
+    addTotal(
+      '純資産合計',
+      balanceSheets.map((b) => b.totalEquity)
+    )
+  }
+
+  return {
+    title: '貸借対照表',
+    type: 'bs',
+    rows,
+  }
+}
+
+function buildPLSection(profitLosses: ProfitLoss[], _months: number[]): ReportSection {
+  const rows: ReportTableRow[] = []
+
+  const addItems = (
+    items: Array<{ code: string; name: string; amount: number }>,
+    indent: number = 0
+  ) => {
+    items.forEach((item) => {
+      const values = profitLosses.map((pl) => {
+        const allItems = [...pl.revenue, ...pl.costOfSales, ...pl.sgaExpenses]
+        const found = allItems.find((i) => i.code === item.code)
+        return found?.amount || 0
+      })
+      rows.push({
+        code: item.code,
+        name: item.name,
+        rowType: 'item',
+        indent,
+        values,
+        total: values.reduce((s, v) => s + v, 0),
+        average: values.reduce((s, v) => s + v, 0) / values.length,
+      })
+    })
+  }
+
+  const addSubtotal = (name: string, getValues: (pl: ProfitLoss) => number) => {
+    const values = profitLosses.map(getValues)
+    rows.push({
+      name,
+      rowType: 'subtotal',
+      indent: 1,
+      values,
+      total: values.reduce((s, v) => s + v, 0),
+      average: values.reduce((s, v) => s + v, 0) / values.length,
+    })
+  }
+
+  const addTotal = (name: string, getValues: (pl: ProfitLoss) => number) => {
+    const values = profitLosses.map(getValues)
+    rows.push({
+      name,
+      rowType: 'total',
+      indent: 0,
+      values,
+      total: values.reduce((s, v) => s + v, 0),
+      average: values.reduce((s, v) => s + v, 0) / values.length,
+    })
+  }
+
+  if (profitLosses.length > 0) {
+    const pl = profitLosses[0]
+
+    addItems(pl.revenue, 0)
+    addSubtotal('売上高計', (p) => p.revenue.reduce((s, r) => s + r.amount, 0))
+
+    addItems(pl.costOfSales, 0)
+    addSubtotal('売上原価計', (p) => p.costOfSales.reduce((s, c) => s + c.amount, 0))
+
+    addSubtotal('売上総利益', (p) => p.grossProfit)
+
+    addItems(pl.sgaExpenses, 0)
+    addSubtotal('販管費計', (p) => p.sgaExpenses.reduce((s, e) => s + e.amount, 0))
+
+    addSubtotal('営業利益', (p) => p.operatingIncome)
+
+    addTotal('当期純利益', (p) => p.netIncome)
+  }
+
+  return {
+    title: '損益計算書',
+    type: 'pl',
+    rows,
+  }
+}
+
+function buildCFSection(cashFlows: CashFlowStatement[], _months: number[]): ReportSection {
+  const rows: ReportTableRow[] = []
+
+  const addItem = (
+    name: string,
+    getValues: (cf: CashFlowStatement) => number,
+    rowType: 'item' | 'subtotal' | 'total' = 'item'
+  ) => {
+    const values = cashFlows.map(getValues)
+    rows.push({
+      name,
+      rowType,
+      indent: rowType === 'subtotal' ? 1 : 0,
+      values,
+      total: values.reduce((s, v) => s + v, 0),
+    })
+  }
+
+  addItem(
+    '営業CF',
+    (cf) => cf.operatingActivities?.netCashFromOperating ?? cf.operating?.netCashFromOperating ?? 0,
+    'subtotal'
+  )
+  addItem(
+    '投資CF',
+    (cf) => cf.investingActivities?.netCashFromInvesting ?? cf.investing?.netCashFromInvesting ?? 0,
+    'item'
+  )
+  addItem(
+    '財務CF',
+    (cf) => cf.financingActivities?.netCashFromFinancing ?? cf.financing?.netCashFromFinancing ?? 0,
+    'item'
+  )
+  addItem('現金増減', (cf) => cf.netChangeInCash, 'subtotal')
+  addItem('期末現金', (cf) => cf.endingCash, 'total')
+
+  return {
+    title: 'キャッシュフロー計算書',
+    type: 'cf',
+    rows,
+  }
+}
+
+function buildKPISection(
+  balanceSheets: BalanceSheet[],
+  profitLosses: ProfitLoss[],
+  _cashFlows: CashFlowStatement[],
+  _months: number[]
+): ReportSection {
+  const rows: ReportTableRow[] = []
+
+  const calcROE = (pl: ProfitLoss, bs: BalanceSheet) => {
+    const equity = bs.totalEquity
+    return equity > 0 ? (pl.netIncome / equity) * 100 : 0
+  }
+
+  const calcROA = (pl: ProfitLoss, bs: BalanceSheet) => {
+    const assets = bs.totalAssets
+    return assets > 0 ? (pl.netIncome / assets) * 100 : 0
+  }
+
+  const calcCurrentRatio = (_pl: ProfitLoss, bs: BalanceSheet) => {
+    const currentLiab = bs.liabilities.current.reduce((s, l) => s + l.amount, 0)
+    const currentAssets = bs.assets.current.reduce((s, a) => s + a.amount, 0)
+    return currentLiab > 0 ? (currentAssets / currentLiab) * 100 : 0
+  }
+
+  const calcEquityRatio = (_pl: ProfitLoss, bs: BalanceSheet) => {
+    const total = bs.totalAssets
+    return total > 0 ? (bs.totalEquity / total) * 100 : 0
+  }
+
+  const calcGrossMargin = (pl: ProfitLoss, _bs: BalanceSheet) => pl.grossProfitMargin
+
+  const calcOperatingMargin = (pl: ProfitLoss, _bs: BalanceSheet) => pl.operatingMargin
+
+  const addKPI = (name: string, calcFn: (pl: ProfitLoss, bs: BalanceSheet) => number) => {
+    const values: number[] = []
+    for (let i = 0; i < balanceSheets.length; i++) {
+      values.push(calcFn(profitLosses[i], balanceSheets[i]))
+    }
+    rows.push({
+      name,
+      rowType: 'item',
+      indent: 0,
+      values,
+      total: values.reduce((s, v) => s + v, 0),
+      average: values.reduce((s, v) => s + v, 0) / values.length,
+    })
+  }
+
+  addKPI('ROE (%)', calcROE)
+  addKPI('ROA (%)', calcROA)
+  addKPI('流動比率 (%)', calcCurrentRatio)
+  addKPI('自己資本比率 (%)', calcEquityRatio)
+  addKPI('売上総利益率 (%)', calcGrossMargin)
+  addKPI('営業利益率 (%)', calcOperatingMargin)
+
+  return {
+    title: '経営指標',
+    type: 'kpi',
+    rows,
+  }
 }

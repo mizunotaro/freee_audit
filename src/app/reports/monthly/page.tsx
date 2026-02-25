@@ -4,20 +4,24 @@ import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import { MonthlyTrendChart } from '@/components/charts/MonthlyTrendChart'
 import { KPICard } from '@/components/charts/KPIGauge'
-import type { MonthlyReport, MonthlyTrend } from '@/types'
-import { formatCurrency, formatPercent, formatFiscalYear } from '@/lib/utils'
+import { MultiMonthReportTable } from '@/components/reports/templates/monthly-report-template'
+import type { MultiMonthReport, MonthlyTrend } from '@/types'
+import { formatFiscalYear } from '@/lib/utils'
 
 export default function MonthlyReportPage() {
-  const [report, setReport] = useState<MonthlyReport | null>(null)
+  const [report, setReport] = useState<MultiMonthReport | null>(null)
   const [trend, setTrend] = useState<MonthlyTrend[]>([])
   const [loading, setLoading] = useState(true)
   const [fiscalYear, setFiscalYear] = useState(new Date().getFullYear())
-  const [month, setMonth] = useState(new Date().getMonth() + 1)
+  const [endMonth, setEndMonth] = useState(new Date().getMonth() + 1)
+  const [monthCount, setMonthCount] = useState<3 | 6 | 12>(3)
 
   const fetchData = useCallback(async () => {
     setLoading(true)
     try {
-      const res = await fetch(`/api/reports/monthly?fiscalYear=${fiscalYear}&month=${month}`)
+      const res = await fetch(
+        `/api/reports/monthly?fiscalYear=${fiscalYear}&endMonth=${endMonth}&monthCount=${monthCount}`
+      )
       const data = await res.json()
       setReport(data.report)
       setTrend(data.trend || [])
@@ -26,7 +30,7 @@ export default function MonthlyReportPage() {
     } finally {
       setLoading(false)
     }
-  }, [fiscalYear, month])
+  }, [fiscalYear, endMonth, monthCount])
 
   useEffect(() => {
     fetchData()
@@ -48,6 +52,14 @@ export default function MonthlyReportPage() {
       </div>
     )
   }
+
+  const currentPL = report?.sections.find((s) => s.type === 'pl')
+  const netIncomeRow = currentPL?.rows.find((r) => r.name === '当期純利益')
+  const operatingIncomeRow = currentPL?.rows.find((r) => r.name === '営業利益')
+  const revenueRow = currentPL?.rows.find((r) => r.name === '売上高計')
+
+  const bsSection = report?.sections.find((s) => s.type === 'bs')
+  const cashRow = bsSection?.rows.find((r) => r.name === '現金及び預金')
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -74,7 +86,7 @@ export default function MonthlyReportPage() {
       </header>
 
       <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-        <div className="mb-6 flex items-center space-x-4">
+        <div className="mb-6 flex flex-wrap items-center gap-4">
           <select
             value={fiscalYear}
             onChange={(e) => setFiscalYear(parseInt(e.target.value))}
@@ -87,299 +99,67 @@ export default function MonthlyReportPage() {
             ))}
           </select>
           <select
-            value={month}
-            onChange={(e) => setMonth(parseInt(e.target.value))}
+            value={endMonth}
+            onChange={(e) => setEndMonth(parseInt(e.target.value))}
             className="focus:border-primary-500 focus:ring-primary-500 rounded-md border-gray-300 shadow-sm"
           >
             {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((m) => (
               <option key={m} value={m}>
-                {m}月
+                {m}月まで
               </option>
             ))}
           </select>
+          <div className="flex rounded-lg border border-gray-300 bg-white p-1">
+            {([3, 6, 12] as const).map((m) => (
+              <button
+                key={m}
+                onClick={() => setMonthCount(m)}
+                className={`rounded-md px-4 py-1.5 text-sm font-medium transition-colors ${
+                  monthCount === m ? 'bg-primary-600 text-white' : 'text-gray-600 hover:bg-gray-100'
+                }`}
+              >
+                {m}ヶ月
+              </button>
+            ))}
+          </div>
         </div>
 
         {report && (
           <>
             <div className="mb-8">
               <h2 className="mb-4 text-lg font-semibold text-gray-900">
-                {formatFiscalYear(fiscalYear, month)} - {report.companyName}
+                {formatFiscalYear(fiscalYear, endMonth)} ({monthCount}ヶ月) - {report.companyName}
               </h2>
             </div>
 
             <div className="mb-8 grid grid-cols-1 gap-4 md:grid-cols-4">
-              <KPICard
-                title="売上高"
-                value={report.profitLoss.revenue.reduce((s, r) => s + r.amount, 0)}
-                unit="円"
-                trend="up"
-              />
+              <KPICard title="売上高" value={revenueRow?.total ?? 0} unit="円" trend="up" />
               <KPICard
                 title="営業利益"
-                value={report.profitLoss.operatingIncome}
+                value={operatingIncomeRow?.total ?? 0}
                 unit="円"
-                trend={report.profitLoss.operatingIncome > 0 ? 'up' : 'down'}
+                trend={(operatingIncomeRow?.total ?? 0) > 0 ? 'up' : 'down'}
               />
               <KPICard
                 title="当期純利益"
-                value={report.profitLoss.netIncome}
+                value={netIncomeRow?.total ?? 0}
                 unit="円"
-                trend={report.profitLoss.netIncome > 0 ? 'up' : 'down'}
+                trend={(netIncomeRow?.total ?? 0) > 0 ? 'up' : 'down'}
               />
               <KPICard
                 title="現金預金"
-                value={report.balanceSheet.assets.current[0]?.amount || 0}
+                value={cashRow?.values[cashRow.values.length - 1] ?? 0}
                 unit="円"
               />
             </div>
 
-            <div className="mb-8 grid grid-cols-1 gap-6 lg:grid-cols-2">
-              <div className="rounded-lg bg-white p-6 shadow">
-                <h3 className="mb-4 text-lg font-medium text-gray-900">貸借対照表（BS）</h3>
-                <div className="space-y-4">
-                  <div>
-                    <h4 className="mb-2 font-medium text-gray-700">資産の部</h4>
-                    <table className="min-w-full">
-                      <tbody>
-                        {report.balanceSheet.assets.current.map((item) => (
-                          <tr key={item.code} className="border-b">
-                            <td className="py-2 text-sm text-gray-600">{item.name}</td>
-                            <td className="py-2 text-right text-sm font-medium">
-                              {formatCurrency(item.amount)}
-                            </td>
-                          </tr>
-                        ))}
-                        <tr className="border-b bg-gray-50">
-                          <td className="py-2 text-sm font-medium">流動資産合計</td>
-                          <td className="py-2 text-right text-sm font-bold">
-                            {formatCurrency(
-                              report.balanceSheet.assets.current.reduce((s, a) => s + a.amount, 0)
-                            )}
-                          </td>
-                        </tr>
-                        {report.balanceSheet.assets.fixed.map((item) => (
-                          <tr key={item.code} className="border-b">
-                            <td className="py-2 text-sm text-gray-600">{item.name}</td>
-                            <td className="py-2 text-right text-sm font-medium">
-                              {formatCurrency(item.amount)}
-                            </td>
-                          </tr>
-                        ))}
-                        <tr className="bg-primary-50">
-                          <td className="text-primary-900 py-2 text-sm font-bold">資産合計</td>
-                          <td className="text-primary-900 py-2 text-right text-sm font-bold">
-                            {formatCurrency(report.balanceSheet.totalAssets)}
-                          </td>
-                        </tr>
-                      </tbody>
-                    </table>
-                  </div>
-
-                  <div>
-                    <h4 className="mb-2 font-medium text-gray-700">負債・純資産の部</h4>
-                    <table className="min-w-full">
-                      <tbody>
-                        {report.balanceSheet.liabilities.current.map((item) => (
-                          <tr key={item.code} className="border-b">
-                            <td className="py-2 text-sm text-gray-600">{item.name}</td>
-                            <td className="py-2 text-right text-sm font-medium">
-                              {formatCurrency(item.amount)}
-                            </td>
-                          </tr>
-                        ))}
-                        <tr className="border-b bg-gray-50">
-                          <td className="py-2 text-sm font-medium">負債合計</td>
-                          <td className="py-2 text-right text-sm font-bold">
-                            {formatCurrency(report.balanceSheet.totalLiabilities)}
-                          </td>
-                        </tr>
-                        {report.balanceSheet.equity.items.map((item) => (
-                          <tr key={item.code} className="border-b">
-                            <td className="py-2 text-sm text-gray-600">{item.name}</td>
-                            <td className="py-2 text-right text-sm font-medium">
-                              {formatCurrency(item.amount)}
-                            </td>
-                          </tr>
-                        ))}
-                        <tr className="bg-primary-50">
-                          <td className="text-primary-900 py-2 text-sm font-bold">純資産合計</td>
-                          <td className="text-primary-900 py-2 text-right text-sm font-bold">
-                            {formatCurrency(report.balanceSheet.totalEquity)}
-                          </td>
-                        </tr>
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              </div>
-
-              <div className="rounded-lg bg-white p-6 shadow">
-                <h3 className="mb-4 text-lg font-medium text-gray-900">損益計算書（PL）</h3>
-                <table className="min-w-full">
-                  <tbody>
-                    {report.profitLoss.revenue.map((item) => (
-                      <tr key={item.code} className="border-b">
-                        <td className="py-2 text-sm text-gray-600">{item.name}</td>
-                        <td className="py-2 text-right text-sm font-medium">
-                          {formatCurrency(item.amount)}
-                        </td>
-                      </tr>
-                    ))}
-                    {report.profitLoss.costOfSales.map((item) => (
-                      <tr key={item.code} className="border-b">
-                        <td className="py-2 text-sm text-gray-600">△ {item.name}</td>
-                        <td className="py-2 text-right text-sm font-medium text-red-600">
-                          {formatCurrency(-item.amount)}
-                        </td>
-                      </tr>
-                    ))}
-                    <tr className="border-b bg-blue-50">
-                      <td className="py-2 text-sm font-bold text-blue-900">売上総利益</td>
-                      <td className="py-2 text-right text-sm font-bold text-blue-900">
-                        {formatCurrency(report.profitLoss.grossProfit)}
-                        <span className="ml-2 text-xs font-normal">
-                          ({formatPercent(report.profitLoss.grossProfitMargin)})
-                        </span>
-                      </td>
-                    </tr>
-                    {report.profitLoss.sgaExpenses.slice(0, 5).map((item) => (
-                      <tr key={item.code} className="border-b">
-                        <td className="py-2 pl-4 text-sm text-gray-600">△ {item.name}</td>
-                        <td className="py-2 text-right text-sm font-medium text-red-600">
-                          {formatCurrency(-item.amount)}
-                        </td>
-                      </tr>
-                    ))}
-                    <tr className="border-b bg-green-50">
-                      <td className="py-2 text-sm font-bold text-green-900">営業利益</td>
-                      <td className="py-2 text-right text-sm font-bold text-green-900">
-                        {formatCurrency(report.profitLoss.operatingIncome)}
-                        <span className="ml-2 text-xs font-normal">
-                          ({formatPercent(report.profitLoss.operatingMargin)})
-                        </span>
-                      </td>
-                    </tr>
-                    <tr className="bg-purple-50">
-                      <td className="py-2 text-sm font-bold text-purple-900">当期純利益</td>
-                      <td className="py-2 text-right text-sm font-bold text-purple-900">
-                        {formatCurrency(report.profitLoss.netIncome)}
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
+            <div className="mb-8">
+              <MultiMonthReportTable report={report} />
             </div>
 
             <div className="mb-8 rounded-lg bg-white p-6 shadow">
               <h3 className="mb-4 text-lg font-medium text-gray-900">月次推移</h3>
               <MonthlyTrendChart data={trend} height={350} />
-            </div>
-
-            <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-              <div className="rounded-lg bg-white p-6 shadow">
-                <h3 className="mb-4 text-lg font-medium text-gray-900">キャッシュフロー計算書</h3>
-                <table className="min-w-full">
-                  <tbody>
-                    <tr className="border-b">
-                      <td className="py-2 text-sm font-medium">当期純利益</td>
-                      <td className="py-2 text-right text-sm">
-                        {formatCurrency(report.cashFlow.operatingActivities?.netIncome ?? 0)}
-                      </td>
-                    </tr>
-                    <tr className="border-b">
-                      <td className="py-2 pl-4 text-sm text-gray-600">減価償却費</td>
-                      <td className="py-2 text-right text-sm">
-                        {formatCurrency(report.cashFlow.operatingActivities?.depreciation ?? 0)}
-                      </td>
-                    </tr>
-                    <tr className="border-b">
-                      <td className="py-2 pl-4 text-sm text-gray-600">売掛金増減</td>
-                      <td className="py-2 text-right text-sm">
-                        {formatCurrency(
-                          report.cashFlow.operatingActivities?.increaseInReceivables ?? 0
-                        )}
-                      </td>
-                    </tr>
-                    <tr className="border-b bg-blue-50">
-                      <td className="py-2 text-sm font-bold text-blue-900">営業CF</td>
-                      <td className="py-2 text-right text-sm font-bold text-blue-900">
-                        {formatCurrency(
-                          report.cashFlow.operatingActivities?.netCashFromOperating ??
-                            report.cashFlow.operating?.netCashFromOperating ??
-                            0
-                        )}
-                      </td>
-                    </tr>
-                    <tr className="border-b bg-orange-50">
-                      <td className="py-2 text-sm font-bold text-orange-900">投資CF</td>
-                      <td className="py-2 text-right text-sm font-bold text-orange-900">
-                        {formatCurrency(
-                          report.cashFlow.investingActivities?.netCashFromInvesting ??
-                            report.cashFlow.investing?.netCashFromInvesting ??
-                            0
-                        )}
-                      </td>
-                    </tr>
-                    <tr className="border-b bg-purple-50">
-                      <td className="py-2 text-sm font-bold text-purple-900">財務CF</td>
-                      <td className="py-2 text-right text-sm font-bold text-purple-900">
-                        {formatCurrency(
-                          report.cashFlow.financingActivities?.netCashFromFinancing ??
-                            report.cashFlow.financing?.netCashFromFinancing ??
-                            0
-                        )}
-                      </td>
-                    </tr>
-                    <tr className="bg-gray-100">
-                      <td className="py-2 text-sm font-bold">現金増減</td>
-                      <td className="py-2 text-right text-sm font-bold">
-                        {formatCurrency(report.cashFlow.netChangeInCash)}
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-
-              <div className="rounded-lg bg-white p-6 shadow">
-                <h3 className="mb-4 text-lg font-medium text-gray-900">Runway分析</h3>
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between rounded-lg bg-gray-50 p-4">
-                    <div>
-                      <div className="text-sm text-gray-500">月次Burn Rate</div>
-                      <div className="text-2xl font-bold text-gray-900">
-                        {formatCurrency(report.runway.monthlyBurnRate)}
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <div className="text-sm text-gray-500">Runway</div>
-                      <div className="text-primary-600 text-2xl font-bold">
-                        {report.runway.runwayMonths}ヶ月
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-3 gap-2">
-                    <div className="rounded bg-green-50 p-3 text-center">
-                      <div className="text-xs text-green-600">楽観</div>
-                      <div className="text-lg font-bold text-green-700">
-                        {report.runway.scenarios.optimistic.runwayMonths}ヶ月
-                      </div>
-                    </div>
-                    <div className="rounded bg-blue-50 p-3 text-center">
-                      <div className="text-xs text-blue-600">現実</div>
-                      <div className="text-lg font-bold text-blue-700">
-                        {report.runway.scenarios.realistic.runwayMonths}ヶ月
-                      </div>
-                    </div>
-                    <div className="rounded bg-red-50 p-3 text-center">
-                      <div className="text-xs text-red-600">悲観</div>
-                      <div className="text-lg font-bold text-red-700">
-                        {report.runway.scenarios.pessimistic.runwayMonths}ヶ月
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
             </div>
           </>
         )}

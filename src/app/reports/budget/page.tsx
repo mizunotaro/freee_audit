@@ -2,7 +2,22 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
+import { Pencil, Trash2, Plus, Upload } from 'lucide-react'
+import { toast } from 'sonner'
 import { BudgetVsActualHorizontalChart } from '@/components/charts/BudgetVsActualChart'
+import { BudgetForm } from '@/components/budget/BudgetForm'
+import { CSVUpload } from '@/components/budget/CSVUpload'
+import { Button } from '@/components/ui/button'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { formatCurrency, formatPercent } from '@/lib/utils'
 
 interface BudgetItem {
@@ -12,6 +27,16 @@ interface BudgetItem {
   actualAmount: number
   variance: number
   achievementRate: number
+}
+
+interface BudgetRecord {
+  id: string
+  fiscalYear: number
+  month: number
+  accountCode: string
+  accountName: string
+  amount: number
+  departmentId?: string | null
 }
 
 interface BudgetVsActual {
@@ -40,19 +65,29 @@ interface VarianceData {
 export default function BudgetPage() {
   const [budgetVsActual, setBudgetVsActual] = useState<BudgetVsActual | null>(null)
   const [variance, setVariance] = useState<VarianceData | null>(null)
+  const [budgets, setBudgets] = useState<BudgetRecord[]>([])
   const [loading, setLoading] = useState(true)
   const [fiscalYear, setFiscalYear] = useState(new Date().getFullYear())
   const [month, setMonth] = useState(new Date().getMonth() + 1)
 
+  const [formOpen, setFormOpen] = useState(false)
+  const [csvOpen, setCSVOpen] = useState(false)
+  const [editingBudget, setEditingBudget] = useState<BudgetRecord | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<BudgetRecord | null>(null)
+
   const fetchData = useCallback(async () => {
     setLoading(true)
     try {
-      const res = await fetch(
-        `/api/reports/budget?action=variance&fiscalYear=${fiscalYear}&month=${month}`
-      )
-      const data = await res.json()
-      setBudgetVsActual(data.budgetVsActual)
-      setVariance(data.variance)
+      const [varianceRes, budgetsRes] = await Promise.all([
+        fetch(`/api/reports/budget?action=variance&fiscalYear=${fiscalYear}&month=${month}`),
+        fetch(`/api/reports/budget?&fiscalYear=${fiscalYear}&month=${month}`),
+      ])
+      const varianceData = await varianceRes.json()
+      const budgetsData = await budgetsRes.json()
+
+      setBudgetVsActual(varianceData.budgetVsActual)
+      setVariance(varianceData.variance)
+      setBudgets(budgetsData.budgets || [])
     } catch (error) {
       console.error('Failed to fetch budget:', error)
     } finally {
@@ -63,6 +98,33 @@ export default function BudgetPage() {
   useEffect(() => {
     fetchData()
   }, [fetchData])
+
+  const handleCreate = () => {
+    setEditingBudget(null)
+    setFormOpen(true)
+  }
+
+  const handleEdit = (budget: BudgetRecord) => {
+    setEditingBudget(budget)
+    setFormOpen(true)
+  }
+
+  const handleDelete = async () => {
+    if (!deleteTarget) return
+
+    try {
+      const res = await fetch(`/api/reports/budget?id=${deleteTarget.id}`, {
+        method: 'DELETE',
+      })
+      if (!res.ok) throw new Error('削除に失敗しました')
+      toast.success('予算を削除しました')
+      fetchData()
+    } catch (error) {
+      toast.error('削除に失敗しました')
+    } finally {
+      setDeleteTarget(null)
+    }
+  }
 
   const chartData =
     budgetVsActual?.items.slice(0, 8).map((item) => ({
@@ -110,7 +172,7 @@ export default function BudgetPage() {
       </header>
 
       <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-        <div className="mb-6 flex items-center space-x-4">
+        <div className="mb-6 flex flex-wrap items-center gap-4">
           <select
             value={fiscalYear}
             onChange={(e) => setFiscalYear(parseInt(e.target.value))}
@@ -133,12 +195,16 @@ export default function BudgetPage() {
               </option>
             ))}
           </select>
-          <a
-            href="/api/reports/budget?action=template"
-            className="bg-primary-600 hover:bg-primary-700 ml-auto inline-flex items-center rounded-md border border-transparent px-4 py-2 text-sm font-medium text-white"
-          >
-            CSVテンプレート
-          </a>
+          <div className="ml-auto flex gap-2">
+            <Button onClick={handleCreate} size="sm">
+              <Plus className="mr-1 h-4 w-4" />
+              新規登録
+            </Button>
+            <Button onClick={() => setCSVOpen(true)} variant="outline" size="sm">
+              <Upload className="mr-1 h-4 w-4" />
+              CSVアップロード
+            </Button>
+          </div>
         </div>
 
         {budgetVsActual && (
@@ -275,76 +341,66 @@ export default function BudgetPage() {
 
             <div className="overflow-hidden rounded-lg bg-white shadow">
               <div className="border-b border-gray-200 px-6 py-4">
-                <h3 className="text-lg font-medium text-gray-900">予実管理表（詳細）</h3>
+                <h3 className="text-lg font-medium text-gray-900">
+                  予算一覧（{fiscalYear}年度 {month}月）
+                </h3>
               </div>
               <div className="overflow-x-auto">
                 <table className="min-w-full divide-y divide-gray-200">
                   <thead className="bg-gray-50">
                     <tr>
                       <th className="px-6 py-3 text-left text-xs font-medium uppercase text-gray-500">
-                        勘定科目
+                        勘定科目コード
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium uppercase text-gray-500">
+                        勘定科目名
                       </th>
                       <th className="px-6 py-3 text-right text-xs font-medium uppercase text-gray-500">
-                        予算
-                      </th>
-                      <th className="px-6 py-3 text-right text-xs font-medium uppercase text-gray-500">
-                        実績
-                      </th>
-                      <th className="px-6 py-3 text-right text-xs font-medium uppercase text-gray-500">
-                        差異
-                      </th>
-                      <th className="px-6 py-3 text-right text-xs font-medium uppercase text-gray-500">
-                        達成率
+                        予算金額
                       </th>
                       <th className="px-6 py-3 text-center text-xs font-medium uppercase text-gray-500">
-                        状態
+                        部門
+                      </th>
+                      <th className="px-6 py-3 text-center text-xs font-medium uppercase text-gray-500">
+                        操作
                       </th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200 bg-white">
-                    {budgetVsActual.items.map((item, index) => (
-                      <tr key={index} className={index === 0 ? 'bg-blue-50' : ''}>
-                        <td className="px-6 py-4 text-sm text-gray-900">{item.accountName}</td>
-                        <td className="px-6 py-4 text-right text-sm text-gray-600">
-                          {formatCurrency(item.budgetAmount)}
-                        </td>
-                        <td className="px-6 py-4 text-right text-sm font-medium text-gray-900">
-                          {formatCurrency(item.actualAmount)}
-                        </td>
-                        <td
-                          className={`px-6 py-4 text-right text-sm font-medium ${
-                            item.variance >= 0 ? 'text-green-600' : 'text-red-600'
-                          }`}
-                        >
-                          {item.variance >= 0 ? '+' : ''}
-                          {formatCurrency(item.variance)}
-                        </td>
-                        <td className="px-6 py-4 text-right text-sm">
-                          {formatPercent(item.achievementRate)}
-                        </td>
-                        <td className="px-6 py-4 text-center">
-                          <span
-                            className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                              item.achievementRate >= 100
-                                ? 'bg-green-100 text-green-800'
-                                : item.achievementRate >= 80
-                                  ? 'bg-blue-100 text-blue-800'
-                                  : item.achievementRate >= 60
-                                    ? 'bg-yellow-100 text-yellow-800'
-                                    : 'bg-red-100 text-red-800'
-                            }`}
-                          >
-                            {item.achievementRate >= 100
-                              ? '達成'
-                              : item.achievementRate >= 80
-                                ? '良好'
-                                : item.achievementRate >= 60
-                                  ? '注意'
-                                  : '要改善'}
-                          </span>
+                    {budgets.length === 0 ? (
+                      <tr>
+                        <td colSpan={5} className="px-6 py-8 text-center text-gray-500">
+                          データがありません
                         </td>
                       </tr>
-                    ))}
+                    ) : (
+                      budgets.map((budget) => (
+                        <tr key={budget.id}>
+                          <td className="px-6 py-4 text-sm text-gray-900">{budget.accountCode}</td>
+                          <td className="px-6 py-4 text-sm text-gray-900">{budget.accountName}</td>
+                          <td className="px-6 py-4 text-right text-sm font-medium text-gray-900">
+                            {formatCurrency(budget.amount)}
+                          </td>
+                          <td className="px-6 py-4 text-center text-sm text-gray-500">
+                            {budget.departmentId || '-'}
+                          </td>
+                          <td className="px-6 py-4 text-center">
+                            <div className="flex justify-center gap-2">
+                              <Button variant="ghost" size="sm" onClick={() => handleEdit(budget)}>
+                                <Pencil className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => setDeleteTarget(budget)}
+                              >
+                                <Trash2 className="h-4 w-4 text-red-500" />
+                              </Button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))
+                    )}
                   </tbody>
                 </table>
               </div>
@@ -352,6 +408,39 @@ export default function BudgetPage() {
           </>
         )}
       </main>
+
+      <BudgetForm
+        open={formOpen}
+        onOpenChange={setFormOpen}
+        budget={editingBudget}
+        fiscalYear={fiscalYear}
+        month={month}
+        onSuccess={fetchData}
+      />
+
+      <CSVUpload
+        open={csvOpen}
+        onOpenChange={setCSVOpen}
+        fiscalYear={fiscalYear}
+        onSuccess={fetchData}
+      />
+
+      <AlertDialog open={!!deleteTarget} onOpenChange={() => setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>予算の削除</AlertDialogTitle>
+            <AlertDialogDescription>
+              「{deleteTarget?.accountName}」の予算を削除しますか？ この操作は取り消せません。
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>キャンセル</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete} className="bg-red-600 hover:bg-red-700">
+              削除
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

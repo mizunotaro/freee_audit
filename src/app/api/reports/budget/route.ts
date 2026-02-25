@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import {
   getBudgets,
   createBudget,
+  updateBudget,
   deleteBudget,
   getBudgetsByFiscalYear,
 } from '@/services/budget/budget-service'
@@ -142,6 +143,28 @@ export async function DELETE(request: NextRequest) {
   } catch (error) {
     console.error('Budget DELETE error:', error)
     return NextResponse.json({ error: 'Failed to delete budget' }, { status: 500 })
+  }
+}
+
+export async function PUT(request: NextRequest) {
+  try {
+    const body = await request.json()
+    const { id, amount, departmentId, note } = body
+
+    if (!id) {
+      return NextResponse.json({ error: 'Budget ID is required' }, { status: 400 })
+    }
+
+    const updateData: { amount?: number; departmentId?: string | null; note?: string } = {}
+    if (amount !== undefined) updateData.amount = amount
+    if (departmentId !== undefined) updateData.departmentId = departmentId
+    if (note !== undefined) updateData.note = note
+
+    const budget = await updateBudget(id, updateData)
+    return NextResponse.json({ budget })
+  } catch (error) {
+    console.error('Budget PUT error:', error)
+    return NextResponse.json({ error: 'Failed to update budget' }, { status: 500 })
   }
 }
 

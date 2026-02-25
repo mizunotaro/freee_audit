@@ -14,6 +14,7 @@ export interface CreateBudgetInput {
 
 export interface UpdateBudgetInput {
   amount?: number
+  departmentId?: string | null
   note?: string
 }
 
@@ -61,6 +62,7 @@ export async function updateBudget(id: string, data: UpdateBudgetInput): Promise
     where: { id },
     data: {
       amount: data.amount,
+      departmentId: data.departmentId,
       note: data.note,
     },
   })
