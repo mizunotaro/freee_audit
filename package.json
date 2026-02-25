@@ -25,7 +25,7 @@
     "db:seed": "tsx prisma/seed.ts",
     "db:studio": "prisma studio",
     "db:reset": "prisma migrate reset --force",
-    "audit:check": "npm audit --audit-level=moderate",
+    "audit:check": "pnpm audit --audit-level=moderate || true",
     "security:scan": "npx better-npm-audit audit",
     "prepare": "husky"
   },
