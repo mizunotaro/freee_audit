@@ -1,0 +1,23 @@
+FROM node:20-alpine
+
+WORKDIR /app
+
+RUN corepack enable && corepack prepare pnpm@8 --activate
+
+RUN apk add --no-cache libc6-compat
+
+COPY package.json pnpm-lock.yaml* ./
+COPY prisma ./prisma/
+
+RUN pnpm install
+
+COPY . .
+
+ENV NEXT_TELEMETRY_DISABLED 1
+ENV NODE_ENV development
+
+RUN pnpm db:generate
+
+EXPOSE 3000
+
+CMD ["pnpm", "dev"]

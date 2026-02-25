@@ -1,0 +1,252 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String     @id @default(cuid())
+  email        String     @unique
+  passwordHash String?    @map("password_hash")
+  name         String
+  role         String     @default("VIEWER")
+  companyId    String?    @map("company_id")
+  company      Company?   @relation(fields: [companyId], references: [id])
+  sessions     Session[]
+  auditLogs    AuditLog[]
+  createdAt    DateTime   @default(now()) @map("created_at")
+  updatedAt    DateTime   @updatedAt @map("updated_at")
+
+  @@map("users")
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  userId    String   @map("user_id")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token     String   @unique
+  expiresAt DateTime @map("expires_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([userId])
+  @@index([token])
+  @@map("sessions")
+}
+
+model Company {
+  id              String           @id @default(cuid())
+  freeeCompanyId  String?          @unique @map("freee_company_id")
+  name            String
+  fiscalYearStart Int              @default(1) @map("fiscal_year_start")
+  users           User[]
+  journals        Journal[]
+  documents       Document[]
+  budgets         Budget[]
+  cashFlows       CashFlow[]
+  kpis            FinancialKPI[]
+  apiKeys         ApiKey[]
+  monthlyBalances MonthlyBalance[]
+  createdAt       DateTime         @default(now()) @map("created_at")
+  updatedAt       DateTime         @updatedAt @map("updated_at")
+
+  @@map("companies")
+}
+
+model ApiKey {
+  id              String   @id @default(cuid())
+  companyId       String   @map("company_id")
+  company         Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  provider        String
+  encryptedKey    String   @map("encrypted_key")
+  encryptedSecret String?  @map("encrypted_secret")
+  metadata        String?
+  expiresAt       DateTime? @map("expires_at")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  @@unique([companyId, provider])
+  @@map("api_keys")
+}
+
+model Journal {
+  id             String        @id @default(cuid())
+  companyId      String        @map("company_id")
+  company        Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  freeeJournalId String        @unique @map("freee_journal_id")
+  entryDate      DateTime      @map("entry_date")
+  description    String
+  debitAccount   String        @map("debit_account")
+  creditAccount  String        @map("credit_account")
+  amount         Float
+  taxAmount      Float         @default(0) @map("tax_amount")
+  taxType        String?       @map("tax_type")
+  documentId     String?       @unique @map("document_id")
+  document       Document?     @relation(fields: [documentId], references: [id])
+  auditStatus    String        @default("PENDING") @map("audit_status")
+  auditResults   AuditResult[]
+  syncedAt       DateTime      @map("synced_at")
+  createdAt      DateTime      @default(now()) @map("created_at")
+
+  @@index([companyId, entryDate])
+  @@index([companyId, auditStatus])
+  @@map("journals")
+}
+
+model Document {
+  id              String        @id @default(cuid())
+  companyId       String        @map("company_id")
+  company         Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  freeeDocumentId String?       @unique @map("freee_document_id")
+  journal         Journal?
+  filePath        String        @map("file_path")
+  fileType        String        @map("file_type")
+  fileName        String        @map("file_name")
+  fileSize        Int           @map("file_size")
+  uploadDate      DateTime      @map("upload_date")
+  auditResults    AuditResult[]
+  createdAt       DateTime      @default(now()) @map("created_at")
+
+  @@index([companyId])
+  @@map("documents")
+}
+
+model AuditResult {
+  id              String   @id @default(cuid())
+  journalId       String   @map("journal_id")
+  journal         Journal  @relation(fields: [journalId], references: [id], onDelete: Cascade)
+  documentId      String?  @map("document_id")
+  document        Document? @relation(fields: [documentId], references: [id])
+  status          String
+  issues          String
+  confidenceScore Float?   @map("confidence_score")
+  rawAiResponse   String?  @map("raw_ai_response")
+  analyzedAt      DateTime @map("analyzed_at")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  @@index([journalId])
+  @@index([status])
+  @@map("audit_results")
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  userId     String?  @map("user_id")
+  user       User?    @relation(fields: [userId], references: [id])
+  action     String
+  resource   String
+  resourceId String?  @map("resource_id")
+  ipAddress  String?  @map("ip_address")
+  userAgent  String?  @map("user_agent")
+  details    String?
+  result     String
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@index([userId])
+  @@index([action])
+  @@index([resource])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+model Budget {
+  id           String   @id @default(cuid())
+  companyId    String   @map("company_id")
+  company      Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  fiscalYear   Int      @map("fiscal_year")
+  month        Int
+  departmentId String?  @map("department_id")
+  accountCode  String   @map("account_code")
+  accountName  String   @map("account_name")
+  amount       Float
+  note         String?
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  @@unique([companyId, fiscalYear, month, departmentId, accountCode])
+  @@index([companyId, fiscalYear])
+  @@map("budgets")
+}
+
+model CashFlow {
+  id         String   @id @default(cuid())
+  companyId  String   @map("company_id")
+  company    Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  fiscalYear Int      @map("fiscal_year")
+  month      Int
+  category   String
+  itemName   String   @map("item_name")
+  amount     Float
+  note       String?
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@unique([companyId, fiscalYear, month, category, itemName])
+  @@index([companyId, fiscalYear])
+  @@map("cash_flows")
+}
+
+model ExchangeRate {
+  id           String         @id @default(cuid())
+  rateDate     DateTime       @map("rate_date")
+  fromCurrency String         @map("from_currency")
+  toCurrency   String         @map("to_currency")
+  rate         Float
+  source       String
+  kpis         FinancialKPI[]
+  createdAt    DateTime       @default(now()) @map("created_at")
+
+  @@unique([rateDate, fromCurrency, toCurrency])
+  @@index([rateDate])
+  @@map("exchange_rates")
+}
+
+model FinancialKPI {
+  id             String        @id @default(cuid())
+  companyId      String        @map("company_id")
+  company        Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  fiscalYear     Int           @map("fiscal_year")
+  month          Int
+  kpiName        String        @map("kpi_name")
+  value          Float
+  currency       String        @default("JPY")
+  exchangeRateId String?       @map("exchange_rate_id")
+  exchangeRate   ExchangeRate? @relation(fields: [exchangeRateId], references: [id])
+  createdAt      DateTime      @default(now()) @map("created_at")
+
+  @@unique([companyId, fiscalYear, month, kpiName, currency])
+  @@index([companyId, fiscalYear])
+  @@map("financial_kpis")
+}
+
+model MonthlyBalance {
+  id           String   @id @default(cuid())
+  companyId    String   @map("company_id")
+  company      Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  fiscalYear   Int      @map("fiscal_year")
+  month        Int
+  accountCode  String   @map("account_code")
+  accountName  String   @map("account_name")
+  category     String
+  amount       Float
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  @@unique([companyId, fiscalYear, month, accountCode])
+  @@index([companyId, fiscalYear])
+  @@map("monthly_balances")
+}
+
+model FreeeToken {
+  id           String   @id @default(cuid())
+  companyId    String   @unique @map("company_id")
+  accessToken  String   @map("access_token")
+  refreshToken String   @map("refresh_token")
+  expiresAt    DateTime @map("expires_at")
+  tokenType    String   @default("Bearer") @map("token_type")
+  scope        String?
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  @@map("freee_tokens")
+}
