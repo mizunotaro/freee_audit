@@ -4,11 +4,11 @@ import { getRequestConfig } from 'next-intl/server'
 export { locales, defaultLocale }
 export type { Locale, Messages }
 
-export default getRequestConfig(async ({ locale }) => {
+export default getRequestConfig(async ({ requestLocale }) => {
   let resolvedLocale: Locale = defaultLocale
 
-  if (locale && locales.includes(locale as Locale)) {
-    resolvedLocale = locale as Locale
+  if (requestLocale && locales.includes(requestLocale as Locale)) {
+    resolvedLocale = requestLocale as Locale
   }
 
   return {

@@ -30,13 +30,7 @@ const nextConfig = {
   },
 
   async redirects() {
-    return [
-      {
-        source: '/',
-        destination: '/ja/login',
-        permanent: false,
-      },
-    ]
+    return []
   },
 
   env: {

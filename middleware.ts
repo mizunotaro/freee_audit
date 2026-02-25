@@ -1,7 +1,9 @@
 import createMiddleware from 'next-intl/middleware'
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
-import { locales, defaultLocale } from './src/lib/i18n/types'
+
+const locales = ['ja', 'en'] as const
+const defaultLocale = 'ja'
 
 const intlMiddleware = createMiddleware({
   locales,
@@ -15,43 +17,49 @@ function isPublicPath(pathname: string): boolean {
   return publicPaths.some((path) => pathname.includes(path))
 }
 
-export async function middleware(request: NextRequest) {
+export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
 
-  const localeMatch = locales.find((locale) => pathname.startsWith(`/${locale}`))
-  if (!localeMatch && pathname !== '/') {
-    return intlMiddleware(request)
-  }
-
-  if (pathname === '/') {
-    return intlMiddleware(request)
-  }
-
-  if (isPublicPath(pathname)) {
-    return NextResponse.next()
-  }
-
+  // Handle API routes first
   if (pathname.startsWith('/api/')) {
-    const token = request.cookies.get('session')?.value
+    if (isPublicPath(pathname)) {
+      return NextResponse.next()
+    }
 
+    const token = request.cookies.get('session')?.value
     if (!token) {
       return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
     }
-
     return NextResponse.next()
   }
 
-  const token = request.cookies.get('session')?.value
+  // Check for locale in path
+  const localeMatch = locales.find(
+    (locale) => pathname === `/${locale}` || pathname.startsWith(`/${locale}/`)
+  )
 
-  if (!token) {
-    const locale = localeMatch || defaultLocale
-    const loginUrl = new URL(`/${locale}/login`, request.url)
-    return NextResponse.redirect(loginUrl)
+  // If no locale, redirect to default
+  if (!localeMatch && pathname !== '/') {
+    return NextResponse.redirect(new URL(`/${defaultLocale}${pathname}`, request.url))
   }
 
-  return NextResponse.next()
+  // Root redirect
+  if (pathname === '/') {
+    return NextResponse.redirect(new URL(`/${defaultLocale}/login`, request.url))
+  }
+
+  // Auth check for protected pages
+  if (localeMatch && !isPublicPath(pathname)) {
+    const token = request.cookies.get('session')?.value
+    if (!token) {
+      const loginUrl = new URL(`/${localeMatch}/login`, request.url)
+      return NextResponse.redirect(loginUrl)
+    }
+  }
+
+  return intlMiddleware(request)
 }
 
 export const config = {
-  matcher: ['/', '/(ja|en)/:path*', '/api/:path*'],
+  matcher: ['/((?!api|_next|_vercel|.*\\..*).*)'],
 }
