@@ -241,3 +241,4 @@ jobs:
           name: build
           path: .next/
           retention-days: 1
+          if-no-files-found: ignore
