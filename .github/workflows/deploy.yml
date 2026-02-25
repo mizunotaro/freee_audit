@@ -2,7 +2,7 @@ name: Deploy
 
 on:
   push:
-    branches: [main, master]
+    branches: [master]
   workflow_dispatch:
     inputs:
       environment:
@@ -16,7 +16,7 @@ on:
 
 env:
   NODE_VERSION: '20'
-  PNPM_VERSION: '8'
+  PNPM_VERSION: '9'
 
 jobs:
   deploy:
