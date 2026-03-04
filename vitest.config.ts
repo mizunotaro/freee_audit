@@ -30,12 +30,6 @@ export default defineConfig({
       },
     },
     setupFiles: ['./tests/setup.ts'],
-    pool: 'threads',
-    poolOptions: {
-      threads: {
-        singleThread: false,
-      },
-    },
     testTimeout: 10000,
     hookTimeout: 10000,
   },

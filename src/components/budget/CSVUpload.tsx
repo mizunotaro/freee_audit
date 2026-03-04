@@ -198,9 +198,11 @@ export function CSVUpload({ open, onOpenChange, fiscalYear, onSuccess }: CSVUplo
           <p className="text-xs text-gray-500">
             CSVフォーマット: 月,勘定科目コード,勘定科目名,金額,部門ID（任意）
           </p>
+          {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
           <a
             href="/api/reports/budget?action=template"
             className="text-sm text-blue-600 hover:underline"
+            download
           >
             テンプレートをダウンロード
           </a>
