@@ -43,6 +43,8 @@ interface Settings {
   freeeClientSecret: string
   freeeCompanyId: string
   analysisPrompt: string
+  fiscalYearEndMonth: number
+  taxBusinessType: 'exempt' | 'simplified' | 'general'
 }
 
 const defaultPrompt = `freeeから取得したスタートアップ企業の財務データを公認会計士・税理士の観点から分析を行って下さい。経営指標についてはVC/CVCや銀行員の観点からも評価をおこなってください。
@@ -72,6 +74,8 @@ export default function SettingsPage() {
     freeeClientSecret: '',
     freeeCompanyId: '',
     analysisPrompt: defaultPrompt,
+    fiscalYearEndMonth: 12,
+    taxBusinessType: 'general',
   })
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -163,6 +167,7 @@ export default function SettingsPage() {
           <TabsTrigger value="general">一般</TabsTrigger>
           <TabsTrigger value="ai">AI設定</TabsTrigger>
           <TabsTrigger value="freee">freee連携</TabsTrigger>
+          <TabsTrigger value="tax">税金設定</TabsTrigger>
           <TabsTrigger value="prompt">プロンプト</TabsTrigger>
         </TabsList>
 
@@ -564,6 +569,69 @@ export default function SettingsPage() {
                 >
                   デフォルトに戻す
                 </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="tax" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>税金設定</CardTitle>
+              <CardDescription>決算期と課税事業者区分を設定します</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="space-y-2">
+                <Label htmlFor="fiscal-year-end">決算月</Label>
+                <Select
+                  value={settings.fiscalYearEndMonth?.toString() || '12'}
+                  onValueChange={(value) => updateSetting('fiscalYearEndMonth', parseInt(value))}
+                >
+                  <SelectTrigger className="w-40">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {[
+                      { value: '1', label: '1月' },
+                      { value: '2', label: '2月' },
+                      { value: '3', label: '3月' },
+                      { value: '4', label: '4月' },
+                      { value: '5', label: '5月' },
+                      { value: '6', label: '6月' },
+                      { value: '7', label: '7月' },
+                      { value: '8', label: '8月' },
+                      { value: '9', label: '9月' },
+                      { value: '10', label: '10月' },
+                      { value: '11', label: '11月' },
+                      { value: '12', label: '12月' },
+                    ].map((month) => (
+                      <SelectItem key={month.value} value={month.value}>
+                        {month.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-sm text-gray-500">年間税金スケジュールの生成に使用されます</p>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="tax-business-type">課税事業者区分</Label>
+                <Select
+                  value={settings.taxBusinessType || 'general'}
+                  onValueChange={(value) =>
+                    updateSetting('taxBusinessType', value as Settings['taxBusinessType'])
+                  }
+                >
+                  <SelectTrigger className="w-60">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="exempt">免税事業者</SelectItem>
+                    <SelectItem value="simplified">簡易課税事業者</SelectItem>
+                    <SelectItem value="general">一般課税事業者</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-sm text-gray-500">消費税の計算方法や申告要件が異なります</p>
               </div>
             </CardContent>
           </Card>

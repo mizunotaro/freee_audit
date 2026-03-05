@@ -2,7 +2,16 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Settings, Home, FileText, DollarSign, BarChart3, ClipboardCheck } from 'lucide-react'
+import {
+  Settings,
+  Home,
+  FileText,
+  DollarSign,
+  BarChart3,
+  ClipboardCheck,
+  Receipt,
+  Users,
+} from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 interface AppLayoutProps {
@@ -15,6 +24,8 @@ const navItems = [
   { href: '/reports/cashflow', label: '資金繰り表', icon: DollarSign },
   { href: '/reports/budget', label: '予実管理', icon: BarChart3 },
   { href: '/reports/kpi', label: '経営指標', icon: BarChart3 },
+  { href: '/tax', label: '税金管理', icon: Receipt },
+  { href: '/board', label: '取締役会', icon: Users },
   { href: '/audit/journal', label: '記帳診断', icon: ClipboardCheck },
 ]
 

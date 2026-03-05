@@ -53,6 +53,7 @@ export class JournalChecker {
     this.checkAmount(entry, documentData, issues)
     this.checkTaxAmount(entry, documentData, issues)
     this.checkDescription(entry, documentData, issues)
+    this.checkTaxRelated(entry, documentData, issues)
     await this.checkAccountAppropriateness(entry, documentData, issues)
 
     if (this.aiProvider?.validateEntry && issues.length === 0) {
@@ -197,6 +198,94 @@ export class JournalChecker {
             messageEn: `Please verify if account "${targetAccount}" is appropriate`,
           })
         }
+      }
+    }
+  }
+
+  private checkTaxRelated(
+    entry: JournalEntryData,
+    documentData: DocumentAnalysisResult,
+    issues: ValidationIssue[]
+  ): void {
+    const taxKeywords = {
+      withholding: ['給与', '賞与', '源泉', '所得税'],
+      corporate: ['法人税', '住民税', '事業税'],
+      consumption: ['消費税', '預り消費税'],
+      depreciation: ['償却資産税', '固定資産税'],
+    }
+
+    const isWithholdingRelated = taxKeywords.withholding.some(
+      (k) =>
+        entry.description.includes(k) ||
+        entry.debitAccount.includes(k) ||
+        entry.creditAccount.includes(k)
+    )
+
+    if (isWithholdingRelated) {
+      if (entry.taxAmount === 0) {
+        const expectedRate = 0.10275
+        const expectedTax = Math.round(entry.amount * expectedRate)
+        const diff = Math.abs(entry.taxAmount - expectedTax)
+
+        if (diff > 100) {
+          issues.push({
+            field: 'taxAmount',
+            severity: 'warning',
+            message: `源泉徴収税が計上されていません。給与¥${entry.amount.toLocaleString()}の場合、約¥${expectedTax.toLocaleString()}の源泉徴収税が予想されます`,
+            messageEn: `Withholding tax is not recorded. For salary of ¥${entry.amount.toLocaleString()}, approximately ¥${expectedTax.toLocaleString()} withholding tax is expected`,
+            expectedValue: expectedTax,
+            actualValue: entry.taxAmount,
+          })
+        }
+      }
+    }
+
+    const isCorporateTaxRelated = taxKeywords.corporate.some(
+      (k) =>
+        entry.description.includes(k) ||
+        entry.debitAccount.includes(k) ||
+        entry.creditAccount.includes(k)
+    )
+
+    if (isCorporateTaxRelated) {
+      const entryMonth = new Date(entry.date).getMonth() + 1
+      const isFiscalYearEnd =
+        entryMonth === 3 || entryMonth === 12 || entryMonth === 9 || entryMonth === 6
+
+      if (!isFiscalYearEnd && entry.amount > 0) {
+        issues.push({
+          field: 'date',
+          severity: 'info',
+          message: `法人税関連の仕訳です。決算期や中間申告時期の計上か確認してください`,
+          messageEn: `Corporate tax related entry. Please verify if it is booked at fiscal year end or interim filing period`,
+        })
+      }
+    }
+
+    const isConsumptionTaxRelated = taxKeywords.consumption.some(
+      (k) =>
+        entry.description.includes(k) ||
+        entry.debitAccount.includes(k) ||
+        entry.creditAccount.includes(k)
+    )
+
+    if (isConsumptionTaxRelated && documentData.amount) {
+      const standardRate = 0.1
+      const reducedRate = 0.08
+
+      const expectedStandardTax = Math.round(documentData.amount * standardRate)
+      const expectedReducedTax = Math.round(documentData.amount * reducedRate)
+
+      const diffStandard = Math.abs(entry.taxAmount - expectedStandardTax)
+      const diffReduced = Math.abs(entry.taxAmount - expectedReducedTax)
+
+      if (diffStandard > 1 && diffReduced > 1) {
+        issues.push({
+          field: 'taxAmount',
+          severity: 'warning',
+          message: `消費税額が標準税率(10%)または軽減税率(8%)と乖離があります。計算を確認してください`,
+          messageEn: `Consumption tax amount deviates from standard rate (10%) or reduced rate (8%). Please verify calculation`,
+        })
       }
     }
   }

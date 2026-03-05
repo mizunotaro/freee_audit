@@ -63,6 +63,8 @@ export async function GET(request: NextRequest) {
         freeeClientSecret: '',
         freeeCompanyId: '',
         analysisPrompt: DEFAULT_PROMPT,
+        fiscalYearEndMonth: 12,
+        taxBusinessType: 'general',
       })
     }
 
@@ -77,6 +79,8 @@ export async function GET(request: NextRequest) {
       freeeClientId: settings.freeeClientId,
       freeeCompanyId: settings.freeeCompanyId,
       analysisPrompt: settings.analysisPrompt || DEFAULT_PROMPT,
+      fiscalYearEndMonth: settings.fiscalYearEndMonth || 12,
+      taxBusinessType: settings.taxBusinessType || 'general',
     }
 
     for (const field of ENCRYPTED_FIELDS) {
@@ -115,6 +119,8 @@ export async function PUT(request: NextRequest) {
       freeeClientId: body.freeeClientId,
       freeeCompanyId: body.freeeCompanyId,
       analysisPrompt: body.analysisPrompt,
+      fiscalYearEndMonth: body.fiscalYearEndMonth || 12,
+      taxBusinessType: body.taxBusinessType || 'general',
     }
 
     for (const field of ENCRYPTED_FIELDS) {

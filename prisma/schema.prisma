@@ -37,22 +37,28 @@ model Session {
 }
 
 model Company {
-  id              String           @id @default(cuid())
-  freeeCompanyId  String?          @unique @map("freee_company_id")
-  name            String
-  fiscalYearStart Int              @default(1) @map("fiscal_year_start")
-  users           User[]
-  journals        Journal[]
-  documents       Document[]
-  budgets         Budget[]
-  cashFlows       CashFlow[]
-  kpis            FinancialKPI[]
-  apiKeys         ApiKey[]
-  monthlyBalances MonthlyBalance[]
-  accountItems    AccountItem[]
-  debts           Debt[]
-  createdAt       DateTime         @default(now()) @map("created_at")
-  updatedAt       DateTime         @updatedAt @map("updated_at")
+  id                     String                  @id @default(cuid())
+  freeeCompanyId         String?                 @unique @map("freee_company_id")
+  name                   String
+  fiscalYearStart        Int                     @default(1) @map("fiscal_year_start")
+  users                  User[]
+  journals               Journal[]
+  documents              Document[]
+  budgets                Budget[]
+  cashFlows              CashFlow[]
+  kpis                   FinancialKPI[]
+  apiKeys                ApiKey[]
+  monthlyBalances        MonthlyBalance[]
+  accountItems           AccountItem[]
+  debts                  Debt[]
+  taxSchedules           TaxSchedule[]
+  boardMeetings          BoardMeeting[]
+  customKPIs             CustomKPI[]
+  fixedAssets            FixedAsset[]
+  taxEffectAccounting    TaxEffectAccounting[]
+  inventoryAdjustments   InventoryAdjustment[]
+  createdAt              DateTime                @default(now()) @map("created_at")
+  updatedAt              DateTime                @updatedAt @map("updated_at")
 
   @@map("companies")
 }
@@ -273,6 +279,8 @@ model Settings {
   freeeClientSecret   String?  @map("freee_client_secret")
   freeeCompanyId      String?  @map("freee_company_id")
   analysisPrompt      String?  @map("analysis_prompt")
+  fiscalYearEndMonth  Int?     @map("fiscal_year_end_month")
+  taxBusinessType     String?  @map("tax_business_type")
   createdAt           DateTime @default(now()) @map("created_at")
   updatedAt           DateTime @updatedAt @map("updated_at")
 
@@ -324,4 +332,149 @@ model Debt {
   @@index([companyId, dueDate])
   @@index([companyId, status])
   @@map("debts")
+}
+
+model TaxSchedule {
+  id              String       @id @default(cuid())
+  companyId       String       @map("company_id")
+  company         Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  taxType         String       @map("tax_type")
+  fiscalYear      Int          @map("fiscal_year")
+  dueDate         DateTime     @map("due_date")
+  amount          Float?
+  status          String       @default("PENDING")
+  filedDate       DateTime?    @map("filed_date")
+  paidDate        DateTime?    @map("paid_date")
+  note            String?
+  payments        TaxPayment[]
+  createdAt       DateTime     @default(now()) @map("created_at")
+  updatedAt       DateTime     @updatedAt @map("updated_at")
+
+  @@unique([companyId, taxType, fiscalYear])
+  @@index([companyId, fiscalYear])
+  @@map("tax_schedules")
+}
+
+model TaxPayment {
+  id              String      @id @default(cuid())
+  taxScheduleId   String      @map("tax_schedule_id")
+  taxSchedule     TaxSchedule @relation(fields: [taxScheduleId], references: [id], onDelete: Cascade)
+  paymentDate     DateTime    @map("payment_date")
+  amount          Float
+  paymentMethod   String      @map("payment_method")
+  referenceNumber String?     @map("reference_number")
+  note            String?
+  createdAt       DateTime    @default(now()) @map("created_at")
+
+  @@index([taxScheduleId])
+  @@map("tax_payments")
+}
+
+model BoardMeeting {
+  id                String       @id @default(cuid())
+  companyId         String       @map("company_id")
+  company           Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  meetingDate       DateTime     @map("meeting_date")
+  meetingType       String       @map("meeting_type")
+  agendaItems       AgendaItem[]
+  minutes           String?
+  status            String       @default("SCHEDULED")
+  createdAt         DateTime     @default(now()) @map("created_at")
+  updatedAt         DateTime     @updatedAt @map("updated_at")
+
+  @@index([companyId, meetingDate])
+  @@map("board_meetings")
+}
+
+model AgendaItem {
+  id                  String       @id @default(cuid())
+  boardMeetingId      String       @map("board_meeting_id")
+  boardMeeting        BoardMeeting @relation(fields: [boardMeetingId], references: [id], onDelete: Cascade)
+  title               String
+  description         String?
+  category            String
+  decisionType        String       @map("decision_type")
+  requiredByLaw       Boolean      @default(false) @map("required_by_law")
+  legalBasis          String?      @map("legal_basis")
+  aiAnalysis          String?      @map("ai_analysis")
+  resolution          String?
+  resolutionStatus    String       @default("PENDING") @map("resolution_status")
+  createdAt           DateTime     @default(now()) @map("created_at")
+  updatedAt           DateTime     @updatedAt @map("updated_at")
+
+  @@index([boardMeetingId])
+  @@map("agenda_items")
+}
+
+model CustomKPI {
+  id          String   @id @default(cuid())
+  companyId   String   @map("company_id")
+  company     Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  name        String
+  formula     String
+  category    String
+  unit        String
+  targetValue Float?   @map("target_value")
+  isVisible   Boolean  @default(true) @map("is_visible")
+  sortOrder   Int      @map("sort_order")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@index([companyId])
+  @@map("custom_kpis")
+}
+
+model FixedAsset {
+  id                  String   @id @default(cuid())
+  companyId           String   @map("company_id")
+  company             Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  freeeAssetId        String?  @map("freee_asset_id")
+  name                String
+  acquisitionDate     DateTime @map("acquisition_date")
+  acquisitionCost     Float    @map("acquisition_cost")
+  salvageValue        Float    @map("salvage_value")
+  usefulLife          Int      @map("useful_life")
+  depreciationMethod  String   @map("depreciation_method")
+  accumulatedDep      Float    @default(0) @map("accumulated_dep")
+  bookValue           Float    @map("book_value")
+  createdAt           DateTime @default(now()) @map("created_at")
+  updatedAt           DateTime @updatedAt @map("updated_at")
+
+  @@index([companyId])
+  @@map("fixed_assets")
+}
+
+model TaxEffectAccounting {
+  id                   String   @id @default(cuid())
+  companyId            String   @map("company_id")
+  company              Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  fiscalYear           Int      @map("fiscal_year")
+  deferredTaxAsset     Float    @map("deferred_tax_asset")
+  deferredTaxLiability Float    @map("deferred_tax_liability")
+  netDeferredTax       Float    @map("net_deferred_tax")
+  createdAt            DateTime @default(now()) @map("created_at")
+  updatedAt            DateTime @updatedAt @map("updated_at")
+
+  @@unique([companyId, fiscalYear])
+  @@index([companyId, fiscalYear])
+  @@map("tax_effect_accounting")
+}
+
+model InventoryAdjustment {
+  id             String   @id @default(cuid())
+  companyId      String   @map("company_id")
+  company        Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  fiscalYear     Int      @map("fiscal_year")
+  month          Int
+  openingBalance Float    @map("opening_balance")
+  closingBalance Float    @map("closing_balance")
+  adjustment     Float
+  journalEntryId String?  @map("journal_entry_id")
+  status         String   @default("PENDING")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  @@unique([companyId, fiscalYear, month])
+  @@index([companyId, fiscalYear])
+  @@map("inventory_adjustments")
 }
