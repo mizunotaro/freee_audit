@@ -62,23 +62,52 @@ interface CashFlowStatementItem {
   }
 }
 
+interface CashOutForecast {
+  date: string
+  amount: number
+  category: string
+  description: string
+  partnerName: string | null
+  urgency: 'high' | 'medium' | 'low'
+}
+
+interface MonthlyCashOutSummary {
+  month: string
+  totalAmount: number
+  itemCount: number
+  categories: {
+    payable: number
+    loan: number
+    other: number
+  }
+}
+
 export default function CashflowPage() {
   const [cashFlows, setCashFlows] = useState<CashFlowStatementItem[]>([])
   const [cashPosition, setCashPosition] = useState<CashPosition | null>(null)
   const [runway, setRunway] = useState<RunwayData | null>(null)
   const [alert, setAlert] = useState<RunwayAlert | null>(null)
+  const [cashOutForecasts, setCashOutForecasts] = useState<CashOutForecast[]>([])
+  const [monthlyCashOut, setMonthlyCashOut] = useState<MonthlyCashOutSummary[]>([])
   const [loading, setLoading] = useState(true)
   const [fiscalYear, setFiscalYear] = useState(new Date().getFullYear())
 
   const fetchData = useCallback(async () => {
     setLoading(true)
     try {
-      const res = await fetch(`/api/reports/cashflow?fiscalYear=${fiscalYear}`)
-      const data = await res.json()
-      setCashFlows(data.cashFlows || [])
-      setCashPosition(data.cashPosition)
-      setRunway(data.runway)
-      setAlert(data.alert)
+      const [cashflowRes, debtRes] = await Promise.all([
+        fetch(`/api/reports/cashflow?fiscalYear=${fiscalYear}`),
+        fetch('/api/debt/forecast'),
+      ])
+      const cashflowData = await cashflowRes.json()
+      const debtData = await debtRes.json()
+
+      setCashFlows(cashflowData.cashFlows || [])
+      setCashPosition(cashflowData.cashPosition)
+      setRunway(cashflowData.runway)
+      setAlert(cashflowData.alert)
+      setCashOutForecasts(debtData.forecasts || [])
+      setMonthlyCashOut(debtData.monthlySummary || [])
     } catch (error) {
       console.error('Failed to fetch cashflow:', error)
     } finally {
@@ -374,6 +403,126 @@ export default function CashflowPage() {
                       )}
                     </td>
                   </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {monthlyCashOut.length > 0 && (
+          <div className="mt-8 overflow-hidden rounded-lg bg-white shadow">
+            <div className="border-b border-gray-200 px-6 py-4">
+              <h3 className="text-lg font-medium text-gray-900">
+                将来キャッシュアウト予測（月次）
+              </h3>
+              <p className="mt-1 text-sm text-gray-500">
+                freeeから取得した未払債務に基づく支払予定
+              </p>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium uppercase text-gray-500">
+                      月
+                    </th>
+                    <th className="px-6 py-3 text-right text-xs font-medium uppercase text-gray-500">
+                      買掛金等
+                    </th>
+                    <th className="px-6 py-3 text-right text-xs font-medium uppercase text-gray-500">
+                      借入金
+                    </th>
+                    <th className="px-6 py-3 text-right text-xs font-medium uppercase text-gray-500">
+                      その他
+                    </th>
+                    <th className="bg-red-50 px-6 py-3 text-right text-xs font-medium uppercase text-gray-500">
+                      合計
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200 bg-white">
+                  {monthlyCashOut.map((m) => (
+                    <tr key={m.month}>
+                      <td className="px-6 py-4 text-sm font-medium text-gray-900">{m.month}</td>
+                      <td className="px-6 py-4 text-right text-sm text-gray-600">
+                        {formatCurrency(m.categories.payable)}
+                      </td>
+                      <td className="px-6 py-4 text-right text-sm text-gray-600">
+                        {formatCurrency(m.categories.loan)}
+                      </td>
+                      <td className="px-6 py-4 text-right text-sm text-gray-600">
+                        {formatCurrency(m.categories.other)}
+                      </td>
+                      <td className="bg-red-50/50 px-6 py-4 text-right text-sm font-semibold text-red-700">
+                        {formatCurrency(m.totalAmount)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {cashOutForecasts.length > 0 && (
+          <div className="mt-8 overflow-hidden rounded-lg bg-white shadow">
+            <div className="border-b border-gray-200 px-6 py-4">
+              <h3 className="text-lg font-medium text-gray-900">今後の支払予定一覧</h3>
+              <p className="mt-1 text-sm text-gray-500">直近の支払期限順に表示</p>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium uppercase text-gray-500">
+                      支払期限
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium uppercase text-gray-500">
+                      取引先
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium uppercase text-gray-500">
+                      内容
+                    </th>
+                    <th className="px-6 py-3 text-right text-xs font-medium uppercase text-gray-500">
+                      金額
+                    </th>
+                    <th className="px-6 py-3 text-center text-xs font-medium uppercase text-gray-500">
+                      緊急度
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200 bg-white">
+                  {cashOutForecasts.slice(0, 10).map((forecast, idx) => (
+                    <tr key={idx}>
+                      <td className="px-6 py-4 text-sm text-gray-900">
+                        {new Date(forecast.date).toLocaleDateString('ja-JP')}
+                      </td>
+                      <td className="px-6 py-4 text-sm text-gray-600">
+                        {forecast.partnerName || '-'}
+                      </td>
+                      <td className="px-6 py-4 text-sm text-gray-600">{forecast.description}</td>
+                      <td className="px-6 py-4 text-right text-sm font-medium text-gray-900">
+                        {formatCurrency(forecast.amount)}
+                      </td>
+                      <td className="px-6 py-4 text-center">
+                        <span
+                          className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold ${
+                            forecast.urgency === 'high'
+                              ? 'bg-red-100 text-red-800'
+                              : forecast.urgency === 'medium'
+                                ? 'bg-yellow-100 text-yellow-800'
+                                : 'bg-green-100 text-green-800'
+                          }`}
+                        >
+                          {forecast.urgency === 'high'
+                            ? '要対応'
+                            : forecast.urgency === 'medium'
+                              ? '要注意'
+                              : '通常'}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
                 </tbody>
               </table>
             </div>

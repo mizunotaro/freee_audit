@@ -21,6 +21,8 @@ export function MultiMonthReportTable({
     return formatCurrency(value, currency, language === 'en' ? 'en' : 'ja')
   }
 
+  const hasTotalOrAverage = report.sections.some((s) => s.type === 'pl' || s.type === 'kpi')
+
   return (
     <div className="overflow-x-auto rounded-lg bg-white shadow">
       <table className="min-w-full border-collapse text-sm">
@@ -37,9 +39,16 @@ export function MultiMonthReportTable({
                 {m}月
               </th>
             ))}
-            <th className="min-w-[110px] border-b border-gray-200 bg-blue-50 px-3 py-3 text-right font-semibold">
-              合計
-            </th>
+            {hasTotalOrAverage && (
+              <>
+                <th className="min-w-[110px] border-b border-gray-200 bg-blue-50 px-3 py-3 text-right font-semibold">
+                  合計
+                </th>
+                <th className="min-w-[110px] border-b border-gray-200 bg-green-50 px-3 py-3 text-right font-semibold">
+                  平均値
+                </th>
+              </>
+            )}
           </tr>
         </thead>
         <tbody>
@@ -58,13 +67,13 @@ interface SectionRowsProps {
 }
 
 function SectionRows({ section, formatValue }: SectionRowsProps) {
-  const showAverage = section.type === 'pl' || section.type === 'kpi'
+  const showTotalAndAverage = section.type === 'pl' || section.type === 'kpi'
 
   return (
     <>
       <tr className="bg-gray-50">
         <td
-          colSpan={section.rows[0]?.values.length + (showAverage ? 3 : 2)}
+          colSpan={section.rows[0]?.values.length + (showTotalAndAverage ? 3 : 1)}
           className="sticky left-0 z-10 border-b border-t-2 border-gray-300 bg-gray-50 px-4 py-2 font-bold text-gray-700"
         >
           【{section.title}】
@@ -76,7 +85,7 @@ function SectionRows({ section, formatValue }: SectionRowsProps) {
           row={row}
           sectionType={section.type}
           formatValue={formatValue}
-          showAverage={showAverage}
+          showTotalAndAverage={showTotalAndAverage}
         />
       ))}
     </>
@@ -87,10 +96,10 @@ interface RowProps {
   row: ReportTableRow
   sectionType: string
   formatValue: (value: number, sectionType: string) => string
-  showAverage: boolean
+  showTotalAndAverage: boolean
 }
 
-function Row({ row, sectionType, formatValue, showAverage }: RowProps) {
+function Row({ row, sectionType, formatValue, showTotalAndAverage }: RowProps) {
   const getRowStyle = () => {
     switch (row.rowType) {
       case 'subtotal':
@@ -121,13 +130,15 @@ function Row({ row, sectionType, formatValue, showAverage }: RowProps) {
           {formatValue(value, sectionType)}
         </td>
       ))}
-      <td className="border-b border-gray-100 bg-blue-50/50 px-3 py-2 text-right font-semibold">
-        {formatValue(row.total ?? 0, sectionType)}
-      </td>
-      {showAverage && (
-        <td className="border-b border-gray-100 bg-green-50/50 px-3 py-2 text-right">
-          {formatValue(row.average ?? 0, sectionType)}
-        </td>
+      {showTotalAndAverage && (
+        <>
+          <td className="border-b border-gray-100 bg-blue-50/50 px-3 py-2 text-right font-semibold">
+            {formatValue(row.total ?? 0, sectionType)}
+          </td>
+          <td className="border-b border-gray-100 bg-green-50/50 px-3 py-2 text-right">
+            {formatValue(row.average ?? 0, sectionType)}
+          </td>
+        </>
       )}
     </tr>
   )

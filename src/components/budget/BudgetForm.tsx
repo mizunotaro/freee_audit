@@ -149,6 +149,7 @@ export function BudgetForm({
       onSuccess()
       onOpenChange(false)
     } catch (error) {
+      console.error('Budget form submission error:', error)
       toast.error(isEditing ? '更新に失敗しました' : '登録に失敗しました')
     }
   }

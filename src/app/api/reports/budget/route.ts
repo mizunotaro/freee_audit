@@ -16,8 +16,48 @@ import {
   analyzeBudgetVariance,
   getMonthlyBudgetTrend,
 } from '@/services/budget/actual-vs-budget'
+import { calculateDetailedActualVsBudget } from '@/services/budget/detailed-actual-vs-budget'
 import { prisma } from '@/lib/db'
 import type { ProfitLoss } from '@/types'
+
+function generateSamplePL(
+  fiscalYear: number,
+  month: number
+): Omit<ProfitLoss, 'netIncome'> & { netIncome: number } {
+  const baseMultiplier = 1 + (month - 1) * 0.03
+  const revenue = Math.round(5000000 * baseMultiplier)
+  const costOfSales = Math.round(2000000 * baseMultiplier)
+
+  return {
+    fiscalYear,
+    month,
+    revenue: [{ code: '400', name: '売上高', amount: revenue }],
+    costOfSales: [{ code: '500', name: '売上原価', amount: costOfSales }],
+    grossProfit: revenue - costOfSales,
+    grossProfitMargin: ((revenue - costOfSales) / revenue) * 100,
+    sgaExpenses: [
+      { code: '600', name: '給与手当', amount: 800000 },
+      { code: '610', name: '福利厚生費', amount: 160000 },
+      { code: '620', name: '旅費交通費', amount: 50000 },
+      { code: '630', name: '通信費', amount: 30000 },
+      { code: '640', name: '水道光熱費', amount: 40000 },
+      { code: '650', name: '地代家賃', amount: 200000 },
+      { code: '660', name: '広告宣伝費', amount: 100000 },
+      { code: '670', name: '減価償却費', amount: 50000 },
+    ],
+    operatingIncome: revenue - costOfSales - 1430000,
+    operatingMargin: ((revenue - costOfSales - 1430000) / revenue) * 100,
+    nonOperatingIncome: [],
+    nonOperatingExpenses: [],
+    ordinaryIncome: revenue - costOfSales - 1430000,
+    extraordinaryIncome: [],
+    extraordinaryLoss: [],
+    incomeBeforeTax: revenue - costOfSales - 1430000,
+    incomeTax: Math.round((revenue - costOfSales - 1430000) * 0.3),
+    netIncome: Math.round((revenue - costOfSales - 1430000) * 0.7),
+    depreciation: 50000,
+  }
+}
 
 export async function GET(request: NextRequest) {
   try {
@@ -67,6 +107,22 @@ export async function GET(request: NextRequest) {
         )
         const variance = analyzeBudgetVariance(budgetVsActual)
         return NextResponse.json({ budgetVsActual, variance })
+
+      case 'detailed':
+        if (!month) {
+          return NextResponse.json(
+            { error: 'Month is required for detailed analysis' },
+            { status: 400 }
+          )
+        }
+        const samplePL = generateSamplePL(fiscalYear, month)
+        const detailed = await calculateDetailedActualVsBudget(
+          targetCompanyId,
+          fiscalYear,
+          month,
+          samplePL as ProfitLoss
+        )
+        return NextResponse.json(detailed)
 
       case 'trend':
         const trends = await getMonthlyBudgetTrendWithSample(targetCompanyId, fiscalYear)

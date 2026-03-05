@@ -2,9 +2,10 @@ import { AIProvider, AIProviderType, AIConfig } from './provider'
 import { OpenAIProvider, createOpenAIProvider } from './openai'
 import { GeminiProvider, createGeminiProvider } from './gemini'
 import { ClaudeProvider, createClaudeProvider } from './claude'
+import { MockAIProvider, createMockAIProvider } from './mock'
 
 export type { AIProvider, AIProviderType, AIConfig }
-export { OpenAIProvider, GeminiProvider, ClaudeProvider }
+export { OpenAIProvider, GeminiProvider, ClaudeProvider, MockAIProvider }
 
 const PROVIDER_ENV_MAP: Record<AIProviderType, { keyEnv: string; modelEnv?: string }> = {
   openai: { keyEnv: 'OPENAI_API_KEY', modelEnv: 'OPENAI_MODEL' },
@@ -26,6 +27,14 @@ export function createAIProvider(config: AIConfig): AIProvider {
 }
 
 export function createAIProviderFromEnv(provider?: AIProviderType): AIProvider | null {
+  if (process.env.AI_MOCK_MODE === 'true') {
+    console.log('[AI] Running in mock mode')
+    return createMockAIProvider({
+      provider: provider || 'openai',
+      apiKey: 'mock-api-key',
+    })
+  }
+
   const providerType = provider || (process.env.AI_PROVIDER as AIProviderType) || 'openai'
   const envConfig = PROVIDER_ENV_MAP[providerType]
 

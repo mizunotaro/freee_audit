@@ -111,6 +111,74 @@ pnpm dev
 - Email: `admin@example.com`
 - Password: `admin123`
 
+### モック環境での実行（開発用）
+
+外部API（freee、OpenAI等）に接続せずにシステムを動作させることができます。
+
+#### モックモードの有効化
+
+`.env.local` に以下の設定を追加：
+
+```bash
+# Mock Mode Settings
+FREEE_MOCK_MODE=true
+AI_MOCK_MODE=true
+
+# Database
+DATABASE_URL="file:./dev.db"
+
+# Authentication
+NEXTAUTH_SECRET="dev-secret-key-for-mock-environment"
+NEXTAUTH_URL="http://localhost:3000"
+JWT_SECRET="dev-jwt-secret-key-for-mock-environment"
+
+# Encryption (32バイトの16進数)
+ENCRYPTION_KEY="0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+```
+
+#### モックモードで起動
+
+```bash
+pnpm install
+pnpm db:generate
+pnpm db:migrate
+pnpm db:seed
+pnpm dev
+```
+
+#### モック化される機能
+
+| 機能 | モック内容 |
+|------|----------|
+| freee API | 仕訳データ、試算表、BS/PL を自動生成 |
+| AI証憑分析 | ランダムな分析結果を返却（200-500ms遅延） |
+| Slack通知 | 自動無効化（コンソールログのみ） |
+
+### 本番環境への切り替え
+
+実際のAPIキーを取得したら、環境変数を以下のように変更：
+
+```bash
+FREEE_MOCK_MODE=false
+AI_MOCK_MODE=false
+
+# freee API
+FREEE_CLIENT_ID="your-client-id"
+FREEE_CLIENT_SECRET="your-client-secret"
+FREEE_REDIRECT_URI="http://localhost:3000/api/auth/freee/callback"
+
+# AI APIs（いずれか一つ以上）
+OPENAI_API_KEY="sk-..."
+# または
+GEMINI_API_KEY="..."
+# または
+ANTHROPIC_API_KEY="sk-ant-..."
+
+# Slack（オプション）
+SLACK_BOT_TOKEN="xoxb-..."
+SLACK_CHANNEL_ID="C..."
+```
+
 ---
 
 ## プロジェクト構成

@@ -1,0 +1,244 @@
+import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { FreeeClient } from '@/lib/integrations/freee/client'
+
+describe('FreeeClient', () => {
+  let client: FreeeClient
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+
+    client = new FreeeClient({
+      clientId: 'test_client_id',
+      clientSecret: 'test_client_secret',
+      redirectUri: 'http://localhost:3000/callback',
+      accessToken: 'test_access_token',
+    })
+  })
+
+  describe('constructor', () => {
+    it('should create client with config', () => {
+      expect(client).toBeDefined()
+    })
+
+    it('should use environment variables when config not provided', () => {
+      const envClient = new FreeeClient()
+      expect(envClient).toBeDefined()
+    })
+  })
+
+  describe('getAuthorizationUrl', () => {
+    it('should generate valid authorization URL', () => {
+      const url = client.getAuthorizationUrl('test_state')
+
+      expect(url).toContain('https://accounts.secure.freee.co.jp/public_api/authorize')
+      expect(url).toContain('client_id=test_client_id')
+      expect(url).toContain('redirect_uri=')
+      expect(url).toContain('response_type=code')
+      expect(url).toContain('scope=read+write')
+      expect(url).toContain('state=test_state')
+    })
+
+    it('should generate authorization URL without state', () => {
+      const url = client.getAuthorizationUrl()
+
+      expect(url).toContain('https://accounts.secure.freee.co.jp/public_api/authorize')
+      expect(url).not.toContain('state=')
+    })
+
+    it('should properly encode special characters', () => {
+      const clientWithSpecialChars = new FreeeClient({
+        redirectUri: 'http://localhost:3000/callback?param=value',
+      })
+
+      const url = clientWithSpecialChars.getAuthorizationUrl()
+
+      expect(url).toContain('redirect_uri=')
+    })
+  })
+
+  describe('exchangeCodeForToken', () => {
+    it('should exchange authorization code for token', async () => {
+      const mockTokenResponse = {
+        access_token: 'new_access_token',
+        refresh_token: 'new_refresh_token',
+        expires_in: 3600,
+        token_type: 'Bearer',
+      }
+
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => mockTokenResponse,
+      })
+
+      const result = await client.exchangeCodeForToken('auth_code')
+
+      expect(result).toEqual(mockTokenResponse)
+    })
+
+    it('should throw error on failed exchange', async () => {
+      const mockError = {
+        error: 'invalid_grant',
+        error_description: 'Invalid authorization code',
+      }
+
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: false,
+        status: 400,
+        json: async () => mockError,
+      })
+
+      await expect(client.exchangeCodeForToken('invalid_code')).rejects.toThrow()
+    })
+
+    it('should handle network errors gracefully', async () => {
+      global.fetch = vi.fn().mockRejectedValue(new Error('Network error'))
+
+      await expect(client.exchangeCodeForToken('auth_code')).rejects.toThrow('Network error')
+    })
+  })
+
+  describe('refreshToken', () => {
+    it('should refresh access token', async () => {
+      const mockTokenResponse = {
+        access_token: 'refreshed_access_token',
+        refresh_token: 'refreshed_refresh_token',
+        expires_in: 3600,
+        token_type: 'Bearer',
+      }
+
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => mockTokenResponse,
+      })
+
+      const result = await client.refreshToken('old_refresh_token')
+
+      expect(result).toEqual(mockTokenResponse)
+    })
+
+    it('should throw error when refresh token is invalid', async () => {
+      const mockError = {
+        error: 'invalid_grant',
+        error_description: 'Invalid refresh token',
+      }
+
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: false,
+        status: 400,
+        json: async () => mockError,
+      })
+
+      await expect(client.refreshToken('invalid_token')).rejects.toThrow()
+    })
+  })
+
+  describe('error handling and robustness', () => {
+    it('should handle rate limit errors', async () => {
+      const rateLimitError = {
+        error: 'rate_limit_exceeded',
+        error_description: 'API rate limit exceeded',
+      }
+
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: false,
+        status: 429,
+        json: async () => rateLimitError,
+      })
+
+      await expect(client.exchangeCodeForToken('code')).rejects.toThrow()
+    })
+
+    it('should handle server errors', async () => {
+      const serverError = {
+        error: 'internal_server_error',
+        error_description: 'Internal server error',
+      }
+
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: false,
+        status: 500,
+        json: async () => serverError,
+      })
+
+      await expect(client.exchangeCodeForToken('code')).rejects.toThrow()
+    })
+
+    it('should handle empty response body', async () => {
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({}),
+      })
+
+      const result = await client.exchangeCodeForToken('code')
+      expect(result).toEqual({})
+    })
+
+    it('should handle malformed responses', async () => {
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => 'invalid_json',
+      })
+
+      const result = await client.exchangeCodeForToken('code')
+      expect(result).toBe('invalid_json')
+    })
+  })
+
+  describe('security', () => {
+    it('should not expose client secret in URLs', () => {
+      const url = client.getAuthorizationUrl()
+      expect(url).not.toContain('client_secret')
+      expect(url).not.toContain('test_client_secret')
+    })
+
+    it('should send client secret only in POST body', async () => {
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({ access_token: 'token' }),
+      })
+
+      await client.exchangeCodeForToken('code')
+
+      const call = vi.mocked(fetch).mock.calls[0]
+      const body = call[1]?.body as string
+
+      expect(body).toContain('client_secret=test_client_secret')
+      expect(call[0]).not.toContain('client_secret')
+    })
+  })
+
+  describe('performance', () => {
+    it('should handle concurrent requests', async () => {
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({ access_token: 'token' }),
+      })
+
+      const promises = Array(5)
+        .fill(null)
+        .map(() => client.exchangeCodeForToken('code'))
+
+      const results = await Promise.all(promises)
+
+      expect(results).toHaveLength(5)
+      results.forEach((result) => {
+        expect(result).toHaveProperty('access_token', 'token')
+      })
+    })
+  })
+
+  describe('mock mode', () => {
+    it('should return mock token in mock mode', async () => {
+      const originalEnv = process.env.FREEE_MOCK_MODE
+      process.env.FREEE_MOCK_MODE = 'true'
+
+      const mockClient = new FreeeClient()
+      const result = await mockClient.exchangeCodeForToken('code')
+
+      expect(result).toHaveProperty('access_token')
+      expect(result).toHaveProperty('refresh_token')
+
+      process.env.FREEE_MOCK_MODE = originalEnv
+    })
+  })
+})

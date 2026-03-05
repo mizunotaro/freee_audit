@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { calculateFinancialKPIs, getKPIBenchmarks } from '@/services/analytics/financial-kpi'
+import {
+  calculateFinancialKPIs,
+  calculateExtendedKPIs,
+  getKPIBenchmarks,
+} from '@/services/analytics/financial-kpi'
 import { prisma } from '@/lib/db'
 
 export async function GET(request: NextRequest) {
@@ -10,6 +14,7 @@ export async function GET(request: NextRequest) {
     )
     const month = parseInt(searchParams.get('month') || new Date().getMonth().toString())
     const companyId = searchParams.get('companyId')
+    const extended = searchParams.get('extended') !== 'false'
 
     let targetCompanyId = companyId
 
@@ -25,6 +30,19 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    if (extended) {
+      const extendedKPIs = await calculateSampleExtendedKPIs(targetCompanyId, fiscalYear, month)
+      const benchmarks = getKPIBenchmarks(extendedKPIs)
+      const yearlyKPIs = await calculateYearlyKPIs(targetCompanyId, fiscalYear)
+
+      return NextResponse.json({
+        kpis: extendedKPIs,
+        benchmarks,
+        yearlyKPIs,
+        advice: extendedKPIs.advice,
+      })
+    }
+
     const kpis = await calculateSampleKPIs(targetCompanyId, fiscalYear, month)
     const benchmarks = getKPIBenchmarks(kpis)
     const yearlyKPIs = await calculateYearlyKPIs(targetCompanyId, fiscalYear)
@@ -38,6 +56,26 @@ export async function GET(request: NextRequest) {
     console.error('KPI API error:', error)
     return NextResponse.json({ error: 'Failed to calculate KPIs' }, { status: 500 })
   }
+}
+
+async function calculateSampleExtendedKPIs(companyId: string, fiscalYear: number, month: number) {
+  const bs = generateSampleBalanceSheet(fiscalYear, month)
+  const pl = generateSampleProfitLoss(fiscalYear, month)
+  const cf = generateSampleCashFlow(fiscalYear, month)
+  const previousPL = generateSampleProfitLoss(fiscalYear - 1, month)
+
+  const options = {
+    marketingSpend: 500000,
+    newCustomers: 50,
+    churnedCustomers: 5,
+    totalCustomers: 500,
+    arRevenue: pl.revenue.reduce((s: number, r: { amount: number }) => s + r.amount, 0) * 0.9,
+    interestExpense: 50000,
+    principalPayments: 100000,
+    valuation: 500000000,
+  }
+
+  return calculateExtendedKPIs(bs, pl, cf, previousPL, options)
 }
 
 async function calculateSampleKPIs(companyId: string, fiscalYear: number, month: number) {

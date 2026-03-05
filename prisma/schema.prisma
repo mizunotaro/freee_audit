@@ -49,6 +49,8 @@ model Company {
   kpis            FinancialKPI[]
   apiKeys         ApiKey[]
   monthlyBalances MonthlyBalance[]
+  accountItems    AccountItem[]
+  debts           Debt[]
   createdAt       DateTime         @default(now()) @map("created_at")
   updatedAt       DateTime         @updatedAt @map("updated_at")
 
@@ -249,4 +251,77 @@ model FreeeToken {
   updatedAt    DateTime @updatedAt @map("updated_at")
 
   @@map("freee_tokens")
+}
+
+model Settings {
+  id                  String   @id @default(cuid())
+  userId              String   @unique @map("user_id")
+  theme               String   @default("system")
+  aiProvider          String   @default("openai") @map("ai_provider")
+  openaiApiKey        String?  @map("openai_api_key")
+  geminiApiKey        String?  @map("gemini_api_key")
+  claudeApiKey        String?  @map("claude_api_key")
+  azureApiKey         String?  @map("azure_api_key")
+  azureEndpoint       String?  @map("azure_endpoint")
+  awsAccessKeyId      String?  @map("aws_access_key_id")
+  awsSecretAccessKey  String?  @map("aws_secret_access_key")
+  awsRegion           String?  @map("aws_region")
+  gcpApiKey           String?  @map("gcp_api_key")
+  gcpProjectId        String?  @map("gcp_project_id")
+  secretSource        String   @default("local") @map("secret_source")
+  freeeClientId       String?  @map("freee_client_id")
+  freeeClientSecret   String?  @map("freee_client_secret")
+  freeeCompanyId      String?  @map("freee_company_id")
+  analysisPrompt      String?  @map("analysis_prompt")
+  createdAt           DateTime @default(now()) @map("created_at")
+  updatedAt           DateTime @updatedAt @map("updated_at")
+
+  @@map("settings")
+}
+
+model AccountItem {
+  id                        String   @id @default(cuid())
+  companyId                 String   @map("company_id")
+  company                   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  freeeId                   Int      @map("freee_id")
+  name                      String
+  shortcut                  String?
+  shortcutNum               String?  @map("shortcut_num")
+  categoryId                Int      @map("category_id")
+  categoryName              String   @map("category_name")
+  categoryType              String   @map("category_type")
+  correspondingIncomeId     Int?     @map("corresponding_income_id")
+  correspondingIncomeName   String?  @map("corresponding_income_name")
+  correspondingExpenseId    Int?     @map("corresponding_expense_id")
+  correspondingExpenseName  String?  @map("corresponding_expense_name")
+  searchable                Boolean  @default(true)
+  cumulable                 Boolean  @default(false)
+  balance                   String
+  createdAt                 DateTime @default(now()) @map("created_at")
+  updatedAt                 DateTime @updatedAt @map("updated_at")
+
+  @@unique([companyId, freeeId])
+  @@index([companyId, categoryType])
+  @@map("account_items")
+}
+
+model Debt {
+  id               String    @id @default(cuid())
+  companyId        String    @map("company_id")
+  company          Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  freeeDealId      String?   @map("freee_deal_id")
+  partnerId        String?   @map("partner_id")
+  partnerName      String?   @map("partner_name")
+  description      String?
+  amount           Float
+  dueDate          DateTime  @map("due_date")
+  paymentDate      DateTime? @map("payment_date")
+  status           String    @default("PENDING")
+  category         String
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+
+  @@index([companyId, dueDate])
+  @@index([companyId, status])
+  @@map("debts")
 }

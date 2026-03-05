@@ -457,7 +457,6 @@ function buildBSSection(balanceSheets: BalanceSheet[], _months: number[]): Repor
         rowType: 'item',
         indent,
         values,
-        total: values.reduce((s, v) => s + v, 0),
       })
     })
   }
@@ -468,7 +467,6 @@ function buildBSSection(balanceSheets: BalanceSheet[], _months: number[]): Repor
       rowType: 'subtotal',
       indent: 1,
       values,
-      total: values.reduce((s, v) => s + v, 0),
     })
   }
 
@@ -478,7 +476,6 @@ function buildBSSection(balanceSheets: BalanceSheet[], _months: number[]): Repor
       rowType: 'total',
       indent: 0,
       values,
-      total: values.reduce((s, v) => s + v, 0),
     })
   }
 

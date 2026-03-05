@@ -55,6 +55,7 @@ export function FreeeSettings() {
     try {
       window.location.href = '/api/freee/auth'
     } catch (err) {
+      console.error('Failed to connect to freee:', err)
       setError('接続に失敗しました')
       setConnecting(false)
     }
@@ -77,6 +78,7 @@ export function FreeeSettings() {
         setError('連携解除に失敗しました')
       }
     } catch (err) {
+      console.error('Failed to disconnect from freee:', err)
       setError('連携解除に失敗しました')
     } finally {
       setLoading(false)
@@ -95,6 +97,7 @@ export function FreeeSettings() {
         setError('接続テストに失敗しました')
       }
     } catch (err) {
+      console.error('Failed to test freee connection:', err)
       setError('接続テストに失敗しました')
     } finally {
       setLoading(false)

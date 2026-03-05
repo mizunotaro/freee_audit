@@ -95,6 +95,7 @@ export function CSVUpload({ open, onOpenChange, fiscalYear, onSuccess }: CSVUplo
         toast.error('インポートに失敗しました')
       }
     } catch (error) {
+      console.error('CSV upload error:', error)
       setResult({
         success: false,
         errors: ['ファイルの読み込みに失敗しました'],

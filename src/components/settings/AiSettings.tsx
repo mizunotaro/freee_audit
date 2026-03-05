@@ -73,6 +73,7 @@ export function AiSettings() {
         setError(data.error || '保存に失敗しました')
       }
     } catch (err) {
+      console.error('Failed to save AI settings:', err)
       setError('保存に失敗しました')
     } finally {
       setSaving(false)
