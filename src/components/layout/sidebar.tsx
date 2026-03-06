@@ -13,12 +13,14 @@ import {
   LogOut,
   Menu,
   X,
-  ChevronDown,
   Shield,
   Calculator,
   Receipt,
   Package,
   TrendingUp,
+  Users,
+  FileText,
+  ChevronDown,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
@@ -50,6 +52,8 @@ const navItems = [
   { key: 'kpiSettings', href: '/settings/kpi', icon: BarChart3 },
   { key: 'inventory', href: '/inventory', icon: Package },
   { key: 'tax', href: '/tax', icon: Receipt },
+  { key: 'board', href: '/board', icon: Users },
+  { key: 'businessReport', href: '/reports/business', icon: FileText },
   { key: 'socialInsurance', href: '/social-insurance', icon: Shield },
   { key: 'deferredAccrual', href: '/deferred-accrual', icon: Calculator },
   { key: 'settings', href: '/settings', icon: Settings },

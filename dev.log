@@ -14,4 +14,11 @@
   ? turbo (invalid experimental key)
 
 ✓ Starting...
-✓ Ready in 2.2s
+✓ Ready in 2.9s
+○ Compiling /tax ...
+ GET /tax 200 in 6.0s (compile: 5.6s, render: 405ms)
+ GET /board 200 in 1011ms (compile: 839ms, render: 172ms)
+ GET /reports/business 200 in 814ms (compile: 645ms, render: 169ms)
+ GET /tax 200 in 188ms (compile: 78ms, render: 110ms)
+ GET /board 200 in 121ms (compile: 16ms, render: 106ms)
+ GET /reports/business 200 in 126ms (compile: 18ms, render: 107ms)
