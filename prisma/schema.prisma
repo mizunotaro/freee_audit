@@ -54,9 +54,16 @@ model Company {
   taxSchedules           TaxSchedule[]
   boardMeetings          BoardMeeting[]
   customKPIs             CustomKPI[]
+  boardReports           BoardReport[]
+  analysisPrompts        AnalysisPrompt[]
   fixedAssets            FixedAsset[]
   taxEffectAccounting    TaxEffectAccounting[]
   inventoryAdjustments   InventoryAdjustment[]
+  socialInsuranceSchedules SocialInsuranceSchedule[]
+  socialInsurancePayments SocialInsurancePayment[]
+  prepaidExpenses        PrepaidExpense[]
+  accrualExpenses        AccrualExpense[]
+  taxSettings            TaxSettings?
   createdAt              DateTime                @default(now()) @map("created_at")
   updatedAt              DateTime                @updatedAt @map("updated_at")
 
@@ -407,21 +414,135 @@ model AgendaItem {
 }
 
 model CustomKPI {
-  id          String   @id @default(cuid())
-  companyId   String   @map("company_id")
-  company     Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  name        String
-  formula     String
-  category    String
-  unit        String
-  targetValue Float?   @map("target_value")
-  isVisible   Boolean  @default(true) @map("is_visible")
-  sortOrder   Int      @map("sort_order")
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
+  id                 String   @id @default(cuid())
+  companyId          String   @map("company_id")
+  company            Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
 
+  name               String
+  code               String
+  description        String?
+  category           String
+
+  calculationType    String   @map("calculation_type")
+  formula            String?
+  dataSource         String?  @map("data_source")
+
+  unit               String   @default("number")
+  displayFormat      String?  @map("display_format")
+  decimalPlaces      Int      @default(0) @map("decimal_places")
+  isVisible          Boolean  @default(true) @map("is_visible")
+  sortOrder          Int      @default(0) @map("sort_order")
+
+  targetValue        Float?   @map("target_value")
+  warningThreshold   Float?   @map("warning_threshold")
+  criticalThreshold  Float?   @map("critical_threshold")
+  comparisonType     String   @default("higher_better") @map("comparison_type")
+
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
+
+  values             CustomKPIValue[]
+
+  @@unique([companyId, code])
   @@index([companyId])
   @@map("custom_kpis")
+}
+
+model CustomKPIValue {
+  id             String    @id @default(cuid())
+  customKPIId    String    @map("custom_kpi_id")
+  customKPI      CustomKPI @relation(fields: [customKPIId], references: [id], onDelete: Cascade)
+
+  fiscalYear     Int       @map("fiscal_year")
+  month          Int
+
+  value          Float
+  previousValue  Float?    @map("previous_value")
+  yoyChange      Float?    @map("yoy_change")
+
+  isCalculated   Boolean   @default(false) @map("is_calculated")
+  notes          String?
+
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  @@unique([customKPIId, fiscalYear, month])
+  @@index([customKPIId, fiscalYear])
+  @@map("custom_kpi_values")
+}
+
+model BoardReport {
+  id            String   @id @default(cuid())
+  companyId     String   @map("company_id")
+  company       Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  fiscalYear    Int      @map("fiscal_year")
+  month         Int
+
+  title         String
+  summary       String?
+  sections      BoardReportSection[]
+
+  status        String   @default("DRAFT")
+  generatedAt   DateTime? @map("generated_at")
+  presentedAt   DateTime? @map("presented_at")
+
+  approvedBy    String?  @map("approved_by")
+  approvedAt    DateTime? @map("approved_at")
+
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  @@unique([companyId, fiscalYear, month])
+  @@index([companyId, fiscalYear])
+  @@map("board_reports")
+}
+
+model BoardReportSection {
+  id           String      @id @default(cuid())
+  reportId     String      @map("report_id")
+  report       BoardReport @relation(fields: [reportId], references: [id], onDelete: Cascade)
+
+  sectionType  String      @map("section_type")
+  title        String
+  content      String
+  data         String?
+
+  sortOrder    Int         @map("sort_order")
+
+  createdAt    DateTime    @default(now()) @map("created_at")
+  updatedAt    DateTime    @updatedAt @map("updated_at")
+
+  @@index([reportId])
+  @@map("board_report_sections")
+}
+
+model AnalysisPrompt {
+  id                 String    @id @default(cuid())
+  companyId          String?   @map("company_id")
+  company            Company?  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  analysisType       String    @map("analysis_type")
+  name               String
+  description        String?
+  systemPrompt       String    @map("system_prompt")
+  userPromptTemplate String    @map("user_prompt_template")
+
+  variables          String
+
+  isActive           Boolean   @default(true) @map("is_active")
+  isDefault          Boolean   @default(false) @map("is_default")
+
+  version            Int       @default(1)
+  parentPromptId     String?   @map("parent_prompt_id")
+
+  createdAt          DateTime  @default(now()) @map("created_at")
+  updatedAt          DateTime  @updatedAt @map("updated_at")
+
+  @@unique([companyId, analysisType, isActive])
+  @@index([companyId, analysisType])
+  @@index([analysisType, isDefault])
+  @@map("analysis_prompts")
 }
 
 model FixedAsset {
@@ -477,4 +598,122 @@ model InventoryAdjustment {
   @@unique([companyId, fiscalYear, month])
   @@index([companyId, fiscalYear])
   @@map("inventory_adjustments")
+}
+
+model SocialInsuranceSchedule {
+  id             String   @id @default(cuid())
+  companyId      String   @map("company_id")
+  company        Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  insuranceType  String   @map("insurance_type")
+  taskName       String   @map("task_name")
+  dueDate        DateTime @map("due_date")
+  completedDate  DateTime? @map("completed_date")
+  status         String   @default("PENDING")
+  notes          String?
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  @@index([companyId, dueDate])
+  @@index([companyId, status])
+  @@map("social_insurance_schedules")
+}
+
+model SocialInsurancePayment {
+  id             String    @id @default(cuid())
+  companyId      String    @map("company_id")
+  company        Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  insuranceType  String    @map("insurance_type")
+  year           Int
+  month          Int
+  expectedAmount Float     @map("expected_amount")
+  actualAmount   Float     @map("actual_amount")
+  journalEntryId String?   @map("journal_entry_id")
+  paymentDate    DateTime? @map("payment_date")
+  dueDate        DateTime  @map("due_date")
+  status         String    @default("PENDING")
+  notes          String?
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  @@unique([companyId, insuranceType, year, month])
+  @@index([companyId, year, month])
+  @@map("social_insurance_payments")
+}
+
+model PrepaidExpense {
+  id              String   @id @default(cuid())
+  companyId       String   @map("company_id")
+  company         Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  accountCode     String   @map("account_code")
+  accountName     String   @map("account_name")
+  originalAmount  Float    @map("original_amount")
+  remainingAmount Float    @map("remaining_amount")
+  startDate       DateTime @map("start_date")
+  endDate         DateTime @map("end_date")
+  totalMonths     Int      @map("total_months")
+  monthlyAmount   Float    @map("monthly_amount")
+  status          String   @default("ACTIVE")
+  notes           String?
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  amortizations   PrepaidAmortization[]
+
+  @@index([companyId, status])
+  @@map("prepaid_expenses")
+}
+
+model PrepaidAmortization {
+  id             String   @id @default(cuid())
+  prepaidId      String   @map("prepaid_id")
+  prepaid        PrepaidExpense @relation(fields: [prepaidId], references: [id], onDelete: Cascade)
+  year           Int
+  month          Int
+  expectedAmount Float    @map("expected_amount")
+  actualAmount   Float    @map("actual_amount")
+  journalEntryId String?  @map("journal_entry_id")
+  status         String   @default("PENDING")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  @@unique([prepaidId, year, month])
+  @@map("prepaid_amortizations")
+}
+
+model AccrualExpense {
+  id               String    @id @default(cuid())
+  companyId        String    @map("company_id")
+  company          Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  accountCode      String    @map("account_code")
+  accountName      String    @map("account_name")
+  accrualYear      Int       @map("accrual_year")
+  accrualMonth     Int       @map("accrual_month")
+  expectedAmount   Float     @map("expected_amount")
+  actualAmount     Float     @map("actual_amount")
+  accrualJournalId String?   @map("accrual_journal_id")
+  paymentYear      Int?      @map("payment_year")
+  paymentMonth     Int?      @map("payment_month")
+  paymentJournalId String?   @map("payment_journal_id")
+  status           String    @default("ACCRUED")
+  notes            String?
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+
+  @@index([companyId, accrualYear, accrualMonth])
+  @@map("accrual_expenses")
+}
+
+model TaxSettings {
+  id                       String   @id @default(cuid())
+  companyId                String   @unique @map("company_id")
+  company                  Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  withholdingSpecialRule   Boolean  @default(false) @map("withholding_special_rule")
+  withholdingEmployeeCount Int      @default(0) @map("withholding_employee_count")
+  fiscalYearStart          Int      @default(1) @map("fiscal_year_start")
+  consumptionTaxable       Boolean  @default(true) @map("consumption_taxable")
+  taxFilingMethod          String   @default("BLUE") @map("tax_filing_method")
+  createdAt                DateTime @default(now()) @map("created_at")
+  updatedAt                DateTime @updatedAt @map("updated_at")
+
+  @@map("tax_settings")
 }

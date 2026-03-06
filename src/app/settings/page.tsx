@@ -17,7 +17,16 @@ import {
 } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import { toast } from 'sonner'
-import { Eye, EyeOff, Save, RefreshCw } from 'lucide-react'
+import { Eye, EyeOff, Save, RefreshCw, AlertCircle } from 'lucide-react'
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
+
+interface TaxSettings {
+  withholdingSpecialRule: boolean
+  withholdingEmployeeCount: number
+  fiscalYearStart: number
+  consumptionTaxable: boolean
+  taxFilingMethod: string
+}
 
 interface Settings {
   theme: 'light' | 'dark' | 'system'
@@ -45,6 +54,7 @@ interface Settings {
   analysisPrompt: string
   fiscalYearEndMonth: number
   taxBusinessType: 'exempt' | 'simplified' | 'general'
+  taxSettings: TaxSettings
 }
 
 const defaultPrompt = `freeeから取得したスタートアップ企業の財務データを公認会計士・税理士の観点から分析を行って下さい。経営指標についてはVC/CVCや銀行員の観点からも評価をおこなってください。
@@ -76,10 +86,18 @@ export default function SettingsPage() {
     analysisPrompt: defaultPrompt,
     fiscalYearEndMonth: 12,
     taxBusinessType: 'general',
+    taxSettings: {
+      withholdingSpecialRule: false,
+      withholdingEmployeeCount: 0,
+      fiscalYearStart: 1,
+      consumptionTaxable: true,
+      taxFilingMethod: 'BLUE',
+    },
   })
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [showSecrets, setShowSecrets] = useState<Record<string, boolean>>({})
+  const [taxSettingsSaving, setTaxSettingsSaving] = useState(false)
 
   useEffect(() => {
     fetchSettings()
@@ -91,10 +109,28 @@ export default function SettingsPage() {
 
   const fetchSettings = async () => {
     try {
-      const res = await fetch('/api/settings')
-      if (res.ok) {
-        const data = await res.json()
+      const [settingsRes, taxSettingsRes] = await Promise.all([
+        fetch('/api/settings'),
+        fetch('/api/tax/settings'),
+      ])
+
+      if (settingsRes.ok) {
+        const data = await settingsRes.json()
         setSettings((prev) => ({ ...prev, ...data }))
+      }
+
+      if (taxSettingsRes.ok) {
+        const taxData = await taxSettingsRes.json()
+        setSettings((prev) => ({
+          ...prev,
+          taxSettings: {
+            withholdingSpecialRule: taxData.withholdingSpecialRule ?? false,
+            withholdingEmployeeCount: taxData.withholdingEmployeeCount ?? 0,
+            fiscalYearStart: taxData.fiscalYearStart ?? 1,
+            consumptionTaxable: taxData.consumptionTaxable ?? true,
+            taxFilingMethod: taxData.taxFilingMethod ?? 'BLUE',
+          },
+        }))
       }
     } catch (error) {
       console.error('Failed to fetch settings:', error)
@@ -143,6 +179,35 @@ export default function SettingsPage() {
 
   const toggleShowSecret = (key: string) => {
     setShowSecrets((prev) => ({ ...prev, [key]: !prev[key] }))
+  }
+
+  const updateTaxSetting = <K extends keyof TaxSettings>(key: K, value: TaxSettings[K]) => {
+    setSettings((prev) => ({
+      ...prev,
+      taxSettings: { ...prev.taxSettings, [key]: value },
+    }))
+  }
+
+  const handleSaveTaxSettings = async () => {
+    setTaxSettingsSaving(true)
+    try {
+      const res = await fetch('/api/tax/settings', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(settings.taxSettings),
+      })
+
+      if (res.ok) {
+        toast.success('税金設定を保存しました')
+      } else {
+        throw new Error('Failed to save tax settings')
+      }
+    } catch (error) {
+      console.error('Failed to save tax settings:', error)
+      toast.error('税金設定の保存に失敗しました')
+    } finally {
+      setTaxSettingsSaving(false)
+    }
   }
 
   const updateSetting = <K extends keyof Settings>(key: K, value: Settings[K]) => {
@@ -577,8 +642,124 @@ export default function SettingsPage() {
         <TabsContent value="tax" className="space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle>税金設定</CardTitle>
-              <CardDescription>決算期と課税事業者区分を設定します</CardDescription>
+              <CardTitle>源泉徴収税設定</CardTitle>
+              <CardDescription>源泉徴収税の納期設定を管理します</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label htmlFor="withholding-special-rule">納期の特例を利用する</Label>
+                  <p className="text-sm text-gray-500">
+                    給与の支払を受ける人数が常時10人未満の場合に利用可能
+                  </p>
+                </div>
+                <Switch
+                  id="withholding-special-rule"
+                  checked={settings.taxSettings.withholdingSpecialRule}
+                  onCheckedChange={(checked) => updateTaxSetting('withholdingSpecialRule', checked)}
+                />
+              </div>
+
+              {settings.taxSettings.withholdingSpecialRule && (
+                <Alert>
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertTitle>納期の特例適用中</AlertTitle>
+                  <AlertDescription>
+                    <ul className="mt-2 list-inside list-disc text-sm">
+                      <li>1月〜6月分：7月10日納付</li>
+                      <li>7月〜12月分：翌年1月20日納付</li>
+                    </ul>
+                  </AlertDescription>
+                </Alert>
+              )}
+
+              <div className="space-y-2">
+                <Label htmlFor="withholding-employee-count">
+                  従業員数（源泉徴収税納期の特例判定用）
+                </Label>
+                <Input
+                  id="withholding-employee-count"
+                  type="number"
+                  value={settings.taxSettings.withholdingEmployeeCount}
+                  onChange={(e) =>
+                    updateTaxSetting('withholdingEmployeeCount', parseInt(e.target.value) || 0)
+                  }
+                  className="w-40"
+                />
+                <p className="text-xs text-gray-500">
+                  常時10人未満の場合、納期の特例が適用可能です
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="tax-filing-method">申告区分</Label>
+                <Select
+                  value={settings.taxSettings.taxFilingMethod || 'BLUE'}
+                  onValueChange={(value) => updateTaxSetting('taxFilingMethod', value)}
+                >
+                  <SelectTrigger className="w-60">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="BLUE">青色申告</SelectItem>
+                    <SelectItem value="WHITE">白色申告</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="flex justify-end">
+                <Button onClick={handleSaveTaxSettings} disabled={taxSettingsSaving}>
+                  <Save className="mr-2 h-4 w-4" />
+                  {taxSettingsSaving ? '保存中...' : '税金設定を保存'}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>消費税設定</CardTitle>
+              <CardDescription>消費税に関する設定を行います</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label htmlFor="consumption-taxable">課税事業者</Label>
+                  <p className="text-sm text-gray-500">免税事業者の場合はオフにしてください</p>
+                </div>
+                <Switch
+                  id="consumption-taxable"
+                  checked={settings.taxSettings.consumptionTaxable}
+                  onCheckedChange={(checked) => updateTaxSetting('consumptionTaxable', checked)}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="tax-business-type">課税事業者区分</Label>
+                <Select
+                  value={settings.taxBusinessType || 'general'}
+                  onValueChange={(value) =>
+                    updateSetting('taxBusinessType', value as Settings['taxBusinessType'])
+                  }
+                >
+                  <SelectTrigger className="w-60">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="exempt">免税事業者</SelectItem>
+                    <SelectItem value="simplified">簡易課税事業者</SelectItem>
+                    <SelectItem value="general">一般課税事業者</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-sm text-gray-500">消費税の計算方法や申告要件が異なります</p>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>決算期設定</CardTitle>
+              <CardDescription>決算月を設定します</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="space-y-2">
@@ -612,26 +793,6 @@ export default function SettingsPage() {
                   </SelectContent>
                 </Select>
                 <p className="text-sm text-gray-500">年間税金スケジュールの生成に使用されます</p>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="tax-business-type">課税事業者区分</Label>
-                <Select
-                  value={settings.taxBusinessType || 'general'}
-                  onValueChange={(value) =>
-                    updateSetting('taxBusinessType', value as Settings['taxBusinessType'])
-                  }
-                >
-                  <SelectTrigger className="w-60">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="exempt">免税事業者</SelectItem>
-                    <SelectItem value="simplified">簡易課税事業者</SelectItem>
-                    <SelectItem value="general">一般課税事業者</SelectItem>
-                  </SelectContent>
-                </Select>
-                <p className="text-sm text-gray-500">消費税の計算方法や申告要件が異なります</p>
               </div>
             </CardContent>
           </Card>

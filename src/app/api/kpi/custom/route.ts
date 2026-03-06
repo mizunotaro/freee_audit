@@ -57,8 +57,10 @@ async function handler(request: NextRequest) {
 
     const data: CustomKPIInput = {
       name: body.name,
+      code: body.code || body.name?.toLowerCase().replace(/\s+/g, '_') || '',
       formula: body.formula,
       category: body.category,
+      calculationType: body.calculationType || 'FORMULA',
       unit: body.unit,
       targetValue: body.targetValue,
       isVisible: body.isVisible,

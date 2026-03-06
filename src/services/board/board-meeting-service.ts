@@ -198,7 +198,12 @@ export class BoardMeetingService {
 
   private static generateBasicAnalysis(
     agendaItem: AgendaItem,
-    companyInfo: { name: string; fiscalYearEnd: number; hasInvestors: boolean }
+    companyInfo: {
+      name: string
+      fiscalYearEnd: number
+      hasInvestors: boolean
+      investmentAgreement?: string
+    }
   ): string {
     let analysis = `## ${agendaItem.title} の分析\n\n`
     analysis += `**法的要件**: ${agendaItem.requiredByLaw ? '必要' : '任意'}\n`

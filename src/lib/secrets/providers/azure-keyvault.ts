@@ -40,7 +40,7 @@ export class AzureKeyVaultProvider extends BaseSecretProvider {
         getSecret: async (secretName, options) => {
           const secret = await client.getSecret(secretName, { version: options?.version })
           return {
-            name: secret.name,
+            name: secret.name || secretName,
             value: secret.value || '',
             version: secret.properties.version,
             lastUpdated: secret.properties.updatedOn,
@@ -51,8 +51,8 @@ export class AzureKeyVaultProvider extends BaseSecretProvider {
           const secrets: Array<{ name: string; id: string }> = []
           for await (const secret of client.listPropertiesOfSecrets()) {
             secrets.push({
-              name: secret.name,
-              id: secret.id,
+              name: secret.name || '',
+              id: secret.properties.id || '',
             })
           }
           return secrets

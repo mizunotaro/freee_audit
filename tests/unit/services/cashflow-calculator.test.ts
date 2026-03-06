@@ -51,17 +51,18 @@ describe('calculateCashFlow', () => {
     month: 12,
     revenue: [{ code: 'R001', name: '売上高', amount: 20000000 }],
     costOfSales: [{ code: 'C001', name: '売上原価', amount: 12000000 }],
-    grossProfit: [],
+    grossProfit: 8000000,
     grossProfitMargin: 40,
     sgaExpenses: [],
-    operatingExpenses: [],
-    operatingIncome: [],
+    operatingIncome: 4000000,
     operatingMargin: 20,
     nonOperatingIncome: [],
     nonOperatingExpenses: [],
-    ordinaryIncome: [],
+    ordinaryIncome: 3900000,
     extraordinaryIncome: [],
     extraordinaryLoss: [],
+    incomeBeforeTax: 3900000,
+    incomeTax: 0,
     netIncome,
     depreciation,
   })
@@ -75,8 +76,8 @@ describe('calculateCashFlow', () => {
       const result = calculateCashFlow(pl, currentBS, previousBS)
 
       expect(result.operatingActivities).toBeDefined()
-      expect(result.operatingActivities.netIncome).toBe(3900000)
-      expect(result.operatingActivities.depreciation).toBe(500000)
+      expect(result.operatingActivities!.netIncome).toBe(3900000)
+      expect(result.operatingActivities!.depreciation).toBe(500000)
     })
 
     it('should calculate net change in cash correctly', () => {
@@ -132,9 +133,9 @@ describe('calculateCashFlow', () => {
 
       const result = calculateCashFlow(pl, currentBS, previousBS)
 
-      expect(result.operatingActivities.netCashFromOperating).toBe(0)
-      expect(result.investingActivities.netCashFromInvesting).toBe(0)
-      expect(result.financingActivities.netCashFromFinancing).toBe(0)
+      expect(result.operatingActivities!.netCashFromOperating).toBe(0)
+      expect(result.investingActivities!.netCashFromInvesting).toBe(0)
+      expect(result.financingActivities!.netCashFromFinancing).toBe(0)
     })
 
     it('should handle negative values correctly', () => {
@@ -145,7 +146,7 @@ describe('calculateCashFlow', () => {
       const result = calculateCashFlow(pl, currentBS, previousBS)
 
       expect(result).toBeDefined()
-      expect(result.operatingActivities.netIncome).toBe(-1000000)
+      expect(result.operatingActivities!.netIncome).toBe(-1000000)
     })
 
     it('should handle empty arrays in balance sheet', () => {
@@ -166,6 +167,9 @@ describe('calculateCashFlow', () => {
           items: [],
           total: 0,
         },
+        totalAssets: 0,
+        totalLiabilities: 0,
+        totalEquity: 0,
       }
       const pl = createMockProfitLoss()
 
@@ -186,7 +190,7 @@ describe('calculateCashFlow', () => {
       const result = calculateCashFlow(pl, currentBS, previousBS)
 
       // Increase in receivables = previous - current = 3,500,000 - 3,000,000 = 500,000
-      expect(result.operatingActivities.increaseInReceivables).toBe(500000)
+      expect(result.operatingActivities!.increaseInReceivables).toBe(500000)
     })
 
     it('should calculate decrease in inventory correctly', () => {
@@ -197,7 +201,7 @@ describe('calculateCashFlow', () => {
       const result = calculateCashFlow(pl, currentBS, previousBS)
 
       // Decrease in inventory = previous - current = 2,000,000 - 1,800,000 = 200,000
-      expect(result.operatingActivities.decreaseInInventory).toBe(200000)
+      expect(result.operatingActivities!.decreaseInInventory).toBe(200000)
     })
 
     it('should calculate increase in payables correctly', () => {
@@ -208,7 +212,7 @@ describe('calculateCashFlow', () => {
       const result = calculateCashFlow(pl, currentBS, previousBS)
 
       // Increase in payables = current - previous = 2,500,000 - 2,000,000 = 500,000
-      expect(result.operatingActivities.increaseInPayables).toBe(500000)
+      expect(result.operatingActivities!.increaseInPayables).toBe(500000)
     })
   })
 
@@ -221,8 +225,8 @@ describe('calculateCashFlow', () => {
       const result = calculateCashFlow(pl, currentBS, previousBS)
 
       expect(result.investingActivities).toBeDefined()
-      expect(result.investingActivities.purchaseOfFixedAssets).toBeDefined()
-      expect(result.investingActivities.netCashFromInvesting).toBeDefined()
+      expect(result.investingActivities!.purchaseOfFixedAssets).toBeDefined()
+      expect(result.investingActivities!.netCashFromInvesting).toBeDefined()
     })
   })
 
@@ -249,9 +253,9 @@ describe('calculateCashFlow', () => {
       const result = calculateCashFlow(pl, currentBS, previousBS)
 
       expect(result.financingActivities).toBeDefined()
-      expect(result.financingActivities.proceedsFromBorrowing).toBeDefined()
-      expect(result.financingActivities.repaymentOfBorrowing).toBeDefined()
-      expect(result.financingActivities.netCashFromFinancing).toBeDefined()
+      expect(result.financingActivities!.proceedsFromBorrowing).toBeDefined()
+      expect(result.financingActivities!.repaymentOfBorrowing).toBeDefined()
+      expect(result.financingActivities!.netCashFromFinancing).toBeDefined()
     })
   })
 
@@ -264,7 +268,7 @@ describe('calculateCashFlow', () => {
       const result = calculateCashFlow(pl, currentBS, null)
 
       expect(result).toBeDefined()
-      expect(isFinite(result.operatingActivities.netCashFromOperating)).toBe(true)
+      expect(isFinite(result.operatingActivities!.netCashFromOperating)).toBe(true)
     })
 
     it('should handle fiscal year and month correctly', () => {
@@ -289,8 +293,8 @@ describe('calculateCashFlow', () => {
       const result1 = calculateCashFlow(pl, currentBS, previousBS)
       const result2 = calculateCashFlow(pl, currentBS, previousBS)
 
-      expect(result1.operatingActivities.netCashFromOperating).toBe(
-        result2.operatingActivities.netCashFromOperating
+      expect(result1.operatingActivities!.netCashFromOperating).toBe(
+        result2.operatingActivities!.netCashFromOperating
       )
       expect(result1.netChangeInCash).toBe(result2.netChangeInCash)
     })

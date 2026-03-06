@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { TaxService } from '@/services/tax/tax-service'
+import { prisma } from '@/lib/db'
 
 export async function POST(request: NextRequest) {
   try {
@@ -13,10 +14,17 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    const taxSettings = await prisma.taxSettings.findUnique({
+      where: { companyId },
+    })
+
+    const withholdingSpecialRule = taxSettings?.withholdingSpecialRule ?? false
+
     const schedules = await TaxService.generateDefaultTaxSchedules(
       companyId,
       fiscalYearEndMonth,
-      fiscalYear
+      fiscalYear,
+      withholdingSpecialRule
     )
 
     return NextResponse.json(schedules, { status: 201 })

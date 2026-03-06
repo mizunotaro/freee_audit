@@ -120,8 +120,8 @@ class APIKeyService {
         key: secret.value,
         metadata: {
           secretName,
-          secretVersion: secret.version,
-          lastUpdated: secret.lastUpdated?.toISOString(),
+          ...(secret.version ? { secretVersion: secret.version } : {}),
+          ...(secret.lastUpdated ? { lastUpdated: secret.lastUpdated.toISOString() } : {}),
         },
       }
     } catch (error) {

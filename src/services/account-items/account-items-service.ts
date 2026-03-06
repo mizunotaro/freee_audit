@@ -6,8 +6,8 @@ export interface AccountItem {
   freeeId: number
   companyId: string
   name: string
-  shortcut: string
-  shortcutNum: string
+  shortcut: string | null
+  shortcutNum: string | null
   categoryId: number
   categoryName: string
   categoryType: AccountCategoryType

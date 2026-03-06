@@ -1,6 +1,5 @@
-import { PrismaClient, TaxSchedule, TaxPayment } from '@prisma/client'
-
-const prisma = new PrismaClient()
+import { TaxSchedule, TaxPayment } from '@prisma/client'
+import { prisma } from '@/lib/db'
 
 export type TaxType = 'corporate' | 'withholding' | 'depreciation' | 'consumption'
 export type TaxStatus = 'PENDING' | 'FILED' | 'PAID'
@@ -12,6 +11,11 @@ export interface CreateTaxScheduleInput {
   dueDate: Date
   amount?: number
   note?: string
+}
+
+export interface WithholdingScheduleOptions {
+  specialRuleEnabled: boolean
+  fiscalYear: number
 }
 
 export interface UpdateTaxScheduleInput {
@@ -122,7 +126,8 @@ export class TaxService {
   static async generateDefaultTaxSchedules(
     companyId: string,
     fiscalYearEndMonth: number,
-    fiscalYear: number
+    fiscalYear: number,
+    withholdingSpecialRule: boolean = false
   ): Promise<TaxSchedule[]> {
     const schedules: CreateTaxScheduleInput[] = []
     const year = fiscalYear
@@ -136,17 +141,36 @@ export class TaxService {
       note: '法人税（法人所得税・法人住民税）',
     })
 
-    const withholdingDueDates = [5, 11]
-    withholdingDueDates.forEach((month) => {
-      const dueDate = new Date(year + 1, month, 10)
+    if (withholdingSpecialRule) {
+      const firstPeriodDueDate = new Date(year + 1, 6, 10)
       schedules.push({
         companyId,
         taxType: 'withholding',
         fiscalYear: year,
-        dueDate,
-        note: '源泉徴収税',
+        dueDate: firstPeriodDueDate,
+        note: '源泉徴収税（納期の特例：1月〜6月分）',
       })
-    })
+      const secondPeriodDueDate = new Date(year + 2, 0, 20)
+      schedules.push({
+        companyId,
+        taxType: 'withholding',
+        fiscalYear: year,
+        dueDate: secondPeriodDueDate,
+        note: '源泉徴収税（納期の特例：7月〜12月分）',
+      })
+    } else {
+      const withholdingDueDates = [5, 11]
+      withholdingDueDates.forEach((month) => {
+        const dueDate = new Date(year + 1, month, 10)
+        schedules.push({
+          companyId,
+          taxType: 'withholding',
+          fiscalYear: year,
+          dueDate,
+          note: '源泉徴収税',
+        })
+      })
+    }
 
     const depreciationDueDate = new Date(year + 1, fiscalYearEndMonth + 2, 1)
     schedules.push({

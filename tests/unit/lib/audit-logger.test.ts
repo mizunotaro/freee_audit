@@ -218,7 +218,9 @@ describe('auditLogger', () => {
           action: 'VIEW_REPORT',
           resource: 'report',
           resourceId: undefined,
-          details: undefined,
+          ipAddress: undefined,
+          userAgent: undefined,
+          details: null,
           result: 'SUCCESS',
         }),
       })
