@@ -22,7 +22,7 @@ import {
 } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
 import { toast } from 'sonner'
-import { Plus, FileText, RefreshCw, Download, Eye } from 'lucide-react'
+import { Plus, FileText, RefreshCw, Download, Eye, ArrowLeft } from 'lucide-react'
 
 interface BoardReport {
   id: string
@@ -113,6 +113,10 @@ export default function BoardReportsPage() {
   return (
     <AppLayout>
       <div className="container mx-auto space-y-6 py-6">
+        <Link href="/" className="mb-4 flex items-center text-muted-foreground hover:text-primary">
+          <ArrowLeft className="mr-2 h-4 w-4" />
+          トップページに戻る
+        </Link>
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold">取締役会報告資料</h1>

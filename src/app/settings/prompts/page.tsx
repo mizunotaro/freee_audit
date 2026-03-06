@@ -1,5 +1,6 @@
 'use client'
 
+import Link from 'next/link'
 import { useState, useEffect } from 'react'
 import { AppLayout } from '@/components/layout/AppLayout'
 import { Button } from '@/components/ui/button'
@@ -9,7 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Textarea } from '@/components/ui/textarea'
 import { toast } from 'sonner'
-import { Save, RotateCcw, Info } from 'lucide-react'
+import { Save, RotateCcw, Info, ArrowLeft } from 'lucide-react'
 import type {
   AnalysisType,
   AnalysisPromptDetail,
@@ -236,6 +237,13 @@ export default function PromptSettingsPage() {
   return (
     <AppLayout>
       <div className="container mx-auto space-y-6 py-6">
+        <Link
+          href="/"
+          className="mb-4 inline-flex items-center text-muted-foreground hover:text-primary"
+        >
+          <ArrowLeft className="mr-2 h-4 w-4" />
+          トップページに戻る
+        </Link>
         <div>
           <h1 className="text-3xl font-bold">分析プロンプト設定</h1>
           <p className="text-muted-foreground">各分析機能のプロンプトをカスタマイズ</p>

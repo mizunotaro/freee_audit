@@ -1,5 +1,6 @@
 'use client'
 
+import Link from 'next/link'
 import { useState, useEffect, useCallback } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -31,7 +32,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { CalendarDays, Plus, CheckCircle, Clock, AlertTriangle, Shield } from 'lucide-react'
+import {
+  CalendarDays,
+  Plus,
+  CheckCircle,
+  Clock,
+  AlertTriangle,
+  Shield,
+  ArrowLeft,
+} from 'lucide-react'
 import { toast } from 'sonner'
 
 interface Schedule {
@@ -224,6 +233,13 @@ export default function SocialInsurancePage() {
 
   return (
     <div className="container mx-auto space-y-6 py-6">
+      <Link
+        href="/"
+        className="mb-4 inline-flex items-center text-muted-foreground hover:text-primary"
+      >
+        <ArrowLeft className="mr-2 h-4 w-4" />
+        トップページに戻る
+      </Link>
       <div className="flex items-center justify-between">
         <div>
           <h1 className="flex items-center gap-2 text-3xl font-bold">
