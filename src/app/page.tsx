@@ -122,6 +122,100 @@ export default function HomePage() {
           </Link>
         </div>
 
+        <div className="mt-12 grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
+          <Link
+            href="/board-reports"
+            className="rounded-xl bg-white p-6 shadow-lg transition-shadow hover:shadow-xl"
+          >
+            <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-lg bg-indigo-100">
+              <svg
+                className="h-6 w-6 text-indigo-600"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M9 12h6m-6 4h6m2 5H7a2 2 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                />
+              </svg>
+            </div>
+            <h3 className="mb-2 text-lg font-semibold text-gray-900">取締役会報告資料</h3>
+            <p className="text-sm text-gray-500">月次決算の統合レポート自動生成</p>
+          </Link>
+
+          <Link
+            href="/deferred-accrual"
+            className="rounded-xl bg-white p-6 shadow-lg transition-shadow hover:shadow-xl"
+          >
+            <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-lg bg-teal-100">
+              <svg
+                className="h-6 w-6 text-teal-600"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M9 7h6m0 0v8m0-8l-8 8-4-4-6 6"
+                />
+              </svg>
+            </div>
+            <h3 className="mb-2 text-lg font-semibold text-gray-900">前払・未払費用</h3>
+            <p className="text-sm text-gray-500">償却スケジュールと未払計上の管理</p>
+          </Link>
+
+          <Link
+            href="/social-insurance"
+            className="rounded-xl bg-white p-6 shadow-lg transition-shadow hover:shadow-xl"
+          >
+            <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-lg bg-cyan-100">
+              <svg
+                className="h-6 w-6 text-cyan-600"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9-9 0 0118 0m-2-4.5l-2 2 4 4m6-2a9 9 0 00-18 0 9 9 0 0018 0z"
+                />
+              </svg>
+            </div>
+            <h3 className="mb-2 text-lg font-semibold text-gray-900">社会保険管理</h3>
+            <p className="text-sm text-gray-500">手続きスケジュールと納付状況の管理</p>
+          </Link>
+
+          <Link
+            href="/settings/prompts"
+            className="rounded-xl bg-white p-6 shadow-lg transition-shadow hover:shadow-xl"
+          >
+            <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-lg bg-rose-100">
+              <svg
+                className="h-6 w-6 text-rose-600"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M13 10V3L4 14l1.5-1.5L13 6l6-6-1.5-1.5L13 10z"
+                />
+              </svg>
+            </div>
+            <h3 className="mb-2 text-lg font-semibold text-gray-900">AIプロンプト設定</h3>
+            <p className="text-sm text-gray-500">分析機能のプロンプトをカスタマイズ</p>
+          </Link>
+        </div>
+
         <div className="mt-12 rounded-xl bg-white p-8 shadow-lg">
           <h3 className="mb-6 text-xl font-semibold text-gray-900">実装済み機能（Phase 3-4）</h3>
           <div className="grid grid-cols-1 gap-8 md:grid-cols-3">

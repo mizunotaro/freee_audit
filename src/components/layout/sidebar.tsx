@@ -42,6 +42,9 @@ const navItems = [
   { key: 'reports', href: '/reports', icon: BarChart3 },
   { key: 'budgets', href: '/budgets', icon: Wallet },
   { key: 'settings', href: '/settings', icon: Settings },
+  { key: 'periodicReports', href: '/reports/periodic', icon: BarChart3 },
+  { key: 'inventory', href: '/inventory', icon: Package },
+  { key: 'kpiSettings', href: '/settings/kpi', icon: Settings },
 ]
 
 export function Sidebar({ user, locale }: SidebarProps) {
@@ -50,7 +53,8 @@ export function Sidebar({ user, locale }: SidebarProps) {
   const [isOpen, setIsOpen] = useState(false)
 
   const handleLogout = async () => {
-    await fetch('/api/auth/logout', { method: 'POST' })
+    window.location.href = `/${locale}/login`
+  }
     window.location.href = `/${locale}/login`
   }
 

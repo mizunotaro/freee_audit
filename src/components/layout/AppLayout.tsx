@@ -11,6 +11,10 @@ import {
   ClipboardCheck,
   Receipt,
   Users,
+  Shield,
+  Calculator,
+  FileCheck,
+  Sparkles,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -24,9 +28,13 @@ const navItems = [
   { href: '/reports/cashflow', label: '資金繰り表', icon: DollarSign },
   { href: '/reports/budget', label: '予実管理', icon: BarChart3 },
   { href: '/reports/kpi', label: '経営指標', icon: BarChart3 },
+  { href: '/board-reports', label: '取締役会報告資料', icon: FileCheck },
+  { href: '/deferred-accrual', label: '前払・未払費用', icon: Calculator },
+  { href: '/social-insurance', label: '社会保険管理', icon: Shield },
   { href: '/tax', label: '税金管理', icon: Receipt },
   { href: '/board', label: '取締役会', icon: Users },
   { href: '/audit/journal', label: '記帳診断', icon: ClipboardCheck },
+  { href: '/settings/prompts', label: 'AIプロンプト設定', icon: Sparkles },
 ]
 
 export function AppLayout({ children, title }: AppLayoutProps) {
