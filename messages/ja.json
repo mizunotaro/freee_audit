@@ -26,7 +26,18 @@
     "budgets": "予算管理",
     "settings": "設定",
     "audit": "監査",
-    "journals": "仕訳"
+    "journals": "仕訳",
+    "tax": "税金管理",
+    "socialInsurance": "社会保険",
+    "deferredAccrual": "前払・未払",
+    "kpiSettings": "KPI設定",
+    "fixedAssets": "固定資産",
+    "closingEntries": "決算整理仕訳",
+    "expenseAudit": "経費監査",
+    "accountingBasis": "発生主義・現金主義チェック"
+    "inventory": "在庫棚卸管理"
+    "periodicReports": "多期間レポート"
+    "kpi": "経営指標",
   },
   "report": {
     "balanceSheet": "貸借対照表",

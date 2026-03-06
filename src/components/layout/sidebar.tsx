@@ -14,6 +14,11 @@ import {
   Menu,
   X,
   ChevronDown,
+  Shield,
+  Calculator,
+  Receipt,
+  Package,
+  TrendingUp,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
@@ -40,11 +45,14 @@ const navItems = [
   { key: 'dashboard', href: '/dashboard', icon: LayoutDashboard },
   { key: 'audit', href: '/audit/journals', icon: FileCheck },
   { key: 'reports', href: '/reports', icon: BarChart3 },
+  { key: 'periodicReports', href: '/reports/periodic', icon: TrendingUp },
   { key: 'budgets', href: '/budgets', icon: Wallet },
-  { key: 'settings', href: '/settings', icon: Settings },
-  { key: 'periodicReports', href: '/reports/periodic', icon: BarChart3 },
+  { key: 'kpiSettings', href: '/settings/kpi', icon: BarChart3 },
   { key: 'inventory', href: '/inventory', icon: Package },
-  { key: 'kpiSettings', href: '/settings/kpi', icon: Settings },
+  { key: 'tax', href: '/tax', icon: Receipt },
+  { key: 'socialInsurance', href: '/social-insurance', icon: Shield },
+  { key: 'deferredAccrual', href: '/deferred-accrual', icon: Calculator },
+  { key: 'settings', href: '/settings', icon: Settings },
 ]
 
 export function Sidebar({ user, locale }: SidebarProps) {
@@ -53,8 +61,6 @@ export function Sidebar({ user, locale }: SidebarProps) {
   const [isOpen, setIsOpen] = useState(false)
 
   const handleLogout = async () => {
-    window.location.href = `/${locale}/login`
-  }
     window.location.href = `/${locale}/login`
   }
 

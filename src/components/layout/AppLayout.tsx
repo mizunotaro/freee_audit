@@ -15,6 +15,11 @@ import {
   Calculator,
   FileCheck,
   Sparkles,
+  TrendingUp,
+  FileAudit,
+  FileSpreadsheet,
+  FileCog,
+  LayoutDashboard,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -24,17 +29,18 @@ interface AppLayoutProps {
 }
 
 const navItems = [
-  { href: '/reports/monthly', label: '月次レポート', icon: FileText },
-  { href: '/reports/cashflow', label: '資金繰り表', icon: DollarSign },
-  { href: '/reports/budget', label: '予実管理', icon: BarChart3 },
-  { href: '/reports/kpi', label: '経営指標', icon: BarChart3 },
-  { href: '/board-reports', label: '取締役会報告資料', icon: FileCheck },
-  { href: '/deferred-accrual', label: '前払・未払費用', icon: Calculator },
-  { href: '/social-insurance', label: '社会保険管理', icon: Shield },
-  { href: '/tax', label: '税金管理', icon: Receipt },
-  { href: '/board', label: '取締役会', icon: Users },
-  { href: '/audit/journal', label: '記帳診断', icon: ClipboardCheck },
-  { href: '/settings/prompts', label: 'AIプロンプト設定', icon: Sparkles },
+  { href: '/reports/monthly', label: '月次レポート', icon: BarChart3 },
+  { href: '/reports/periodic', label: '多期間レポート', icon: TrendingUp },
+  { href: '/budgets', label: '予実管理', icon: DollarSign },
+  { href: '/reports/kpi', label: '経営指標', icon: ClipboardCheck },
+  { href: '/settings/kpi', label: 'KPI設定', icon: Settings },
+  { href: '/cashflow', label: '資金繰り表', icon: Receipt },
+  { href: '/tax', label: '税金管理', icon: FileText },
+  { href: '/board', label: '取締役会議議室', icon: Users },
+  { href: '/audit/journal', label: '記帳診断', icon: FileAudit },
+  { href: '/audit/expense', label: '経費監査', icon: Receipt },
+  { href: '/audit/basis', label: '発生主義チェック', icon: FileCheck },
+  { href: '/settings', label: '設定', icon: Settings },
 ]
 
 export function AppLayout({ children, title }: AppLayoutProps) {
