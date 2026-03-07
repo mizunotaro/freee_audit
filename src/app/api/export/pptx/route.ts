@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { validateSession } from '@/lib/auth'
 import {
   createExportService,
   ExportRequest,
@@ -8,8 +9,19 @@ import {
   MonthlyReportData,
 } from '@/services/export'
 
+async function getAuthUser(request: NextRequest) {
+  const token = request.cookies.get('session')?.value
+  if (!token) return null
+  return validateSession(token)
+}
+
 export async function POST(request: NextRequest) {
   try {
+    const user = await getAuthUser(request)
+    if (!user || !user.companyId) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
     const body: ExportRequest = await request.json()
 
     if (!body.reportType || !body.fiscalYear) {

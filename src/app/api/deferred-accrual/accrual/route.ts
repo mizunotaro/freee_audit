@@ -1,27 +1,26 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/db'
+import { validateSession } from '@/lib/auth'
 import { AccrualExpenseTracker } from '@/services/deferred-accrual'
 
-async function getCompanyId(): Promise<string> {
-  const companies = await prisma.company.findMany({ take: 1 })
-  if (companies.length > 0) {
-    return companies[0].id
-  }
-  const company = await prisma.company.create({
-    data: { name: 'Default Company', fiscalYearStart: 1 },
-  })
-  return company.id
+async function getAuthUser(request: NextRequest) {
+  const token = request.cookies.get('session')?.value
+  if (!token) return null
+  return validateSession(token)
 }
 
 export async function GET(request: NextRequest) {
   try {
+    const user = await getAuthUser(request)
+    if (!user || !user.companyId) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
     const { searchParams } = new URL(request.url)
-    const companyId = searchParams.get('companyId') || (await getCompanyId())
     const unpaidOnly = searchParams.get('unpaid') === 'true'
 
     const expenses = unpaidOnly
-      ? await AccrualExpenseTracker.getUnpaidAccrualExpenses(companyId)
-      : await AccrualExpenseTracker.getAccrualExpenses(companyId)
+      ? await AccrualExpenseTracker.getUnpaidAccrualExpenses(user.companyId)
+      : await AccrualExpenseTracker.getAccrualExpenses(user.companyId)
 
     return NextResponse.json(expenses)
   } catch (error) {
@@ -32,11 +31,15 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    const user = await getAuthUser(request)
+    if (!user || !user.companyId) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
     const body = await request.json()
-    const companyId = body.companyId || (await getCompanyId())
 
     const expense = await AccrualExpenseTracker.createAccrualExpense({
-      companyId,
+      companyId: user.companyId,
       accountCode: body.accountCode,
       accountName: body.accountName,
       accrualYear: body.accrualYear,

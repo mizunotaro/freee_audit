@@ -1,0 +1,988 @@
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { FallbackAIProvider, createFallbackProvider } from '@/lib/integrations/ai/fallback-provider'
+import {
+  AIProvider,
+  AIProviderType,
+  DocumentAnalysisRequest,
+  EntryValidationRequest,
+} from '@/lib/integrations/ai/provider'
+import { DocumentAnalysisResult, EntryValidationResult } from '@/types/audit'
+import { CircuitBreaker } from '@/lib/integrations/ai/circuit-breaker'
+import {
+  PROVIDER_REGISTRY,
+  filterProvidersBySecurity,
+  getProviderMetadata,
+} from '@/lib/integrations/ai/provider-registry'
+
+const createMockProvider = (
+  name: 'openai' | 'gemini' | 'claude' | 'openrouter',
+  shouldFail: boolean = false,
+  delay: number = 0
+): AIProvider => {
+  return {
+    name,
+    analyzeDocument: vi.fn(
+      async (request: DocumentAnalysisRequest): Promise<DocumentAnalysisResult> => {
+        if (delay > 0) {
+          await new Promise((resolve) => setTimeout(resolve, delay))
+        }
+        if (shouldFail) {
+          throw new Error(`${name} analyzeDocument failed`)
+        }
+        return {
+          date: '2024-01-01',
+          amount: 1000,
+          taxAmount: 100,
+          taxRate: 0.1,
+          description: `Analyzed by ${name}`,
+          vendorName: 'Test Vendor',
+          confidence: 0.9,
+          rawText: '{}',
+        }
+      }
+    ),
+    validateEntry: vi.fn(
+      async (request: EntryValidationRequest): Promise<EntryValidationResult> => {
+        if (delay > 0) {
+          await new Promise((resolve) => setTimeout(resolve, delay))
+        }
+        if (shouldFail) {
+          throw new Error(`${name} validateEntry failed`)
+        }
+        return {
+          isValid: true,
+          issues: [],
+          suggestions: [`Validated by ${name}`],
+        }
+      }
+    ),
+  }
+}
+
+describe('FallbackAIProvider', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  describe('constructor', () => {
+    it('should throw error when no providers specified', () => {
+      expect(() => createFallbackProvider({ providers: [] })).toThrow(
+        'At least one provider must be specified'
+      )
+    })
+
+    it('should accept single provider', () => {
+      const mockProvider = createMockProvider('openai')
+      const fallback = createFallbackProvider({
+        providers: [{ provider: mockProvider, name: 'openai' }],
+      })
+      expect(fallback.getProviderList()).toEqual(['openai'])
+    })
+
+    it('should accept multiple providers', () => {
+      const fallback = createFallbackProvider({
+        providers: [
+          { provider: createMockProvider('openai'), name: 'openai' },
+          { provider: createMockProvider('gemini'), name: 'gemini' },
+          { provider: createMockProvider('claude'), name: 'claude' },
+        ],
+      })
+      expect(fallback.getProviderList()).toEqual(['openai', 'gemini', 'claude'])
+    })
+
+    it('should use first provider name as default', () => {
+      const fallback = createFallbackProvider({
+        providers: [
+          { provider: createMockProvider('gemini'), name: 'gemini' },
+          { provider: createMockProvider('openai'), name: 'openai' },
+        ],
+      })
+      expect(fallback.name).toBe('gemini')
+    })
+  })
+
+  describe('analyzeDocument', () => {
+    it('should succeed with first provider', async () => {
+      const mockProvider = createMockProvider('openai')
+      const fallback = createFallbackProvider({
+        providers: [{ provider: mockProvider, name: 'openai' }],
+      })
+
+      const result = await fallback.analyzeDocument({
+        documentBase64: 'test',
+        documentType: 'pdf',
+        mimeType: 'application/pdf',
+      })
+
+      expect(result.description).toBe('Analyzed by openai')
+      expect(mockProvider.analyzeDocument).toHaveBeenCalledTimes(1)
+    })
+
+    it('should fallback to second provider when first fails', async () => {
+      const failedProvider = createMockProvider('openai', true)
+      const successProvider = createMockProvider('gemini', false)
+      const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+
+      const fallback = createFallbackProvider({
+        providers: [
+          { provider: failedProvider, name: 'openai' },
+          { provider: successProvider, name: 'gemini' },
+        ],
+      })
+
+      const result = await fallback.analyzeDocument({
+        documentBase64: 'test',
+        documentType: 'pdf',
+        mimeType: 'application/pdf',
+      })
+
+      expect(result.description).toBe('Analyzed by gemini')
+      expect(failedProvider.analyzeDocument).toHaveBeenCalledTimes(1)
+      expect(successProvider.analyzeDocument).toHaveBeenCalledTimes(1)
+      expect(consoleWarnSpy).toHaveBeenCalledWith(
+        '[AI] openai analyzeDocument failed:',
+        'openai analyzeDocument failed'
+      )
+
+      consoleWarnSpy.mockRestore()
+    })
+
+    it('should try all providers in order', async () => {
+      const provider1 = createMockProvider('openai', true)
+      const provider2 = createMockProvider('gemini', true)
+      const provider3 = createMockProvider('claude', false)
+
+      const fallback = createFallbackProvider({
+        providers: [
+          { provider: provider1, name: 'openai' },
+          { provider: provider2, name: 'gemini' },
+          { provider: provider3, name: 'claude' },
+        ],
+      })
+
+      const result = await fallback.analyzeDocument({
+        documentBase64: 'test',
+        documentType: 'pdf',
+        mimeType: 'application/pdf',
+      })
+
+      expect(result.description).toBe('Analyzed by claude')
+      expect(provider1.analyzeDocument).toHaveBeenCalledTimes(1)
+      expect(provider2.analyzeDocument).toHaveBeenCalledTimes(1)
+      expect(provider3.analyzeDocument).toHaveBeenCalledTimes(1)
+    })
+
+    it('should throw error when all providers fail', async () => {
+      const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+
+      const fallback = createFallbackProvider({
+        providers: [
+          { provider: createMockProvider('openai', true), name: 'openai' },
+          { provider: createMockProvider('gemini', true), name: 'gemini' },
+        ],
+      })
+
+      await expect(
+        fallback.analyzeDocument({
+          documentBase64: 'test',
+          documentType: 'pdf',
+          mimeType: 'application/pdf',
+        })
+      ).rejects.toThrow('All AI providers failed analyzeDocument')
+
+      consoleWarnSpy.mockRestore()
+    })
+
+    it('should timeout long-running requests', async () => {
+      const slowProvider = createMockProvider('openai', false, 5000)
+      const fastProvider = createMockProvider('gemini', false, 0)
+
+      const fallback = createFallbackProvider({
+        providers: [
+          { provider: slowProvider, name: 'openai' },
+          { provider: fastProvider, name: 'gemini' },
+        ],
+        timeout: 100,
+      })
+
+      const result = await fallback.analyzeDocument({
+        documentBase64: 'test',
+        documentType: 'pdf',
+        mimeType: 'application/pdf',
+      })
+
+      expect(result.description).toBe('Analyzed by gemini')
+    })
+  })
+
+  describe('validateEntry', () => {
+    it('should succeed with first provider', async () => {
+      const mockProvider = createMockProvider('openai')
+      const fallback = createFallbackProvider({
+        providers: [{ provider: mockProvider, name: 'openai' }],
+      })
+
+      const result = await fallback.validateEntry({
+        journalEntry: {
+          date: '2024-01-01',
+          debitAccount: 'Cash',
+          creditAccount: 'Sales',
+          amount: 1000,
+          taxAmount: 100,
+          taxType: '10%',
+          description: 'Test',
+        },
+        documentData: {
+          date: '2024-01-01',
+          amount: 1000,
+          taxAmount: 100,
+          description: 'Test',
+          vendorName: 'Vendor',
+          confidence: 0.9,
+        },
+      })
+
+      expect(result.isValid).toBe(true)
+      expect(result.suggestions).toContain('Validated by openai')
+    })
+
+    it('should fallback to second provider when first fails', async () => {
+      const failedProvider = createMockProvider('openai', true)
+      const successProvider = createMockProvider('gemini', false)
+      const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+
+      const fallback = createFallbackProvider({
+        providers: [
+          { provider: failedProvider, name: 'openai' },
+          { provider: successProvider, name: 'gemini' },
+        ],
+      })
+
+      const result = await fallback.validateEntry({
+        journalEntry: {
+          date: '2024-01-01',
+          debitAccount: 'Cash',
+          creditAccount: 'Sales',
+          amount: 1000,
+          taxAmount: 100,
+          taxType: '10%',
+          description: 'Test',
+        },
+        documentData: {
+          date: '2024-01-01',
+          amount: 1000,
+          taxAmount: 100,
+          description: 'Test',
+          vendorName: 'Vendor',
+          confidence: 0.9,
+        },
+      })
+
+      expect(result.suggestions).toContain('Validated by gemini')
+
+      consoleWarnSpy.mockRestore()
+    })
+  })
+
+  describe('retries', () => {
+    it('should retry with all providers when retries > 0', async () => {
+      const provider = createMockProvider('openai', true)
+      const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+
+      const fallback = createFallbackProvider({
+        providers: [{ provider, name: 'openai' }],
+        retries: 2,
+      })
+
+      await expect(
+        fallback.analyzeDocument({
+          documentBase64: 'test',
+          documentType: 'pdf',
+          mimeType: 'application/pdf',
+        })
+      ).rejects.toThrow()
+
+      expect(provider.analyzeDocument).toHaveBeenCalledTimes(3)
+
+      consoleWarnSpy.mockRestore()
+    })
+  })
+
+  describe('getCurrentProvider', () => {
+    it('should return first provider initially', () => {
+      const fallback = createFallbackProvider({
+        providers: [
+          { provider: createMockProvider('openai'), name: 'openai' },
+          { provider: createMockProvider('gemini'), name: 'gemini' },
+        ],
+      })
+
+      expect(fallback.getCurrentProvider()).toBe('openai')
+    })
+
+    it('should update to successful provider after fallback', async () => {
+      const fallback = createFallbackProvider({
+        providers: [
+          { provider: createMockProvider('openai', true), name: 'openai' },
+          { provider: createMockProvider('gemini', false), name: 'gemini' },
+        ],
+      })
+
+      await fallback.analyzeDocument({
+        documentBase64: 'test',
+        documentType: 'pdf',
+        mimeType: 'application/pdf',
+      })
+
+      expect(fallback.getCurrentProvider()).toBe('gemini')
+    })
+  })
+
+  describe('security filtering', () => {
+    it('should filter providers by ZDR requirement', () => {
+      expect(() =>
+        createFallbackProvider({
+          providers: [{ provider: createMockProvider('gemini'), name: 'gemini' }],
+          requireZDR: true,
+        })
+      ).toThrow('No providers available after security filtering')
+    })
+
+    it('should keep providers that support ZDR', () => {
+      const fallback = createFallbackProvider({
+        providers: [
+          { provider: createMockProvider('openai'), name: 'openai' },
+          { provider: createMockProvider('gemini'), name: 'gemini' },
+        ],
+        requireZDR: true,
+      })
+      expect(fallback.getProviderList()).toEqual(['openai'])
+    })
+
+    it('should filter providers by data residency', () => {
+      const fallback = createFallbackProvider({
+        providers: [
+          { provider: createMockProvider('openai'), name: 'openai' },
+          { provider: createMockProvider('gemini'), name: 'gemini' },
+        ],
+        allowedDataResidency: ['EU'],
+      })
+      expect(fallback.getProviderList()).toEqual(['gemini'])
+    })
+
+    it('should throw when no providers match security requirements', () => {
+      expect(() =>
+        createFallbackProvider({
+          providers: [{ provider: createMockProvider('openai'), name: 'openai' }],
+          allowedDataResidency: ['EU'],
+        })
+      ).toThrow('No providers available after security filtering (allowed regions: EU)')
+    })
+
+    it('should track original provider list', () => {
+      const fallback = createFallbackProvider({
+        providers: [
+          { provider: createMockProvider('openai'), name: 'openai' },
+          { provider: createMockProvider('gemini'), name: 'gemini' },
+        ],
+        requireZDR: true,
+      })
+      expect(fallback.getOriginalProviderList()).toEqual(['openai', 'gemini'])
+      expect(fallback.getProviderList()).toEqual(['openai'])
+    })
+  })
+
+  describe('circuit breaker', () => {
+    it('should initialize circuit breakers when configured', () => {
+      const fallback = createFallbackProvider({
+        providers: [
+          { provider: createMockProvider('openai'), name: 'openai' },
+          { provider: createMockProvider('gemini'), name: 'gemini' },
+        ],
+        circuitBreaker: {
+          failureThreshold: 3,
+          resetTimeout: 30000,
+        },
+      })
+
+      expect(fallback.getCircuitBreakerState('openai')).toBe('closed')
+      expect(fallback.getCircuitBreakerState('gemini')).toBe('closed')
+    })
+
+    it('should open circuit breaker after threshold failures', async () => {
+      const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+
+      const fallback = createFallbackProvider({
+        providers: [{ provider: createMockProvider('openai', true), name: 'openai' }],
+        circuitBreaker: {
+          failureThreshold: 2,
+          resetTimeout: 30000,
+        },
+        retries: 0,
+      })
+
+      for (let i = 0; i < 3; i++) {
+        try {
+          await fallback.analyzeDocument({
+            documentBase64: 'test',
+            documentType: 'pdf',
+            mimeType: 'application/pdf',
+          })
+        } catch {
+          // Expected error - circuit breaker should open
+        }
+      }
+
+      expect(fallback.getCircuitBreakerState('openai')).toBe('open')
+
+      const result = await fallback.analyzeDocument({
+        documentBase64: 'test',
+        documentType: 'pdf',
+        mimeType: 'application/pdf',
+      })
+
+      consoleWarnSpy.mockRestore()
+    })
+
+    it('should skip providers with open circuit breaker', async () => {
+      const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+
+      const failingProvider = createMockProvider('openai', true)
+      const successProvider = createMockProvider('gemini', false)
+
+      const fallback = createFallbackProvider({
+        providers: [
+          { provider: failingProvider, name: 'openai' },
+          { provider: successProvider, name: 'gemini' },
+        ],
+        circuitBreaker: {
+          failureThreshold: 1,
+          resetTimeout: 60000,
+        },
+      })
+
+      try {
+        await fallback.analyzeDocument({
+          documentBase64: 'test',
+          documentType: 'pdf',
+          mimeType: 'application/pdf',
+        })
+      } catch {}
+
+      expect(fallback.getCircuitBreakerState('openai')).toBe('open')
+
+      const result = await fallback.analyzeDocument({
+        documentBase64: 'test',
+        documentType: 'pdf',
+        mimeType: 'application/pdf',
+      })
+
+      expect(result.description).toBe('Analyzed by gemini')
+
+      consoleWarnSpy.mockRestore()
+    })
+
+    it('should reset circuit breaker', () => {
+      const fallback = createFallbackProvider({
+        providers: [{ provider: createMockProvider('openai'), name: 'openai' }],
+        circuitBreaker: {
+          failureThreshold: 1,
+          resetTimeout: 60000,
+        },
+      })
+
+      fallback.resetCircuitBreaker('openai')
+      expect(fallback.getCircuitBreakerState('openai')).toBe('closed')
+    })
+  })
+
+  describe('metrics', () => {
+    it('should track success metrics', async () => {
+      const fallback = createFallbackProvider({
+        providers: [{ provider: createMockProvider('openai'), name: 'openai' }],
+      })
+
+      await fallback.analyzeDocument({
+        documentBase64: 'test',
+        documentType: 'pdf',
+        mimeType: 'application/pdf',
+      })
+
+      const metrics = fallback.getMetricsForProvider('openai')
+      expect(metrics?.successCount).toBe(1)
+      expect(metrics?.failureCount).toBe(0)
+      expect(metrics?.successRate).toBe(1)
+      expect(metrics?.lastSuccess).not.toBeNull()
+      expect(metrics?.averageLatency).toBeGreaterThanOrEqual(0)
+    })
+
+    it('should track failure metrics', async () => {
+      const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+
+      const fallback = createFallbackProvider({
+        providers: [
+          { provider: createMockProvider('openai', true), name: 'openai' },
+          { provider: createMockProvider('gemini', false), name: 'gemini' },
+        ],
+      })
+
+      await fallback.analyzeDocument({
+        documentBase64: 'test',
+        documentType: 'pdf',
+        mimeType: 'application/pdf',
+      })
+
+      const openaiMetrics = fallback.getMetricsForProvider('openai')
+      expect(openaiMetrics?.successCount).toBe(0)
+      expect(openaiMetrics?.failureCount).toBe(1)
+      expect(openaiMetrics?.successRate).toBe(0)
+      expect(openaiMetrics?.lastFailure).not.toBeNull()
+
+      consoleWarnSpy.mockRestore()
+    })
+
+    it('should return all metrics', async () => {
+      const fallback = createFallbackProvider({
+        providers: [
+          { provider: createMockProvider('openai'), name: 'openai' },
+          { provider: createMockProvider('gemini'), name: 'gemini' },
+        ],
+      })
+
+      await fallback.analyzeDocument({
+        documentBase64: 'test',
+        documentType: 'pdf',
+        mimeType: 'application/pdf',
+      })
+
+      const allMetrics = fallback.getMetrics()
+      expect(allMetrics.size).toBe(2)
+      expect(allMetrics.get('openai')?.successCount).toBe(1)
+      expect(allMetrics.get('gemini')?.successCount).toBe(0)
+    })
+
+    it('should prioritize providers by success rate', async () => {
+      const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+
+      const openaiProvider = createMockProvider('openai')
+      const geminiProvider = createMockProvider('gemini', false, 0)
+
+      const fallback = createFallbackProvider({
+        providers: [
+          { provider: openaiProvider, name: 'openai' },
+          { provider: geminiProvider, name: 'gemini' },
+        ],
+      })
+
+      await fallback.analyzeDocument({
+        documentBase64: 'test',
+        documentType: 'pdf',
+        mimeType: 'application/pdf',
+      })
+
+      expect(fallback.getCurrentProvider()).toBe('openai')
+
+      consoleWarnSpy.mockRestore()
+    })
+
+    it('should track available providers excluding circuit-open ones', async () => {
+      const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+
+      const fallback = createFallbackProvider({
+        providers: [
+          { provider: createMockProvider('openai', true), name: 'openai' },
+          { provider: createMockProvider('gemini', false), name: 'gemini' },
+        ],
+        circuitBreaker: {
+          failureThreshold: 1,
+          resetTimeout: 60000,
+        },
+      })
+
+      try {
+        await fallback.analyzeDocument({
+          documentBase64: 'test',
+          documentType: 'pdf',
+          mimeType: 'application/pdf',
+        })
+      } catch {
+        // Expected error - provider should be unavailable
+      }
+
+      const available = fallback.getAvailableProviders()
+      expect(available).not.toContain('openai')
+      expect(available).toContain('gemini')
+
+      consoleWarnSpy.mockRestore()
+    })
+  })
+
+  describe('parallel mode', () => {
+    it('should race providers in parallel mode', async () => {
+      const fastProvider = createMockProvider('openai', false, 10)
+      const slowProvider = createMockProvider('gemini', false, 100)
+
+      const fallback = createFallbackProvider({
+        providers: [
+          { provider: slowProvider, name: 'gemini' },
+          { provider: fastProvider, name: 'openai' },
+        ],
+        parallelMode: true,
+      })
+
+      const result = await fallback.analyzeDocument({
+        documentBase64: 'test',
+        documentType: 'pdf',
+        mimeType: 'application/pdf',
+      })
+
+      expect(['Analyzed by openai', 'Analyzed by gemini']).toContain(result.description)
+    })
+
+    it('should return first successful result in parallel mode', async () => {
+      const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+
+      const failingProvider = createMockProvider('openai', true, 0)
+      const successProvider = createMockProvider('gemini', false, 0)
+
+      const fallback = createFallbackProvider({
+        providers: [
+          { provider: failingProvider, name: 'openai' },
+          { provider: successProvider, name: 'gemini' },
+        ],
+        parallelMode: true,
+      })
+
+      const result = await fallback.analyzeDocument({
+        documentBase64: 'test',
+        documentType: 'pdf',
+        mimeType: 'application/pdf',
+      })
+
+      expect(result.description).toBe('Analyzed by gemini')
+
+      consoleWarnSpy.mockRestore()
+    })
+
+    it('should throw when all providers fail in parallel mode', async () => {
+      const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+
+      const fallback = createFallbackProvider({
+        providers: [
+          { provider: createMockProvider('openai', true), name: 'openai' },
+          { provider: createMockProvider('gemini', true), name: 'gemini' },
+        ],
+        parallelMode: true,
+      })
+
+      await expect(
+        fallback.analyzeDocument({
+          documentBase64: 'test',
+          documentType: 'pdf',
+          mimeType: 'application/pdf',
+        })
+      ).rejects.toThrow('All AI providers failed')
+
+      consoleWarnSpy.mockRestore()
+    })
+
+    it('should skip circuit-open providers in parallel mode', async () => {
+      const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+
+      const fallback = createFallbackProvider({
+        providers: [
+          { provider: createMockProvider('openai', true), name: 'openai' },
+          { provider: createMockProvider('gemini', false), name: 'gemini' },
+        ],
+        parallelMode: true,
+        circuitBreaker: {
+          failureThreshold: 1,
+          resetTimeout: 60000,
+        },
+      })
+
+      try {
+        await fallback.analyzeDocument({
+          documentBase64: 'test',
+          documentType: 'pdf',
+          mimeType: 'application/pdf',
+        })
+      } catch {
+        // Expected error - circuit breaker should open
+      }
+
+      expect(fallback.getCircuitBreakerState('openai')).toBe('open')
+
+      const result = await fallback.analyzeDocument({
+        documentBase64: 'test',
+        documentType: 'pdf',
+        mimeType: 'application/pdf',
+      })
+
+      expect(result.description).toBe('Analyzed by gemini')
+
+      consoleWarnSpy.mockRestore()
+    })
+  })
+
+  describe('caching', () => {
+    it('should cache results when caching is enabled', async () => {
+      const provider = createMockProvider('openai')
+      const fallback = createFallbackProvider({
+        providers: [{ provider, name: 'openai' }],
+        cacheResults: true,
+        cacheTTL: 60000,
+      })
+
+      const request = {
+        documentBase64: 'test',
+        documentType: 'pdf' as const,
+        mimeType: 'application/pdf',
+      }
+
+      const result1 = await fallback.analyzeDocument(request)
+      const result2 = await fallback.analyzeDocument(request)
+
+      expect(result1).toEqual(result2)
+      expect(provider.analyzeDocument).toHaveBeenCalledTimes(1)
+    })
+
+    it('should not cache results when caching is disabled', async () => {
+      const provider = createMockProvider('openai')
+      const fallback = createFallbackProvider({
+        providers: [{ provider, name: 'openai' }],
+        cacheResults: false,
+      })
+
+      const request = {
+        documentBase64: 'test',
+        documentType: 'pdf' as const,
+        mimeType: 'application/pdf',
+      }
+
+      await fallback.analyzeDocument(request)
+      await fallback.analyzeDocument(request)
+
+      expect(provider.analyzeDocument).toHaveBeenCalledTimes(2)
+    })
+
+    it('should expire cached results after TTL', async () => {
+      vi.useFakeTimers()
+
+      const provider = createMockProvider('openai')
+      const fallback = createFallbackProvider({
+        providers: [{ provider, name: 'openai' }],
+        cacheResults: true,
+        cacheTTL: 1000,
+      })
+
+      const request = {
+        documentBase64: 'test',
+        documentType: 'pdf' as const,
+        mimeType: 'application/pdf',
+      }
+
+      await fallback.analyzeDocument(request)
+      expect(provider.analyzeDocument).toHaveBeenCalledTimes(1)
+
+      vi.advanceTimersByTime(1500)
+
+      await fallback.analyzeDocument(request)
+      expect(provider.analyzeDocument).toHaveBeenCalledTimes(2)
+
+      vi.useRealTimers()
+    })
+
+    it('should clear cache', async () => {
+      const provider = createMockProvider('openai')
+      const fallback = createFallbackProvider({
+        providers: [{ provider, name: 'openai' }],
+        cacheResults: true,
+        cacheTTL: 60000,
+      })
+
+      const request = {
+        documentBase64: 'test',
+        documentType: 'pdf' as const,
+        mimeType: 'application/pdf',
+      }
+
+      await fallback.analyzeDocument(request)
+      fallback.clearCache()
+      await fallback.analyzeDocument(request)
+
+      expect(provider.analyzeDocument).toHaveBeenCalledTimes(2)
+    })
+  })
+
+  describe('error handling', () => {
+    it('should handle non-Error exceptions', async () => {
+      const provider: AIProvider = {
+        name: 'openai',
+        analyzeDocument: vi.fn(async () => {
+          throw 'String error'
+        }),
+        validateEntry: vi.fn(async () => ({
+          isValid: true,
+          issues: [],
+        })),
+      }
+
+      const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+
+      const fallback = createFallbackProvider({
+        providers: [
+          { provider, name: 'openai' },
+          { provider: createMockProvider('gemini', false), name: 'gemini' },
+        ],
+      })
+
+      const result = await fallback.analyzeDocument({
+        documentBase64: 'test',
+        documentType: 'pdf',
+        mimeType: 'application/pdf',
+      })
+
+      expect(result.description).toBe('Analyzed by gemini')
+
+      consoleWarnSpy.mockRestore()
+    })
+  })
+})
+
+describe('CircuitBreaker', () => {
+  it('should start in closed state', () => {
+    const cb = new CircuitBreaker({ failureThreshold: 3, resetTimeout: 1000 })
+    expect(cb.getState()).toBe('closed')
+  })
+
+  it('should open after threshold failures', () => {
+    const cb = new CircuitBreaker({ failureThreshold: 3, resetTimeout: 1000 })
+
+    cb.recordFailure()
+    cb.recordFailure()
+    expect(cb.getState()).toBe('closed')
+
+    cb.recordFailure()
+    expect(cb.getState()).toBe('open')
+  })
+
+  it('should not allow execution when open', () => {
+    const cb = new CircuitBreaker({ failureThreshold: 1, resetTimeout: 10000 })
+    cb.recordFailure()
+    expect(cb.canExecute()).toBe(false)
+  })
+
+  it('should transition to half-open after reset timeout', () => {
+    vi.useFakeTimers()
+
+    const cb = new CircuitBreaker({ failureThreshold: 1, resetTimeout: 1000 })
+    cb.recordFailure()
+    expect(cb.getState()).toBe('open')
+
+    vi.advanceTimersByTime(1000)
+    expect(cb.canExecute()).toBe(true)
+    expect(cb.getState()).toBe('half-open')
+
+    vi.useRealTimers()
+  })
+
+  it('should close after success in half-open state', () => {
+    vi.useFakeTimers()
+
+    const cb = new CircuitBreaker({ failureThreshold: 1, resetTimeout: 1000 })
+    cb.recordFailure()
+    vi.advanceTimersByTime(1000)
+
+    expect(cb.getState()).toBe('half-open')
+    cb.recordSuccess()
+    expect(cb.getState()).toBe('closed')
+
+    vi.useRealTimers()
+  })
+
+  it('should reopen on failure in half-open state', () => {
+    vi.useFakeTimers()
+
+    const cb = new CircuitBreaker({ failureThreshold: 1, resetTimeout: 1000 })
+    cb.recordFailure()
+    vi.advanceTimersByTime(1000)
+
+    expect(cb.getState()).toBe('half-open')
+    cb.recordFailure()
+    expect(cb.getState()).toBe('open')
+
+    vi.useRealTimers()
+  })
+
+  it('should reset to closed state', () => {
+    const cb = new CircuitBreaker({ failureThreshold: 1, resetTimeout: 10000 })
+    cb.recordFailure()
+    expect(cb.getState()).toBe('open')
+
+    cb.reset()
+    expect(cb.getState()).toBe('closed')
+  })
+
+  it('should track stats', () => {
+    const cb = new CircuitBreaker({ failureThreshold: 3, resetTimeout: 1000 })
+
+    cb.recordSuccess()
+    cb.recordSuccess()
+    cb.recordFailure()
+
+    const stats = cb.getStats()
+    expect(stats.state).toBe('closed')
+    expect(stats.failureCount).toBe(1)
+    expect(stats.successCount).toBe(2)
+    expect(stats.lastFailure).not.toBeNull()
+  })
+})
+
+describe('Provider Registry', () => {
+  it('should have metadata for all providers', () => {
+    expect(PROVIDER_REGISTRY['openai']).toBeDefined()
+    expect(PROVIDER_REGISTRY['claude']).toBeDefined()
+    expect(PROVIDER_REGISTRY['gemini']).toBeDefined()
+    expect(PROVIDER_REGISTRY['openrouter']).toBeDefined()
+  })
+
+  it('should identify ZDR-supporting providers', () => {
+    expect(PROVIDER_REGISTRY['openai'].supportsZDR).toBe(true)
+    expect(PROVIDER_REGISTRY['claude'].supportsZDR).toBe(true)
+    expect(PROVIDER_REGISTRY['gemini'].supportsZDR).toBe(false)
+    expect(PROVIDER_REGISTRY['openrouter'].supportsZDR).toBe(false)
+  })
+
+  it('should identify data residency regions', () => {
+    expect(PROVIDER_REGISTRY['openai'].dataResidency).toContain('US')
+    expect(PROVIDER_REGISTRY['claude'].dataResidency).toContain('EU')
+    expect(PROVIDER_REGISTRY['gemini'].dataResidency).toContain('GLOBAL')
+  })
+
+  it('should get provider metadata', () => {
+    const metadata = getProviderMetadata('openai')
+    expect(metadata?.displayName).toBe('OpenAI')
+    expect(metadata?.supportsZDR).toBe(true)
+  })
+
+  it('should filter providers by security requirements', () => {
+    const providers: AIProviderType[] = ['openai', 'gemini', 'claude']
+
+    const zdrOnly = filterProvidersBySecurity(providers, { requireZDR: true })
+    expect(zdrOnly).toEqual(['openai', 'claude'])
+
+    const euOnly = filterProvidersBySecurity(providers, { allowedDataResidency: ['EU'] })
+    expect(euOnly).toEqual(['gemini', 'claude'])
+
+    const both = filterProvidersBySecurity(providers, {
+      requireZDR: true,
+      allowedDataResidency: ['EU'],
+    })
+    expect(both).toEqual(['claude'])
+  })
+})

@@ -1,12 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { validateSession } from '@/lib/auth'
 import { FreeeClient } from '@/lib/integrations/freee/client'
 import { saveToken } from '@/lib/integrations/freee/token-store'
-import { prisma } from '@/lib/db'
 
 const client = new FreeeClient()
 
 export async function GET(request: NextRequest) {
   try {
+    const sessionToken = request.cookies.get('session')?.value
+    if (!sessionToken) {
+      return NextResponse.redirect(new URL('/login', request.url))
+    }
+
+    const user = await validateSession(sessionToken)
+    if (!user) {
+      return NextResponse.redirect(new URL('/login', request.url))
+    }
+
     const searchParams = request.nextUrl.searchParams
     const code = searchParams.get('code')
     const state = searchParams.get('state')
@@ -33,23 +43,13 @@ export async function GET(request: NextRequest) {
       return NextResponse.redirect(new URL('/settings/freee?error=invalid_state', request.url))
     }
 
-    const tokenResponse = await client.exchangeCodeForToken(code)
-
-    let targetCompanyId = companyId
-    if (targetCompanyId === 'default') {
-      let company = await prisma.company.findFirst()
-      if (!company) {
-        company = await prisma.company.create({
-          data: {
-            name: 'Default Company',
-            fiscalYearStart: 1,
-          },
-        })
-      }
-      targetCompanyId = company.id
+    if (companyId !== user.companyId) {
+      return NextResponse.redirect(new URL('/settings/freee?error=company_mismatch', request.url))
     }
 
-    await saveToken(targetCompanyId, tokenResponse)
+    const tokenResponse = await client.exchangeCodeForToken(code)
+
+    await saveToken(companyId, tokenResponse)
 
     const response = NextResponse.redirect(new URL('/settings/freee?connected=true', request.url))
 

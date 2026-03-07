@@ -1,17 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { validateSession } from '@/lib/auth'
 import { FreeeClient } from '@/lib/integrations/freee/client'
 import { getToken, saveToken } from '@/lib/integrations/freee/token-store'
 
+async function getAuthUser(request: NextRequest) {
+  const token = request.cookies.get('session')?.value
+  if (!token) return null
+  return validateSession(token)
+}
+
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json()
-    const { company_id } = body
-
-    if (!company_id) {
-      return NextResponse.json({ error: 'company_id is required' }, { status: 400 })
+    const user = await getAuthUser(request)
+    if (!user || !user.companyId) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const token = await getToken(company_id)
+    const companyId = user.companyId
+
+    const token = await getToken(companyId)
     if (!token) {
       return NextResponse.json(
         { error: 'No token found. Please authenticate first.' },
@@ -19,10 +26,10 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const client = new FreeeClient(undefined, company_id)
+    const client = new FreeeClient(undefined, companyId)
     const newTokenResponse = await client.refreshToken(token.refreshToken)
 
-    await saveToken(company_id, newTokenResponse)
+    await saveToken(companyId, newTokenResponse)
 
     return NextResponse.json({
       success: true,

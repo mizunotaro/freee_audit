@@ -1,6 +1,7 @@
 import type { BalanceSheet, ProfitLoss, FinancialKPIs, CashFlowStatement } from '@/types'
 import { safeDivide, calculateGrowthRate } from '@/lib/utils'
 import { calculateFreeCashFlow } from '@/services/cashflow/calculator'
+import { kpiCache } from '@/lib/cache'
 
 export interface StartupKPIs {
   burnRate: number
@@ -53,7 +54,14 @@ export function calculateFinancialKPIs(
   cf: CashFlowStatement,
   previousPL?: ProfitLoss
 ): FinancialKPIs {
-  return {
+  const cacheKey = generateKPIHash(bs, pl, cf, previousPL)
+
+  const cached = kpiCache.get(cacheKey)
+  if (cached) {
+    return cached as unknown as FinancialKPIs
+  }
+
+  const kpis = {
     fiscalYear: pl.fiscalYear,
     month: pl.month,
     profitability: calculateProfitabilityKPIs(bs, pl),
@@ -62,6 +70,23 @@ export function calculateFinancialKPIs(
     growth: calculateGrowthKPIs(pl, previousPL),
     cashFlow: calculateCashFlowKPIs(pl, cf),
   }
+
+  kpiCache.set(cacheKey, kpis)
+  return kpis
+}
+
+function generateKPIHash(
+  bs: BalanceSheet,
+  pl: ProfitLoss,
+  cf: CashFlowStatement,
+  previousPL?: ProfitLoss
+): string {
+  return JSON.stringify({
+    bsTotal: bs.assets.total,
+    plNetIncome: pl.netIncome,
+    cfNetCash: cf.netChangeInCash,
+    prevNetIncome: previousPL?.netIncome,
+  })
 }
 
 export function calculateExtendedKPIs(

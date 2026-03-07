@@ -1,11 +1,19 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
+import { withAuth, type AuthenticatedRequest } from '@/lib/api'
 import { prisma } from '@/lib/db'
 import { encrypt } from '@/lib/crypto/encryption'
 
-export async function GET() {
+async function getHandler(req: AuthenticatedRequest) {
   try {
+    const companyId = req.user.companyId
+
+    if (!companyId) {
+      return NextResponse.json({ config: {} })
+    }
+
     const apiKeys = await prisma.apiKey.findMany({
       where: {
+        companyId,
         provider: { in: ['OPENAI', 'GEMINI', 'CLAUDE'] },
       },
     })
@@ -31,9 +39,19 @@ export async function GET() {
   }
 }
 
-export async function POST(request: NextRequest) {
+async function postHandler(req: AuthenticatedRequest) {
   try {
-    const body = await request.json()
+    if (!['ADMIN', 'SUPER_ADMIN'].includes(req.user.role)) {
+      return NextResponse.json({ error: 'Only admins can configure API keys' }, { status: 403 })
+    }
+
+    const companyId = req.user.companyId
+
+    if (!companyId) {
+      return NextResponse.json({ error: 'User is not associated with a company' }, { status: 400 })
+    }
+
+    const body = await req.json()
     const { provider, apiKey, model } = body
 
     if (!provider || !apiKey) {
@@ -51,27 +69,17 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid provider' }, { status: 400 })
     }
 
-    let company = await prisma.company.findFirst()
-    if (!company) {
-      company = await prisma.company.create({
-        data: {
-          name: 'Default Company',
-          fiscalYearStart: 1,
-        },
-      })
-    }
-
     const encryptedKey = encrypt(apiKey)
 
     await prisma.apiKey.upsert({
       where: {
         companyId_provider: {
-          companyId: company.id,
+          companyId,
           provider: dbProvider as 'OPENAI' | 'GEMINI' | 'CLAUDE',
         },
       },
       create: {
-        companyId: company.id,
+        companyId,
         provider: dbProvider as 'OPENAI' | 'GEMINI' | 'CLAUDE',
         encryptedKey,
         metadata: JSON.stringify({ model }),
@@ -88,3 +96,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Failed to save configuration' }, { status: 500 })
   }
 }
+
+export const GET = withAuth(getHandler, { requireCompany: true })
+export const POST = withAuth(postHandler, { requireCompany: true })

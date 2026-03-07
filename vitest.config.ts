@@ -15,6 +15,8 @@ export default defineConfig({
       reportsDirectory: './coverage',
       include: ['src/**/*.ts', 'src/**/*.tsx'],
       exclude: [
+        'node_modules/',
+        'tests/',
         'src/types/**',
         'src/components/**',
         'src/app/**/layout.tsx',
@@ -24,10 +26,10 @@ export default defineConfig({
         '**/*.config.*',
       ],
       thresholds: {
-        lines: 5,
-        functions: 5,
-        branches: 5,
-        statements: 5,
+        lines: 80,
+        functions: 80,
+        branches: 70,
+        statements: 80,
       },
     },
     setupFiles: ['./tests/setup.ts'],

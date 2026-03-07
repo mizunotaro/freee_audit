@@ -49,7 +49,11 @@ export class ReceiptAnalyzer {
 
   private getPreferredProvider(documentType: 'pdf' | 'image' | 'excel'): AIProviderInterface {
     if (documentType === 'pdf' && this.preferGeminiForPdf) {
-      return createAIProviderFromEnv({ provider: 'gemini' })
+      const geminiProvider = createAIProviderFromEnv('gemini')
+      if (!geminiProvider) {
+        throw new Error('Failed to create Gemini provider')
+      }
+      return geminiProvider as AIProviderInterface
     }
 
     if (!this.aiProvider) {

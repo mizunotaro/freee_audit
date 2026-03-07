@@ -3,10 +3,21 @@ export interface RateLimitConfig {
   windowMs: number
 }
 
+export type FreeePlan = 'starter' | 'standard' | 'advice' | 'advance' | 'enterprise'
+
+export const PLAN_DAILY_LIMITS: Record<FreeePlan, number> = {
+  starter: 3000,
+  standard: 3000,
+  advice: 5000,
+  advance: 5000,
+  enterprise: 10000,
+}
+
 const DEFAULT_LIMITS: Record<string, RateLimitConfig> = {
   auth: { maxRequests: 10, windowMs: 1000 },
   data: { maxRequests: 5, windowMs: 1000 },
-  report: { maxRequests: 2, windowMs: 1000 },
+  report: { maxRequests: 10, windowMs: 1000 },
+  receipt_download: { maxRequests: 3, windowMs: 1000 },
 }
 
 interface TokenBucket {
@@ -77,6 +88,73 @@ export class RateLimiter {
 }
 
 export const freeeRateLimiter = new RateLimiter()
+
+interface DailyUsage {
+  count: number
+  date: string
+  plan: FreeePlan
+}
+
+class DailyUsageTracker {
+  private usage: Map<string, DailyUsage> = new Map()
+
+  private getTodayString(): string {
+    return new Date().toISOString().split('T')[0]
+  }
+
+  async increment(companyId: string, plan: FreeePlan = 'advice'): Promise<void> {
+    const today = this.getTodayString()
+    const current = this.usage.get(companyId)
+
+    if (!current || current.date !== today) {
+      this.usage.set(companyId, { count: 1, date: today, plan })
+    } else {
+      current.count++
+    }
+  }
+
+  getUsage(companyId: string): { count: number; limit: number; remaining: number } {
+    const today = this.getTodayString()
+    const current = this.usage.get(companyId)
+
+    if (!current || current.date !== today) {
+      return { count: 0, limit: PLAN_DAILY_LIMITS.advice, remaining: PLAN_DAILY_LIMITS.advice }
+    }
+
+    const limit = PLAN_DAILY_LIMITS[current.plan]
+    return {
+      count: current.count,
+      limit,
+      remaining: Math.max(0, limit - current.count),
+    }
+  }
+
+  setPlan(companyId: string, plan: FreeePlan): void {
+    const today = this.getTodayString()
+    const current = this.usage.get(companyId)
+
+    if (current && current.date === today) {
+      current.plan = plan
+    } else {
+      this.usage.set(companyId, { count: 0, date: today, plan })
+    }
+  }
+
+  isLimitExceeded(companyId: string): boolean {
+    const usage = this.getUsage(companyId)
+    return usage.count >= usage.limit
+  }
+
+  reset(companyId?: string): void {
+    if (companyId) {
+      this.usage.delete(companyId)
+    } else {
+      this.usage.clear()
+    }
+  }
+}
+
+export const dailyUsageTracker = new DailyUsageTracker()
 
 export class CircuitBreaker {
   private state: 'CLOSED' | 'OPEN' | 'HALF_OPEN' = 'CLOSED'

@@ -1,34 +1,31 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { validateSession } from '@/lib/auth'
 import {
   calculateFinancialKPIs,
   calculateExtendedKPIs,
   getKPIBenchmarks,
 } from '@/services/analytics/financial-kpi'
-import { prisma } from '@/lib/db'
+
+async function getAuthUser(request: NextRequest) {
+  const token = request.cookies.get('session')?.value
+  if (!token) return null
+  return validateSession(token)
+}
 
 export async function GET(request: NextRequest) {
   try {
+    const user = await getAuthUser(request)
+    if (!user || !user.companyId) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
     const { searchParams } = new URL(request.url)
     const fiscalYear = parseInt(
       searchParams.get('fiscalYear') || new Date().getFullYear().toString()
     )
     const month = parseInt(searchParams.get('month') || new Date().getMonth().toString())
-    const companyId = searchParams.get('companyId')
     const extended = searchParams.get('extended') !== 'false'
-
-    let targetCompanyId = companyId
-
-    if (!targetCompanyId) {
-      const companies = await prisma.company.findMany({ take: 1 })
-      if (companies.length === 0) {
-        const company = await prisma.company.create({
-          data: { name: 'サンプル株式会社', fiscalYearStart: 4 },
-        })
-        targetCompanyId = company.id
-      } else {
-        targetCompanyId = companies[0].id
-      }
-    }
+    const targetCompanyId = user.companyId
 
     if (extended) {
       const extendedKPIs = await calculateSampleExtendedKPIs(targetCompanyId, fiscalYear, month)

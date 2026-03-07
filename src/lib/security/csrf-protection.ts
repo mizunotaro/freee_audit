@@ -1,7 +1,18 @@
 import crypto from 'crypto'
 import { NextRequest, NextResponse } from 'next/server'
 
-const CSRF_SECRET: string = process.env.CSRF_SECRET || 'default-csrf-secret-change-in-production'
+function getRequiredEnvVar(name: string): string {
+  const value = process.env[name]
+  if (!value) {
+    throw new Error(`Required environment variable ${name} is not set`)
+  }
+  if (value.length < 32) {
+    throw new Error(`Environment variable ${name} must be at least 32 characters`)
+  }
+  return value
+}
+
+const CSRF_SECRET: string = getRequiredEnvVar('CSRF_SECRET')
 const CSRF_TOKEN_EXPIRY = 60 * 60 * 1000
 const CSRF_HEADER = 'x-csrf-token'
 const CSRF_COOKIE = 'csrf-token'

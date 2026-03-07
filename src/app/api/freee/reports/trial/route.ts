@@ -1,21 +1,28 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { validateSession } from '@/lib/auth'
 import { FreeeClient } from '@/lib/integrations/freee/client'
+
+async function getAuthUser(request: NextRequest) {
+  const token = request.cookies.get('session')?.value
+  if (!token) return null
+  return validateSession(token)
+}
 
 export async function GET(request: NextRequest) {
   try {
+    const user = await getAuthUser(request)
+    if (!user || !user.companyId) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
     const searchParams = request.nextUrl.searchParams
-    const companyId = searchParams.get('company_id')
     const fiscalYear = searchParams.get('fiscal_year')
     const startMonth = searchParams.get('start_month')
     const endMonth = searchParams.get('end_month')
 
-    if (!companyId) {
-      return NextResponse.json({ error: 'company_id is required' }, { status: 400 })
-    }
-
     const client = new FreeeClient()
     const trialBalance = await client.getTrialBalance({
-      company_id: parseInt(companyId, 10),
+      company_id: parseInt(user.companyId, 10),
       fiscal_year: fiscalYear ? parseInt(fiscalYear, 10) : undefined,
       start_month: startMonth ? parseInt(startMonth, 10) : undefined,
       end_month: endMonth ? parseInt(endMonth, 10) : undefined,

@@ -259,4 +259,111 @@ export interface FreeeConnectionStatus {
   companyName?: string
   expiresAt?: Date
   lastSyncAt?: Date
+  plan?: FreeePlanInfo
+  dailyUsage?: DailyUsageInfo
+}
+
+export type FreeePlanType = 'starter' | 'standard' | 'advice' | 'advance' | 'enterprise'
+
+export interface FreeePlanInfo {
+  type: FreeePlanType
+  displayName: string
+  dailyApiLimit: number
+  features: FreeePlanFeatures
+}
+
+export interface FreeePlanFeatures {
+  journals: boolean
+  trialBalance: boolean
+  generalLedger: boolean
+  fixedAssets: boolean
+  segments: number
+  manualJournalImport: boolean
+}
+
+export const FREEE_PLAN_FEATURES: Record<FreeePlanType, FreeePlanFeatures> = {
+  starter: {
+    journals: true,
+    trialBalance: true,
+    generalLedger: false,
+    fixedAssets: false,
+    segments: 0,
+    manualJournalImport: true,
+  },
+  standard: {
+    journals: true,
+    trialBalance: true,
+    generalLedger: false,
+    fixedAssets: false,
+    segments: 0,
+    manualJournalImport: true,
+  },
+  advice: {
+    journals: true,
+    trialBalance: true,
+    generalLedger: true,
+    fixedAssets: false,
+    segments: 1,
+    manualJournalImport: true,
+  },
+  advance: {
+    journals: true,
+    trialBalance: true,
+    generalLedger: true,
+    fixedAssets: false,
+    segments: 3,
+    manualJournalImport: true,
+  },
+  enterprise: {
+    journals: true,
+    trialBalance: true,
+    generalLedger: true,
+    fixedAssets: true,
+    segments: 3,
+    manualJournalImport: true,
+  },
+}
+
+export const FREEE_PLAN_DISPLAY_NAMES: Record<FreeePlanType, string> = {
+  starter: 'スタータープラン',
+  standard: 'スタンダードプラン',
+  advice: 'アドバイスプラン',
+  advance: 'アドバンスプラン',
+  enterprise: 'エンタープライズプラン',
+}
+
+export const FREEE_PLAN_DAILY_LIMITS: Record<FreeePlanType, number> = {
+  starter: 3000,
+  standard: 3000,
+  advice: 5000,
+  advance: 5000,
+  enterprise: 10000,
+}
+
+export function getFreeePlanInfo(planType: FreeePlanType): FreeePlanInfo {
+  return {
+    type: planType,
+    displayName: FREEE_PLAN_DISPLAY_NAMES[planType],
+    dailyApiLimit: FREEE_PLAN_DAILY_LIMITS[planType],
+    features: FREEE_PLAN_FEATURES[planType],
+  }
+}
+
+export function detectPlanFromApi(company: FreeeCompany & { plan?: string }): FreeePlanType {
+  if (company.plan) {
+    const normalized = company.plan.toLowerCase()
+    if (normalized.includes('enterprise')) return 'enterprise'
+    if (normalized.includes('advance')) return 'advance'
+    if (normalized.includes('advice') || normalized.includes('professional')) return 'advice'
+    if (normalized.includes('standard') || normalized.includes('basic')) return 'standard'
+    if (normalized.includes('starter')) return 'starter'
+  }
+  return 'advice'
+}
+
+export interface DailyUsageInfo {
+  count: number
+  limit: number
+  remaining: number
+  resetAt: Date
 }

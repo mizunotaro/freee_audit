@@ -1,9 +1,11 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
+import { withAuth, type AuthenticatedRequest } from '@/lib/api'
+import { validateCompanyId } from '@/lib/api/auth-helpers'
 import { prisma } from '@/lib/db'
 
-export async function GET(request: NextRequest) {
+async function handler(req: AuthenticatedRequest) {
   try {
-    const searchParams = request.nextUrl.searchParams
+    const searchParams = new URL(req.url).searchParams
     const page = parseInt(searchParams.get('page') || '1', 10)
     const limit = parseInt(searchParams.get('limit') || '50', 10)
     const startDate = searchParams.get('startDate')
@@ -15,10 +17,13 @@ export async function GET(request: NextRequest) {
       | 'SKIPPED'
       | null
 
+    const companyId = await validateCompanyId(req.user, searchParams.get('companyId'))
+
     const where: {
+      companyId: string
       entryDate?: { gte?: Date; lte?: Date }
       auditStatus?: 'PENDING' | 'PASSED' | 'FAILED' | 'SKIPPED'
-    } = {}
+    } = { companyId }
 
     if (startDate || endDate) {
       where.entryDate = {}
@@ -74,9 +79,17 @@ export async function GET(request: NextRequest) {
     })
   } catch (error) {
     console.error('[API] Error fetching journals:', error)
+    if (error instanceof Error && error.message.includes('Access denied')) {
+      return NextResponse.json(
+        { success: false, error: error.message, code: 'FORBIDDEN' },
+        { status: 403 }
+      )
+    }
     return NextResponse.json(
       { error: { code: 'INTERNAL_ERROR', message: 'Failed to fetch journals' } },
       { status: 500 }
     )
   }
 }
+
+export const GET = withAuth(handler, { requireCompany: true })

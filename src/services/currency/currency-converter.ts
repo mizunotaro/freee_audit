@@ -111,10 +111,12 @@ export function formatCurrency(
 ): string {
   const localeStr = locale === 'ja' ? 'ja-JP' : 'en-US'
 
-  return new Intl.NumberFormat(localeStr, {
+  const formatted = new Intl.NumberFormat(localeStr, {
     style: 'currency',
     currency,
     minimumFractionDigits: currency === 'JPY' ? 0 : 2,
     maximumFractionDigits: currency === 'JPY' ? 0 : 2,
   }).format(amount)
+
+  return formatted.replace(/\uFFE5/g, '\u00A5')
 }

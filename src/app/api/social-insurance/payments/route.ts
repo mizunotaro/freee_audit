@@ -1,27 +1,26 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/db'
+import { validateSession } from '@/lib/auth'
 import { PaymentChecker } from '@/services/social-insurance'
 
-async function getCompanyId(): Promise<string> {
-  const companies = await prisma.company.findMany({ take: 1 })
-  if (companies.length > 0) {
-    return companies[0].id
-  }
-  const company = await prisma.company.create({
-    data: { name: 'Default Company', fiscalYearStart: 1 },
-  })
-  return company.id
+async function getAuthUser(request: NextRequest) {
+  const token = request.cookies.get('session')?.value
+  if (!token) return null
+  return validateSession(token)
 }
 
 export async function GET(request: NextRequest) {
   try {
+    const user = await getAuthUser(request)
+    if (!user || !user.companyId) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
     const { searchParams } = new URL(request.url)
-    const companyId = searchParams.get('companyId') || (await getCompanyId())
     const year = searchParams.get('year') ? parseInt(searchParams.get('year')!) : undefined
     const month = searchParams.get('month') ? parseInt(searchParams.get('month')!) : undefined
     const insuranceType = searchParams.get('insuranceType') as any
 
-    const payments = await PaymentChecker.getPayments(companyId, {
+    const payments = await PaymentChecker.getPayments(user.companyId, {
       insuranceType: insuranceType || undefined,
       year,
       month,
@@ -36,11 +35,15 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    const user = await getAuthUser(request)
+    if (!user || !user.companyId) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
     const body = await request.json()
-    const companyId = body.companyId || (await getCompanyId())
 
     const payment = await PaymentChecker.createPayment({
-      companyId,
+      companyId: user.companyId,
       insuranceType: body.insuranceType,
       year: body.year,
       month: body.month,

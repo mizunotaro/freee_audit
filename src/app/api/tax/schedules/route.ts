@@ -1,18 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { validateSession } from '@/lib/auth'
 import { TaxService } from '@/services/tax/tax-service'
+
+async function getAuthUser(request: NextRequest) {
+  const token = request.cookies.get('session')?.value
+  if (!token) return null
+  return validateSession(token)
+}
 
 export async function GET(request: NextRequest) {
   try {
-    const searchParams = request.nextUrl.searchParams
-    const companyId = searchParams.get('companyId')
-    const fiscalYear = searchParams.get('fiscalYear')
-
-    if (!companyId) {
-      return NextResponse.json({ error: 'companyId is required' }, { status: 400 })
+    const user = await getAuthUser(request)
+    if (!user || !user.companyId) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    const searchParams = request.nextUrl.searchParams
+    const fiscalYear = searchParams.get('fiscalYear')
+
     const schedules = await TaxService.getTaxSchedules(
-      companyId,
+      user.companyId,
       fiscalYear ? parseInt(fiscalYear) : undefined
     )
 
@@ -25,18 +32,23 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json()
-    const { companyId, taxType, fiscalYear, dueDate, amount, note } = body
+    const user = await getAuthUser(request)
+    if (!user || !user.companyId) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
 
-    if (!companyId || !taxType || !fiscalYear || !dueDate) {
+    const body = await request.json()
+    const { taxType, fiscalYear, dueDate, amount, note } = body
+
+    if (!taxType || !fiscalYear || !dueDate) {
       return NextResponse.json(
-        { error: 'companyId, taxType, fiscalYear, and dueDate are required' },
+        { error: 'taxType, fiscalYear, and dueDate are required' },
         { status: 400 }
       )
     }
 
     const schedule = await TaxService.createTaxSchedule({
-      companyId,
+      companyId: user.companyId,
       taxType,
       fiscalYear,
       dueDate: new Date(dueDate),

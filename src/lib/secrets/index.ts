@@ -210,7 +210,7 @@ export class LocalSecretProvider extends BaseSecretProvider {
   private loadSecrets(): void {
     const secretsPath = process.env.LOCAL_SECRETS_PATH || './secrets.json'
     try {
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
+       
       const fs = require('fs')
       if (fs.existsSync(secretsPath)) {
         const data = fs.readFileSync(secretsPath, 'utf-8')

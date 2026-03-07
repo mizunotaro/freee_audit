@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { AppLayout } from '@/components/layout/AppLayout'
@@ -63,11 +63,7 @@ export default function BoardReportDetailPage() {
   const [editedSections, setEditedSections] = useState<Record<string, string>>({})
   const [editedSummary, setEditedSummary] = useState('')
 
-  useEffect(() => {
-    fetchReport()
-  }, [reportId])
-
-  const fetchReport = async () => {
+  const fetchReport = useCallback(async () => {
     try {
       const res = await fetch(`/api/board-reports/${reportId}`)
       if (res.ok) {
@@ -90,7 +86,11 @@ export default function BoardReportDetailPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [reportId, router])
+
+  useEffect(() => {
+    fetchReport()
+  }, [fetchReport])
 
   const handleSave = async () => {
     if (!report) return

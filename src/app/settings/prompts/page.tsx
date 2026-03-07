@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { AppLayout } from '@/components/layout/AppLayout'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -56,11 +56,7 @@ function PromptEditor({
   const [saving, setSaving] = useState(false)
   const [isCustom, setIsCustom] = useState(false)
 
-  useEffect(() => {
-    fetchPrompt()
-  }, [analysisType])
-
-  const fetchPrompt = async () => {
+  const fetchPrompt = useCallback(async () => {
     setLoading(true)
     try {
       const res = await fetch(`/api/prompts/${analysisType}`)
@@ -75,7 +71,11 @@ function PromptEditor({
     } finally {
       setLoading(false)
     }
-  }
+  }, [analysisType])
+
+  useEffect(() => {
+    fetchPrompt()
+  }, [fetchPrompt])
 
   const handleSave = async () => {
     if (!prompt) return

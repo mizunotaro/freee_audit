@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { validateSession } from '@/lib/auth'
 import {
   getCashOutForecasts,
   getMonthlyCashOutSummary,
@@ -6,38 +7,37 @@ import {
 } from '@/services/debt/debt-service'
 import { prisma } from '@/lib/db'
 
+async function getAuthUser(request: NextRequest) {
+  const token = request.cookies.get('session')?.value
+  if (!token) return null
+  return validateSession(token)
+}
+
 export async function GET(request: NextRequest) {
   try {
-    const { searchParams } = new URL(request.url)
-    const action = searchParams.get('action') || 'forecast'
-    const companyId = searchParams.get('companyId')
-
-    let targetCompanyId = companyId
-
-    if (!targetCompanyId) {
-      const companies = await prisma.company.findMany({ take: 1 })
-      if (companies.length === 0) {
-        const company = await prisma.company.create({
-          data: { name: 'サンプル株式会社', fiscalYearStart: 4 },
-        })
-        targetCompanyId = company.id
-      } else {
-        targetCompanyId = companies[0].id
-      }
+    const user = await getAuthUser(request)
+    if (!user || !user.companyId) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    const { searchParams } = new URL(request.url)
+    const action = searchParams.get('action') || 'forecast'
+    const targetCompanyId = user.companyId
+
     switch (action) {
-      case 'forecast':
+      case 'forecast': {
         const forecasts = await getCashOutForecasts(targetCompanyId, 3)
         return NextResponse.json({ forecasts })
+      }
 
-      case 'monthly':
+      case 'monthly': {
         const monthsParam = searchParams.get('months')
         const months = monthsParam ? parseInt(monthsParam) : 6
         const monthlySummary = await getMonthlyCashOutSummary(targetCompanyId, months)
         return NextResponse.json({ monthlySummary })
+      }
 
-      case 'sync':
+      case 'sync': {
         const company = await prisma.company.findFirst({
           where: { id: targetCompanyId },
         })
@@ -46,14 +46,16 @@ export async function GET(request: NextRequest) {
         }
         const result = await syncDebtsFromFreee(targetCompanyId, parseInt(company.freeeCompanyId))
         return NextResponse.json(result)
+      }
 
-      default:
+      default: {
         const allForecasts = await getCashOutForecasts(targetCompanyId, 3)
         const allMonthlySummary = await getMonthlyCashOutSummary(targetCompanyId, 6)
         return NextResponse.json({
           forecasts: allForecasts,
           monthlySummary: allMonthlySummary,
         })
+      }
     }
   } catch (error) {
     console.error('Debt API error:', error)
@@ -63,18 +65,20 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    const user = await getAuthUser(request)
+    if (!user || !user.companyId) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
     const body = await request.json()
-    const { action, companyId, freeeCompanyId } = body
+    const { action, freeeCompanyId } = body
 
     if (action === 'sync') {
-      if (!companyId || !freeeCompanyId) {
-        return NextResponse.json(
-          { error: 'companyId and freeeCompanyId are required' },
-          { status: 400 }
-        )
+      if (!freeeCompanyId) {
+        return NextResponse.json({ error: 'freeeCompanyId is required' }, { status: 400 })
       }
 
-      const result = await syncDebtsFromFreee(companyId, freeeCompanyId)
+      const result = await syncDebtsFromFreee(user.companyId, freeeCompanyId)
       return NextResponse.json(result)
     }
 

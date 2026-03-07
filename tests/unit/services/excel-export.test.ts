@@ -297,7 +297,349 @@ describe('ExcelExportService', () => {
       const endTime = Date.now()
 
       expect(result).toBeDefined()
-      expect(endTime - startTime).toBeLessThan(5000) // Should complete within 5 seconds
+      expect(endTime - startTime).toBeLessThan(5000)
+    })
+  })
+
+  describe('edge cases', () => {
+    it('should handle zero values', async () => {
+      const zeroData = {
+        fiscalYear: 2024,
+        month: 12,
+        asOfDate: new Date('2024-12-31'),
+        assets: {
+          current: [{ code: '1000', name: '現金', amount: 0 }],
+          fixed: [],
+          total: 0,
+        },
+        liabilities: {
+          current: [],
+          fixed: [],
+          total: 0,
+        },
+        equity: {
+          items: [{ code: '5000', name: '資本金', amount: 0 }],
+          total: 0,
+        },
+      }
+
+      const mockOptions = {
+        format: 'excel' as const,
+        language: 'ja' as const,
+        includeCharts: false,
+        currency: 'JPY' as const,
+        paperSize: 'A4' as const,
+        orientation: 'portrait' as const,
+      }
+
+      const result = await service.export(zeroData as any, mockOptions)
+
+      expect(result).toBeDefined()
+      expect(result.fileSize).toBeGreaterThan(0)
+    })
+
+    it('should handle all empty arrays', async () => {
+      const emptyData = {
+        fiscalYear: 2024,
+        month: 12,
+        asOfDate: new Date('2024-12-31'),
+        assets: {
+          current: [],
+          fixed: [],
+          total: 0,
+        },
+        liabilities: {
+          current: [],
+          fixed: [],
+          total: 0,
+        },
+        equity: {
+          items: [],
+          total: 0,
+        },
+      }
+
+      const mockOptions = {
+        format: 'excel' as const,
+        language: 'ja' as const,
+        includeCharts: false,
+        currency: 'JPY' as const,
+        paperSize: 'A4' as const,
+        orientation: 'portrait' as const,
+      }
+
+      const result = await service.export(emptyData as any, mockOptions)
+
+      expect(result).toBeDefined()
+    })
+
+    it('should handle dual language', async () => {
+      const mockData = {
+        fiscalYear: 2024,
+        month: 12,
+        asOfDate: new Date('2024-12-31'),
+        assets: {
+          current: [{ code: '1000', name: '現金', nameEn: 'Cash', amount: 1000000 }],
+          fixed: [],
+          total: 1000000,
+        },
+        liabilities: {
+          current: [],
+          fixed: [],
+          total: 0,
+        },
+        equity: {
+          items: [{ code: '5000', name: '資本金', nameEn: 'Capital', amount: 1000000 }],
+          total: 1000000,
+        },
+      }
+
+      const mockOptions = {
+        format: 'excel' as const,
+        language: 'dual' as const,
+        includeCharts: false,
+        currency: 'JPY' as const,
+        paperSize: 'A4' as const,
+        orientation: 'portrait' as const,
+      }
+
+      const result = await service.export(mockData as any, mockOptions)
+
+      expect(result).toBeDefined()
+      expect(result.filename).toContain('ja-en')
+    })
+
+    it('should handle USD currency', async () => {
+      const mockData = {
+        fiscalYear: 2024,
+        month: 12,
+        asOfDate: new Date('2024-12-31'),
+        assets: {
+          current: [{ code: '1000', name: 'Cash', amount: 10000 }],
+          fixed: [],
+          total: 10000,
+        },
+        liabilities: {
+          current: [],
+          fixed: [],
+          total: 0,
+        },
+        equity: {
+          items: [{ code: '5000', name: 'Capital', amount: 10000 }],
+          total: 10000,
+        },
+      }
+
+      const mockOptions = {
+        format: 'excel' as const,
+        language: 'en' as const,
+        includeCharts: false,
+        currency: 'USD' as const,
+        paperSize: 'A4' as const,
+        orientation: 'portrait' as const,
+      }
+
+      const result = await service.export(mockData as any, mockOptions)
+
+      expect(result).toBeDefined()
+    })
+
+    it('should handle profit loss data', async () => {
+      const profitLossData = {
+        fiscalYear: 2024,
+        startMonth: 1,
+        endMonth: 12,
+        revenue: 10000000,
+        costOfSales: 6000000,
+        grossProfit: 4000000,
+        sgaExpenses: [
+          { code: 'E001', name: '給与手当', amount: 2000000 },
+          { code: 'E002', name: '広告宣伝費', amount: 500000 },
+        ],
+        operatingIncome: 1500000,
+        nonOperatingIncome: 100000,
+        nonOperatingExpenses: 50000,
+        ordinaryIncome: 1550000,
+        extraordinaryIncome: 0,
+        extraordinaryLoss: 0,
+        incomeBeforeTax: 1550000,
+        corporateTax: 465000,
+        netIncome: 1085000,
+      }
+
+      const mockOptions = {
+        format: 'excel' as const,
+        language: 'ja' as const,
+        includeCharts: false,
+        currency: 'JPY' as const,
+        paperSize: 'A4' as const,
+        orientation: 'portrait' as const,
+      }
+
+      const result = await service.export(profitLossData as any, mockOptions)
+
+      expect(result).toBeDefined()
+      expect(result.filename).toContain('profit_loss')
+    })
+
+    it('should handle cash flow data', async () => {
+      const cashFlowData = {
+        fiscalYear: 2024,
+        month: 12,
+        operatingActivities: {
+          netIncome: 1000000,
+          adjustments: [{ code: 'A001', name: '減価償却費', amount: 300000 }],
+          netCashFromOperating: 1300000,
+        },
+        investingActivities: {
+          items: [{ code: 'I001', name: '設備投資', amount: -500000 }],
+          netCashFromInvesting: -500000,
+        },
+        financingActivities: {
+          items: [{ code: 'F001', name: '借入', amount: 1000000 }],
+          netCashFromFinancing: 1000000,
+        },
+        netChangeInCash: 1800000,
+        beginningCash: 2000000,
+        endingCash: 3800000,
+      }
+
+      const mockOptions = {
+        format: 'excel' as const,
+        language: 'ja' as const,
+        includeCharts: false,
+        currency: 'JPY' as const,
+        paperSize: 'A4' as const,
+        orientation: 'portrait' as const,
+      }
+
+      const result = await service.export(cashFlowData as any, mockOptions)
+
+      expect(result).toBeDefined()
+      expect(result.filename).toContain('cash_flow')
+    })
+
+    it('should handle KPI data', async () => {
+      const kpiData = {
+        fiscalYear: 2024,
+        month: 12,
+        profitability: [{ key: 'roe', name: 'ROE', nameEn: 'ROE', value: 15.5, unit: '%' }],
+        efficiency: [
+          { key: 'turnover', name: '資産回転率', nameEn: 'Asset Turnover', value: 1.2, unit: '回' },
+        ],
+        safety: [
+          {
+            key: 'current_ratio',
+            name: '流動比率',
+            nameEn: 'Current Ratio',
+            value: 150,
+            unit: '%',
+          },
+        ],
+        growth: [
+          {
+            key: 'revenue_growth',
+            name: '売上成長率',
+            nameEn: 'Revenue Growth',
+            value: 10,
+            unit: '%',
+          },
+        ],
+        cashFlow: [
+          {
+            key: 'fcf',
+            name: 'フリーキャッシュフロー',
+            nameEn: 'Free Cash Flow',
+            value: 500000,
+            unit: '円',
+          },
+        ],
+      }
+
+      const mockOptions = {
+        format: 'excel' as const,
+        language: 'ja' as const,
+        includeCharts: false,
+        currency: 'JPY' as const,
+        paperSize: 'A4' as const,
+        orientation: 'portrait' as const,
+      }
+
+      const result = await service.export(kpiData as any, mockOptions)
+
+      expect(result).toBeDefined()
+      expect(result.filename).toContain('kpi')
+    })
+  })
+
+  describe('CSV export', () => {
+    it('should handle CSV with commas in values', async () => {
+      const mockData = {
+        fiscalYear: 2024,
+        startMonth: 1,
+        endMonth: 12,
+        revenue: 10000000,
+        costOfSales: 6000000,
+        grossProfit: 4000000,
+        sgaExpenses: [{ code: 'E001', name: '給与,手当', amount: 2000000 }],
+        operatingIncome: 2000000,
+        nonOperatingIncome: 0,
+        nonOperatingExpenses: 0,
+        ordinaryIncome: 2000000,
+        extraordinaryIncome: 0,
+        extraordinaryLoss: 0,
+        incomeBeforeTax: 2000000,
+        corporateTax: 600000,
+        netIncome: 1400000,
+      }
+
+      const mockOptions = {
+        format: 'csv' as const,
+        language: 'ja' as const,
+        includeCharts: false,
+        currency: 'JPY' as const,
+        paperSize: 'A4' as const,
+        orientation: 'portrait' as const,
+      }
+
+      const result = await service.exportCSV(mockData as any, mockOptions)
+
+      expect(result).toBeDefined()
+      expect(result.mimeType).toBe('text/csv')
+    })
+
+    it('should handle CSV with quotes in values', async () => {
+      const mockData = {
+        fiscalYear: 2024,
+        startMonth: 1,
+        endMonth: 12,
+        revenue: 10000000,
+        costOfSales: 6000000,
+        grossProfit: 4000000,
+        sgaExpenses: [{ code: 'E001', name: '給与"手当"', amount: 2000000 }],
+        operatingIncome: 2000000,
+        nonOperatingIncome: 0,
+        nonOperatingExpenses: 0,
+        ordinaryIncome: 2000000,
+        extraordinaryIncome: 0,
+        extraordinaryLoss: 0,
+        incomeBeforeTax: 2000000,
+        corporateTax: 600000,
+        netIncome: 1400000,
+      }
+
+      const mockOptions = {
+        format: 'csv' as const,
+        language: 'ja' as const,
+        includeCharts: false,
+        currency: 'JPY' as const,
+        paperSize: 'A4' as const,
+        orientation: 'portrait' as const,
+      }
+
+      const result = await service.exportCSV(mockData as any, mockOptions)
+
+      expect(result).toBeDefined()
     })
   })
 })

@@ -1,6 +1,7 @@
 import createMiddleware from 'next-intl/middleware'
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
+import { validateSession } from '@/lib/auth'
 
 const locales = ['ja', 'en'] as const
 const defaultLocale = 'ja'
@@ -14,13 +15,14 @@ const intlMiddleware = createMiddleware({
 const publicPaths = ['/login', '/api/auth/login', '/api/auth/logout', '/api/health']
 
 function isPublicPath(pathname: string): boolean {
-  return publicPaths.some((path) => pathname.includes(path))
+  return publicPaths.some(
+    (path) => pathname === path || pathname === `/ja${path}` || pathname === `/en${path}`
+  )
 }
 
-export function middleware(request: NextRequest) {
+export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
 
-  // Handle API routes first
   if (pathname.startsWith('/api/')) {
     if (isPublicPath(pathname)) {
       return NextResponse.next()
@@ -30,25 +32,37 @@ export function middleware(request: NextRequest) {
     if (!token) {
       return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
     }
-    return NextResponse.next()
+
+    const user = await validateSession(token)
+    if (!user) {
+      const response = NextResponse.json(
+        { success: false, error: 'Invalid or expired session' },
+        { status: 401 }
+      )
+      response.cookies.delete('session')
+      return response
+    }
+
+    const response = NextResponse.next()
+    response.headers.set('x-user-id', user.id)
+    response.headers.set('x-user-role', user.role)
+    response.headers.set('x-user-company-id', user.companyId || '')
+
+    return response
   }
 
-  // Check for locale in path
   const localeMatch = locales.find(
     (locale) => pathname === `/${locale}` || pathname.startsWith(`/${locale}/`)
   )
 
-  // If no locale, redirect to default
   if (!localeMatch && pathname !== '/') {
     return NextResponse.redirect(new URL(`/${defaultLocale}${pathname}`, request.url))
   }
 
-  // Root redirect
   if (pathname === '/') {
     return NextResponse.redirect(new URL(`/${defaultLocale}/login`, request.url))
   }
 
-  // Auth check for protected pages
   if (localeMatch && !isPublicPath(pathname)) {
     const token = request.cookies.get('session')?.value
     if (!token) {

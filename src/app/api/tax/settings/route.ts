@@ -1,23 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { validateSession } from '@/lib/auth'
 import { prisma } from '@/lib/db'
 
-async function getCompanyId(_request: NextRequest): Promise<string> {
-  const companies = await prisma.company.findMany({ take: 1 })
-  if (companies.length > 0) {
-    return companies[0].id
-  }
-  const company = await prisma.company.create({
-    data: {
-      name: 'Default Company',
-      fiscalYearStart: 1,
-    },
-  })
-  return company.id
+async function getAuthUser(request: NextRequest) {
+  const token = request.cookies.get('session')?.value
+  if (!token) return null
+  return validateSession(token)
 }
 
 export async function GET(request: NextRequest) {
   try {
-    const companyId = await getCompanyId(request)
+    const user = await getAuthUser(request)
+    if (!user || !user.companyId) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const companyId = user.companyId
 
     let settings = await prisma.taxSettings.findUnique({
       where: { companyId },
@@ -45,7 +43,12 @@ export async function GET(request: NextRequest) {
 
 export async function PUT(request: NextRequest) {
   try {
-    const companyId = await getCompanyId(request)
+    const user = await getAuthUser(request)
+    if (!user || !user.companyId) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const companyId = user.companyId
     const body = await request.json()
 
     const data = {

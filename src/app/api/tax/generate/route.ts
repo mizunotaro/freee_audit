@@ -1,15 +1,28 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { validateSession } from '@/lib/auth'
 import { TaxService } from '@/services/tax/tax-service'
 import { prisma } from '@/lib/db'
 
+async function getAuthUser(request: NextRequest) {
+  const token = request.cookies.get('session')?.value
+  if (!token) return null
+  return validateSession(token)
+}
+
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json()
-    const { companyId, fiscalYearEndMonth, fiscalYear } = body
+    const user = await getAuthUser(request)
+    if (!user || !user.companyId) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
 
-    if (!companyId || !fiscalYearEndMonth || !fiscalYear) {
+    const body = await request.json()
+    const { fiscalYearEndMonth, fiscalYear } = body
+    const companyId = user.companyId
+
+    if (!fiscalYearEndMonth || !fiscalYear) {
       return NextResponse.json(
-        { error: 'companyId, fiscalYearEndMonth, and fiscalYear are required' },
+        { error: 'fiscalYearEndMonth and fiscalYear are required' },
         { status: 400 }
       )
     }

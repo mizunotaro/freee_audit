@@ -1,8 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { validateSession } from '@/lib/auth'
 import { FreeeClient } from '@/lib/integrations/freee/client'
 
-export async function GET(_request: NextRequest) {
+async function getAuthUser(request: NextRequest) {
+  const token = request.cookies.get('session')?.value
+  if (!token) return null
+  return validateSession(token)
+}
+
+export async function GET(request: NextRequest) {
   try {
+    const user = await getAuthUser(request)
+    if (!user || !user.companyId) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
     const client = new FreeeClient()
     const companies = await client.getCompanies()
 

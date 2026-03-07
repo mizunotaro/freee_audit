@@ -1,19 +1,24 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
+import { withAuth, type AuthenticatedRequest } from '@/lib/api'
+import { validateCompanyId } from '@/lib/api/auth-helpers'
 import { prisma } from '@/lib/db'
 
-export async function GET(request: NextRequest) {
+async function getHandler(req: AuthenticatedRequest) {
   try {
-    const searchParams = request.nextUrl.searchParams
+    const searchParams = new URL(req.url).searchParams
     const page = parseInt(searchParams.get('page') || '1', 10)
     const limit = parseInt(searchParams.get('limit') || '50', 10)
     const status = searchParams.get('status') as 'PASSED' | 'FAILED' | 'ERROR' | null
     const startDate = searchParams.get('startDate')
     const endDate = searchParams.get('endDate')
 
+    const companyId = await validateCompanyId(req.user, searchParams.get('companyId'))
+
     const where: {
+      journal: { companyId: string }
       status?: 'PASSED' | 'FAILED' | 'ERROR'
       analyzedAt?: { gte?: Date; lte?: Date }
-    } = {}
+    } = { journal: { companyId } }
 
     if (status) {
       where.status = status
@@ -82,6 +87,12 @@ export async function GET(request: NextRequest) {
     })
   } catch (error) {
     console.error('[API] Error fetching audit results:', error)
+    if (error instanceof Error && error.message.includes('Access denied')) {
+      return NextResponse.json(
+        { success: false, error: error.message, code: 'FORBIDDEN' },
+        { status: 403 }
+      )
+    }
     return NextResponse.json(
       { error: { code: 'INTERNAL_ERROR', message: 'Failed to fetch audit results' } },
       { status: 500 }
@@ -89,10 +100,24 @@ export async function GET(request: NextRequest) {
   }
 }
 
-export async function POST(request: NextRequest) {
+async function postHandler(req: AuthenticatedRequest) {
   try {
-    const body = await request.json()
+    const body = await req.json()
     const { journalId, documentId, status, issues, confidenceScore, rawAiResponse } = body
+
+    const journal = await prisma.journal.findUnique({
+      where: { id: journalId },
+      select: { companyId: true },
+    })
+
+    if (!journal) {
+      return NextResponse.json(
+        { error: { code: 'NOT_FOUND', message: 'Journal not found' } },
+        { status: 404 }
+      )
+    }
+
+    await validateCompanyId(req.user, journal.companyId)
 
     const result = await prisma.auditResult.create({
       data: {
@@ -120,9 +145,18 @@ export async function POST(request: NextRequest) {
     })
   } catch (error) {
     console.error('[API] Error creating audit result:', error)
+    if (error instanceof Error && error.message.includes('Access denied')) {
+      return NextResponse.json(
+        { success: false, error: error.message, code: 'FORBIDDEN' },
+        { status: 403 }
+      )
+    }
     return NextResponse.json(
       { error: { code: 'INTERNAL_ERROR', message: 'Failed to create audit result' } },
       { status: 500 }
     )
   }
 }
+
+export const GET = withAuth(getHandler, { requireCompany: true })
+export const POST = withAuth(postHandler, { requireCompany: true })

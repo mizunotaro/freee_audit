@@ -1,4 +1,4 @@
-import { GoogleGenerativeAI, Part } from '@google/generative-ai'
+import { GoogleGenerativeAI, Part, HarmCategory, HarmBlockThreshold } from '@google/generative-ai'
 import {
   BaseAIProvider,
   AIConfig,
@@ -6,19 +6,80 @@ import {
   EntryValidationRequest,
 } from './provider'
 import { DocumentAnalysisResult, EntryValidationResult, ValidationIssue } from '@/types/audit'
+import { API_TIMEOUTS, TimeoutError } from '@/lib/utils/timeout'
+import {
+  getDefaultModel,
+  getDefaultTemperature,
+  getDefaultMaxTokens,
+} from '@/lib/ai/config/model-config'
+
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      reject(new TimeoutError(timeoutMs))
+    }, timeoutMs)
+    promise
+      .then(resolve)
+      .catch(reject)
+      .finally(() => clearTimeout(timer))
+  })
+}
+
+export interface GeminiConfig extends AIConfig {
+  vertexAI?: {
+    projectId: string
+    location: string
+  }
+  safetySettings?: Array<{
+    category: HarmCategory
+    threshold: HarmBlockThreshold
+  }>
+}
+
+const DEFAULT_SAFETY_SETTINGS: Array<{
+  category: HarmCategory
+  threshold: HarmBlockThreshold
+}> = [
+  {
+    category: HarmCategory.HARM_CATEGORY_HARASSMENT,
+    threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH,
+  },
+  {
+    category: HarmCategory.HARM_CATEGORY_HATE_SPEECH,
+    threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH,
+  },
+  {
+    category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT,
+    threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH,
+  },
+  {
+    category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT,
+    threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH,
+  },
+]
 
 export class GeminiProvider extends BaseAIProvider {
   readonly name = 'gemini' as const
   private genAI: GoogleGenerativeAI
+  private resolvedModel: string
+  private safetySettings: Array<{ category: HarmCategory; threshold: HarmBlockThreshold }>
 
-  constructor(config: AIConfig) {
+  constructor(config: GeminiConfig) {
     super(config)
     this.genAI = new GoogleGenerativeAI(config.apiKey)
+    this.resolvedModel = config.model || getDefaultModel('gemini')
+    this.safetySettings = config.safetySettings ?? DEFAULT_SAFETY_SETTINGS
+  }
+
+  getModel(): string {
+    return this.resolvedModel
   }
 
   async analyzeDocument(request: DocumentAnalysisRequest): Promise<DocumentAnalysisResult> {
-    const model = this.config.model || 'gemini-1.5-pro'
-    const generativeModel = this.genAI.getGenerativeModel({ model })
+    const generativeModel = this.genAI.getGenerativeModel({
+      model: this.resolvedModel,
+      safetySettings: this.safetySettings,
+    })
 
     const parts: Part[] = [{ text: `${this.getSystemPrompt()}\n\n${this.getSystemPromptJa()}` }]
 
@@ -40,14 +101,20 @@ export class GeminiProvider extends BaseAIProvider {
 
     parts.push({ text: 'Extract information from this document and return JSON only.' })
 
-    const result = await generativeModel.generateContent({
-      contents: [{ role: 'user', parts }],
-      generationConfig: {
-        temperature: this.config.temperature ?? 0.1,
-        maxOutputTokens: this.config.maxTokens ?? 1024,
-        responseMimeType: 'application/json',
-      },
-    })
+    const temperature = this.config.temperature ?? getDefaultTemperature()
+    const maxTokens = this.config.maxTokens ?? getDefaultMaxTokens()
+
+    const result = await withTimeout(
+      generativeModel.generateContent({
+        contents: [{ role: 'user', parts }],
+        generationConfig: {
+          temperature,
+          maxOutputTokens: maxTokens,
+          responseMimeType: 'application/json',
+        },
+      }),
+      API_TIMEOUTS.AI_API
+    )
 
     const responseText = result.response.text()
     let parsedResult: Record<string, unknown> = {}
@@ -74,8 +141,10 @@ export class GeminiProvider extends BaseAIProvider {
   }
 
   async validateEntry(request: EntryValidationRequest): Promise<EntryValidationResult> {
-    const model = this.config.model || 'gemini-1.5-pro'
-    const generativeModel = this.genAI.getGenerativeModel({ model })
+    const generativeModel = this.genAI.getGenerativeModel({
+      model: this.resolvedModel,
+      safetySettings: this.safetySettings,
+    })
 
     const prompt = `${this.getValidationPrompt()}
 
@@ -89,14 +158,20 @@ ${JSON.stringify(request.documentData, null, 2)}
 
 Return JSON with isValid, issues array, and optional suggestions.`
 
-    const result = await generativeModel.generateContent({
-      contents: [{ role: 'user', parts: [{ text: prompt }] }],
-      generationConfig: {
-        temperature: this.config.temperature ?? 0.1,
-        maxOutputTokens: this.config.maxTokens ?? 1024,
-        responseMimeType: 'application/json',
-      },
-    })
+    const temperature = this.config.temperature ?? getDefaultTemperature()
+    const maxTokens = this.config.maxTokens ?? getDefaultMaxTokens()
+
+    const result = await withTimeout(
+      generativeModel.generateContent({
+        contents: [{ role: 'user', parts: [{ text: prompt }] }],
+        generationConfig: {
+          temperature,
+          maxOutputTokens: maxTokens,
+          responseMimeType: 'application/json',
+        },
+      }),
+      API_TIMEOUTS.AI_API
+    )
 
     const responseText = result.response.text()
     let parsedResult: Record<string, unknown> = {}
@@ -125,6 +200,6 @@ Return JSON with isValid, issues array, and optional suggestions.`
   }
 }
 
-export function createGeminiProvider(config: AIConfig): GeminiProvider {
+export function createGeminiProvider(config: GeminiConfig): GeminiProvider {
   return new GeminiProvider(config)
 }

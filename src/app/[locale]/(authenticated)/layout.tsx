@@ -3,6 +3,8 @@
 import { useEffect, useState } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import { Sidebar } from '@/components/layout/sidebar'
+import { DockSidebar } from '@/components/layout/dock-sidebar'
+import { BottomNavigation } from '@/components/layout/bottom-navigation'
 
 interface User {
   id: string
@@ -59,6 +61,14 @@ export default function AuthenticatedLayout({
 
   return (
     <div className="min-h-screen bg-muted/40">
+      <DockSidebar
+        user={{
+          name: user.name,
+          email: user.email,
+          role: user.role,
+        }}
+        locale={locale}
+      />
       <Sidebar
         user={{
           name: user.name,
@@ -67,8 +77,9 @@ export default function AuthenticatedLayout({
         }}
         locale={locale}
       />
-      <main className="min-h-screen lg:pl-64">
-        <div className="pt-14 lg:pt-0">
+      <BottomNavigation locale={locale} />
+      <main className="min-h-screen lg:pl-16">
+        <div className="pt-14 lg:pt-0 pb-16 lg:pb-0">
           <div className="p-4 lg:p-6">{children}</div>
         </div>
       </main>

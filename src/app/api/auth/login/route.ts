@@ -40,10 +40,11 @@ export async function POST(request: NextRequest) {
 
     response.cookies.set('session', result.token, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
+      secure: true,
+      sameSite: 'strict',
       maxAge: 60 * 60 * 24,
       path: '/',
+      domain: process.env.COOKIE_DOMAIN || undefined,
     })
 
     return response

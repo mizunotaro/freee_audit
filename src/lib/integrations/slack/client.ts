@@ -1,4 +1,5 @@
 import { WebClient } from '@slack/web-api'
+import { API_TIMEOUTS } from '@/lib/utils/timeout'
 
 export interface SlackConfig {
   botToken: string
@@ -11,7 +12,9 @@ export class SlackClient {
   private enabled: boolean
 
   constructor(config: SlackConfig) {
-    this.client = new WebClient(config.botToken)
+    this.client = new WebClient(config.botToken, {
+      timeout: API_TIMEOUTS.SLACK_API,
+    })
     this.channelId = config.channelId
     this.enabled = !!config.botToken && !!config.channelId
   }

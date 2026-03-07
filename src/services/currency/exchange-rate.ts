@@ -1,20 +1,25 @@
 import { ExchangeRate, ExchangeRateService, ExchangeRateSource, Currency } from './types'
+import { exchangeRateCache } from '@/lib/cache'
 
 export class BOJExchangeRateService implements ExchangeRateService {
   private baseUrl = 'https://www.boj.or.jp/statistics'
-  private cache: Map<string, ExchangeRate> = new Map()
-  private cacheExpiry: number = 3600000
 
   async getRate(date: Date, from: Currency, to: Currency): Promise<ExchangeRate> {
     const cacheKey = `${date.toISOString()}-${from}-${to}`
-    const cached = this.cache.get(cacheKey)
 
-    if (cached && this.isCacheValid(cached)) {
-      return cached
+    const cachedRate = exchangeRateCache.get(cacheKey)
+    if (cachedRate !== null) {
+      return {
+        date: new Date(date),
+        fromCurrency: from,
+        toCurrency: to,
+        rate: cachedRate,
+        source: 'BOJ' as ExchangeRateSource,
+      }
     }
 
     const rate = await this.fetchBOJRate(date, from, to)
-    this.cache.set(cacheKey, rate)
+    exchangeRateCache.set(cacheKey, rate.rate)
 
     return rate
   }
@@ -58,10 +63,10 @@ export class BOJExchangeRateService implements ExchangeRateService {
     }
   }
 
-  private getMockRate(_date: Date): number {
-    // Mock rate based on date for testing
-    // In production, this would fetch from BOJ API
-    return 149.5 + (Math.random() - 0.5) * 5
+  private getMockRate(date: Date): number {
+    const dateNum = date.getTime()
+    const seed = dateNum % 1000
+    return 149.5 + (seed / 1000) * 5
   }
 
   private getLastBusinessDay(date: Date): Date {
@@ -78,10 +83,6 @@ export class BOJExchangeRateService implements ExchangeRateService {
   private isBusinessDay(date: Date): boolean {
     const day = date.getDay()
     return day !== 0 && day !== 6
-  }
-
-  private isCacheValid(rate: ExchangeRate): boolean {
-    return Date.now() - rate.date.getTime() < this.cacheExpiry
   }
 }
 

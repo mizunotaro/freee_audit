@@ -1,16 +1,15 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
+import { withAuth, type AuthenticatedRequest } from '@/lib/api'
 import { prisma } from '@/lib/db'
-import { encrypt, decrypt } from '@/lib/crypto'
+import { encrypt } from '@/lib/crypto'
+import {
+  sanitizeSettings,
+  validateApiKeyUpdate,
+  SENSITIVE_FIELDS,
+} from '@/lib/api/settings-sanitizer'
+import { z } from 'zod'
 
-const ENCRYPTED_FIELDS = [
-  'openaiApiKey',
-  'geminiApiKey',
-  'claudeApiKey',
-  'azureApiKey',
-  'awsSecretAccessKey',
-  'gcpApiKey',
-  'freeeClientSecret',
-]
+const ENCRYPTED_FIELDS = [...SENSITIVE_FIELDS]
 
 const DEFAULT_PROMPT = `freeeから取得したスタートアップ企業の財務データを公認会計士・税理士の観点から分析を行って下さい。経営指標についてはVC/CVCや銀行員の観点からも評価をおこなってください。
 
@@ -20,130 +19,107 @@ const DEFAULT_PROMPT = `freeeから取得したスタートアップ企業の財
 3. 改善すべき点があれば具体的なアクションプランを提示する
 4. 業界標準との比較観点も含める`
 
-async function getUserId(_request: NextRequest): Promise<string> {
-  const users = await prisma.user.findMany({ take: 1 })
-  if (users.length > 0) {
-    return users[0].id
-  }
-  const user = await prisma.user.create({
-    data: {
-      email: 'admin@example.com',
-      name: 'Admin',
-      passwordHash: 'dummy',
-      role: 'ADMIN',
-    },
-  })
-  return user.id
-}
+const updateSettingsSchema = z.object({
+  theme: z.enum(['light', 'dark', 'system']).optional(),
+  aiProvider: z.enum(['openai', 'gemini', 'claude']).optional(),
+  secretSource: z
+    .enum(['local', 'gcp_secret', 'aws_secrets', 'azure_keyvault', 'onepassword'])
+    .optional(),
+  azureEndpoint: z.string().url().optional().nullable(),
+  awsAccessKeyId: z.string().optional().nullable(),
+  awsRegion: z.string().optional().nullable(),
+  gcpProjectId: z.string().optional().nullable(),
+  freeeClientId: z.string().optional().nullable(),
+  freeeCompanyId: z.string().optional().nullable(),
+  analysisPrompt: z.string().max(5000).optional().nullable(),
+  fiscalYearEndMonth: z.number().int().min(1).max(12).optional(),
+  taxBusinessType: z.string().optional().nullable(),
+  openaiApiKey: z.string().min(1).optional(),
+  geminiApiKey: z.string().min(1).optional(),
+  claudeApiKey: z.string().min(1).optional(),
+  azureApiKey: z.string().min(1).optional(),
+  awsSecretAccessKey: z.string().min(1).optional(),
+  gcpApiKey: z.string().min(1).optional(),
+  freeeClientSecret: z.string().min(1).optional(),
+})
 
-export async function GET(request: NextRequest) {
+async function getHandler(req: AuthenticatedRequest) {
   try {
-    const userId = await getUserId(request)
-
     const settings = await prisma.settings.findUnique({
-      where: { userId },
+      where: { userId: req.user.id },
     })
 
+    const safeSettings = sanitizeSettings(settings)
+
     if (!settings) {
-      return NextResponse.json({
-        theme: 'system',
-        aiProvider: 'openai',
-        secretSource: 'local',
-        openaiApiKey: '',
-        geminiApiKey: '',
-        claudeApiKey: '',
-        azureApiKey: '',
-        azureEndpoint: '',
-        awsAccessKeyId: '',
-        awsSecretAccessKey: '',
-        awsRegion: 'ap-northeast-1',
-        gcpApiKey: '',
-        gcpProjectId: '',
-        freeeClientId: '',
-        freeeClientSecret: '',
-        freeeCompanyId: '',
-        analysisPrompt: DEFAULT_PROMPT,
-        fiscalYearEndMonth: 12,
-        taxBusinessType: 'general',
-      })
+      safeSettings.analysisPrompt = DEFAULT_PROMPT
     }
 
-    const decryptedSettings: Record<string, unknown> = {
-      theme: settings.theme,
-      aiProvider: settings.aiProvider,
-      secretSource: settings.secretSource,
-      azureEndpoint: settings.azureEndpoint,
-      awsAccessKeyId: settings.awsAccessKeyId,
-      awsRegion: settings.awsRegion,
-      gcpProjectId: settings.gcpProjectId,
-      freeeClientId: settings.freeeClientId,
-      freeeCompanyId: settings.freeeCompanyId,
-      analysisPrompt: settings.analysisPrompt || DEFAULT_PROMPT,
-      fiscalYearEndMonth: settings.fiscalYearEndMonth || 12,
-      taxBusinessType: settings.taxBusinessType || 'general',
-    }
-
-    for (const field of ENCRYPTED_FIELDS) {
-      const encryptedValue = settings[field as keyof typeof settings] as string | null
-      if (encryptedValue) {
-        try {
-          decryptedSettings[field] = decrypt(encryptedValue)
-        } catch {
-          decryptedSettings[field] = ''
-        }
-      } else {
-        decryptedSettings[field] = ''
-      }
-    }
-
-    return NextResponse.json(decryptedSettings)
+    return NextResponse.json(safeSettings)
   } catch (error) {
     console.error('Failed to fetch settings:', error)
     return NextResponse.json({ error: 'Failed to fetch settings' }, { status: 500 })
   }
 }
 
-export async function PUT(request: NextRequest) {
+async function putHandler(req: AuthenticatedRequest) {
   try {
-    const userId = await getUserId(request)
-    const body = await request.json()
+    const body = await req.json()
+
+    const validatedBody = updateSettingsSchema.safeParse(body)
+    if (!validatedBody.success) {
+      return NextResponse.json(
+        { success: false, error: 'Validation failed', details: validatedBody.error.flatten() },
+        { status: 400 }
+      )
+    }
+
+    const validation = validateApiKeyUpdate(req.user.role, validatedBody.data)
+    if (!validation.isValid) {
+      return NextResponse.json({ success: false, error: validation.error }, { status: 403 })
+    }
 
     const data: Record<string, unknown> = {
-      theme: body.theme || 'system',
-      aiProvider: body.aiProvider || 'openai',
-      secretSource: body.secretSource || 'local',
-      azureEndpoint: body.azureEndpoint,
-      awsAccessKeyId: body.awsAccessKeyId,
-      awsRegion: body.awsRegion,
-      gcpProjectId: body.gcpProjectId,
-      freeeClientId: body.freeeClientId,
-      freeeCompanyId: body.freeeCompanyId,
-      analysisPrompt: body.analysisPrompt,
-      fiscalYearEndMonth: body.fiscalYearEndMonth || 12,
-      taxBusinessType: body.taxBusinessType || 'general',
+      theme: validatedBody.data.theme ?? 'system',
+      aiProvider: validatedBody.data.aiProvider ?? 'openai',
+      secretSource: validatedBody.data.secretSource ?? 'local',
+      azureEndpoint: validatedBody.data.azureEndpoint,
+      awsAccessKeyId: validatedBody.data.awsAccessKeyId,
+      awsRegion: validatedBody.data.awsRegion,
+      gcpProjectId: validatedBody.data.gcpProjectId,
+      freeeClientId: validatedBody.data.freeeClientId,
+      freeeCompanyId: validatedBody.data.freeeCompanyId,
+      analysisPrompt: validatedBody.data.analysisPrompt,
+      fiscalYearEndMonth: validatedBody.data.fiscalYearEndMonth ?? 12,
+      taxBusinessType: validatedBody.data.taxBusinessType ?? 'general',
     }
 
     for (const field of ENCRYPTED_FIELDS) {
-      const value = body[field]
+      const value = validatedBody.data[field as keyof typeof validatedBody.data]
       if (value && typeof value === 'string' && value.length > 0) {
         data[field] = encrypt(value)
-      } else {
+      } else if (value === '' || value === null) {
         data[field] = null
       }
     }
 
     const settings = await prisma.settings.upsert({
-      where: { userId },
+      where: { userId: req.user.id },
       update: data,
       create: {
-        userId,
+        userId: req.user.id,
         ...data,
       },
     })
 
-    return NextResponse.json({ success: true, settings: { id: settings.id } })
+    const safeSettings = sanitizeSettings(settings)
+
+    return NextResponse.json({ success: true, settings: safeSettings })
   } catch (error) {
     console.error('Failed to save settings:', error)
     return NextResponse.json({ error: 'Failed to save settings' }, { status: 500 })
   }
 }
+
+export const GET = withAuth(getHandler)
+export const PUT = withAuth(putHandler)

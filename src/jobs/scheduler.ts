@@ -1,8 +1,12 @@
 import cron, { ScheduledTask } from 'node-cron'
 import { runAuditJob } from './audit-job'
 import { syncJournals } from './journal-sync'
+import { subDays, subMonths, startOfMonth, endOfMonth, format } from 'date-fns'
 
 type JobHandler = () => Promise<unknown>
+
+const WEEKLY_AUDIT_ENABLED = process.env.WEEKLY_AUDIT_ENABLED !== 'false'
+const MONTHLY_AUDIT_ENABLED = process.env.MONTHLY_AUDIT_ENABLED !== 'false'
 
 interface ScheduledJob {
   name: string
@@ -10,6 +14,7 @@ interface ScheduledJob {
   handler: JobHandler
   task?: ScheduledTask
   timezone: string
+  enabled?: boolean
 }
 
 const jobs: ScheduledJob[] = [
@@ -25,12 +30,46 @@ const jobs: ScheduledJob[] = [
     handler: () => runAuditJob(),
     timezone: 'Asia/Tokyo',
   },
+  {
+    name: 'weekly-audit',
+    schedule: '0 2 * * 1',
+    handler: () => {
+      const endDate = new Date()
+      const startDate = subDays(endDate, 7)
+      return runAuditJob({
+        startDate: format(startDate, 'yyyy-MM-dd'),
+        endDate: format(endDate, 'yyyy-MM-dd'),
+        notifyOnComplete: true,
+      })
+    },
+    timezone: 'Asia/Tokyo',
+    enabled: WEEKLY_AUDIT_ENABLED,
+  },
+  {
+    name: 'monthly-audit',
+    schedule: '0 2 1 * *',
+    handler: () => {
+      const lastMonth = subMonths(new Date(), 1)
+      return runAuditJob({
+        startDate: format(startOfMonth(lastMonth), 'yyyy-MM-dd'),
+        endDate: format(endOfMonth(lastMonth), 'yyyy-MM-dd'),
+        notifyOnComplete: true,
+      })
+    },
+    timezone: 'Asia/Tokyo',
+    enabled: MONTHLY_AUDIT_ENABLED,
+  },
 ]
 
 export function startScheduler(): void {
   console.log('[Scheduler] Starting job scheduler...')
 
   for (const job of jobs) {
+    if (job.enabled === false) {
+      console.log(`[Scheduler] Skipping disabled job: ${job.name}`)
+      continue
+    }
+
     console.log(`[Scheduler] Scheduling ${job.name} with cron "${job.schedule}" (${job.timezone})`)
 
     job.task = cron.schedule(

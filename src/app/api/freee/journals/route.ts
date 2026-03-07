@@ -1,22 +1,29 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { validateSession } from '@/lib/auth'
 import { FreeeClient } from '@/lib/integrations/freee/client'
+
+async function getAuthUser(request: NextRequest) {
+  const token = request.cookies.get('session')?.value
+  if (!token) return null
+  return validateSession(token)
+}
 
 export async function GET(request: NextRequest) {
   try {
+    const user = await getAuthUser(request)
+    if (!user || !user.companyId) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
     const searchParams = request.nextUrl.searchParams
-    const companyId = searchParams.get('company_id')
     const startDate = searchParams.get('start_date')
     const endDate = searchParams.get('end_date')
     const limit = parseInt(searchParams.get('limit') || '100', 10)
     const offset = parseInt(searchParams.get('offset') || '0', 10)
 
-    if (!companyId) {
-      return NextResponse.json({ error: 'company_id is required' }, { status: 400 })
-    }
-
     const client = new FreeeClient()
     const journals = await client.getJournals(
-      parseInt(companyId, 10),
+      parseInt(user.companyId, 10),
       startDate || undefined,
       endDate || undefined,
       limit,

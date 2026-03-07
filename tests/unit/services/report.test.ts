@@ -7,8 +7,12 @@ import {
   calculateGrossProfit,
   calculateOperatingIncome,
   calculateYoYGrowth,
+  calculateNetIncome,
+  aggregateByCategory,
+  calculateMoMGrowth,
 } from '@/services/report/cash-flow'
 import type { CashFlowInputs } from '@/services/report/cash-flow'
+import type { ProfitLossItem } from '@/types'
 
 describe('Cash Flow Service', () => {
   const mockInputs: CashFlowInputs = {
@@ -137,6 +141,128 @@ describe('Cash Flow Service', () => {
     it('should handle zero previous value', () => {
       const result = calculateYoYGrowth(1000000, 0)
       expect(result).toBe(100)
+    })
+
+    it('should return 0 when both values are zero', () => {
+      const result = calculateYoYGrowth(0, 0)
+      expect(result).toBe(0)
+    })
+
+    it('should handle negative previous value', () => {
+      const result = calculateYoYGrowth(1000000, -500000)
+      expect(result).toBe(300)
+    })
+  })
+
+  describe('calculateNetIncome', () => {
+    it('should calculate net income correctly', () => {
+      const result = calculateNetIncome(500000, 100000, 50000, 100000)
+      expect(result).toBe(450000)
+    })
+
+    it('should handle negative non-operating expenses', () => {
+      const result = calculateNetIncome(500000, 0, 200000, 100000)
+      expect(result).toBe(200000)
+    })
+
+    it('should handle zero operating income', () => {
+      const result = calculateNetIncome(0, 50000, 20000, 10000)
+      expect(result).toBe(20000)
+    })
+
+    it('should handle high tax rate', () => {
+      const result = calculateNetIncome(1000000, 0, 0, 300000)
+      expect(result).toBe(700000)
+    })
+
+    it('should result in negative when expenses exceed income', () => {
+      const result = calculateNetIncome(100000, 0, 150000, 50000)
+      expect(result).toBe(-100000)
+    })
+  })
+
+  describe('aggregateByCategory', () => {
+    it('should aggregate items by category', () => {
+      const items: ProfitLossItem[] = [
+        { code: 'A1', name: 'Item 1', amount: 100, category: 'sales' },
+        { code: 'A2', name: 'Item 2', amount: 200, category: 'sales' },
+        { code: 'B1', name: 'Item 3', amount: 150, category: 'expense' },
+      ]
+
+      const result = aggregateByCategory(items)
+
+      expect(result.get('sales')).toBe(300)
+      expect(result.get('expense')).toBe(150)
+    })
+
+    it('should handle items without category', () => {
+      const items: ProfitLossItem[] = [
+        { code: 'A1', name: 'Item 1', amount: 100 },
+        { code: 'A2', name: 'Item 2', amount: 200 },
+      ]
+
+      const result = aggregateByCategory(items)
+
+      expect(result.get('default')).toBe(300)
+    })
+
+    it('should return empty map for empty array', () => {
+      const result = aggregateByCategory([])
+      expect(result.size).toBe(0)
+    })
+
+    it('should handle single item', () => {
+      const items: ProfitLossItem[] = [
+        { code: 'A1', name: 'Item 1', amount: 500, category: 'revenue' },
+      ]
+
+      const result = aggregateByCategory(items)
+
+      expect(result.size).toBe(1)
+      expect(result.get('revenue')).toBe(500)
+    })
+
+    it('should handle negative amounts', () => {
+      const items: ProfitLossItem[] = [
+        { code: 'A1', name: 'Item 1', amount: 100, category: 'sales' },
+        { code: 'A2', name: 'Item 2', amount: -50, category: 'sales' },
+      ]
+
+      const result = aggregateByCategory(items)
+
+      expect(result.get('sales')).toBe(50)
+    })
+  })
+
+  describe('calculateMoMGrowth', () => {
+    it('should calculate positive MoM growth correctly', () => {
+      const result = calculateMoMGrowth(1100000, 1000000)
+      expect(result).toBe(10)
+    })
+
+    it('should calculate negative MoM growth correctly', () => {
+      const result = calculateMoMGrowth(900000, 1000000)
+      expect(result).toBe(-10)
+    })
+
+    it('should handle zero previous value', () => {
+      const result = calculateMoMGrowth(500000, 0)
+      expect(result).toBe(100)
+    })
+
+    it('should return 0 when both values are zero', () => {
+      const result = calculateMoMGrowth(0, 0)
+      expect(result).toBe(0)
+    })
+
+    it('should handle negative previous value', () => {
+      const result = calculateMoMGrowth(200000, -100000)
+      expect(result).toBe(300)
+    })
+
+    it('should handle negative current value', () => {
+      const result = calculateMoMGrowth(-50000, 100000)
+      expect(result).toBe(-150)
     })
   })
 })

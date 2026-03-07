@@ -1,0 +1,32 @@
+export {
+  ModelConfigService,
+  getModelConfigService,
+  resetModelConfigService,
+  modelRegistry,
+  DEFAULT_MODELS,
+  DEFAULT_TEMPERATURE,
+  DEFAULT_MAX_TOKENS,
+  CACHE_TTL_MS,
+  getDefaultModel,
+  getDefaultTemperature,
+  getDefaultMaxTokens,
+  isValidProvider,
+  sanitizeModelId,
+  sanitizeTemperature,
+  sanitizeMaxTokens,
+} from './model-config'
+
+export type {
+  AIProviderType,
+  ModelConfig,
+  ResolvedConfig,
+  ConfigSource,
+  ModelPricing,
+  ModelCapabilities,
+  UserConfigOverride,
+  CompanyConfigOverride,
+  ModelConfigRegistry,
+  ModelConfigService as IModelConfigService,
+  EnvironmentConfigMap,
+  DatabaseConfigResult,
+} from './types'

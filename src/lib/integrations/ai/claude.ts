@@ -6,18 +6,68 @@ import {
   EntryValidationRequest,
 } from './provider'
 import { DocumentAnalysisResult, EntryValidationResult, ValidationIssue } from '@/types/audit'
+import { API_TIMEOUTS } from '@/lib/utils/timeout'
+import { getDefaultModel } from '@/lib/ai/config/model-config'
+
+const MAX_RETRIES = 3
+const RETRY_DELAY_BASE_MS = 1000
+
+function isOverloadedError(error: unknown): boolean {
+  if (error && typeof error === 'object') {
+    const err = error as { status?: number; message?: string }
+    if (err.status === 529) {
+      return true
+    }
+    if (typeof err.message === 'string') {
+      return err.message.includes('overloaded') || err.message.includes('529')
+    }
+  }
+  return false
+}
+
+async function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+function sanitizeInput(input: string): string {
+  // eslint-disable-next-line no-control-regex
+  return input.replace(/[\x00-\x1F\x7F]/g, '').slice(0, 100000)
+}
 
 export class ClaudeProvider extends BaseAIProvider {
   readonly name = 'claude' as const
   private client: Anthropic
+  private resolvedModel: string
 
   constructor(config: AIConfig) {
     super(config)
-    this.client = new Anthropic({ apiKey: config.apiKey })
+    this.resolvedModel = config.model || getDefaultModel('claude')
+    this.client = new Anthropic({
+      apiKey: config.apiKey,
+      timeout: API_TIMEOUTS.AI_API,
+    })
+  }
+
+  private async withRetry<T>(operation: () => Promise<T>): Promise<T> {
+    let lastError: unknown
+    for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+      try {
+        return await operation()
+      } catch (error) {
+        lastError = error
+        if (isOverloadedError(error) && attempt < MAX_RETRIES - 1) {
+          const delay = RETRY_DELAY_BASE_MS * Math.pow(2, attempt)
+          await sleep(delay)
+          continue
+        }
+        throw error
+      }
+    }
+    throw lastError
   }
 
   async analyzeDocument(request: DocumentAnalysisRequest): Promise<DocumentAnalysisResult> {
-    const model = this.config.model || 'claude-sonnet-4-20250514'
+    const model = this.resolvedModel
 
     const content: Anthropic.Messages.ContentBlockParam[] = []
 
@@ -42,21 +92,26 @@ export class ClaudeProvider extends BaseAIProvider {
       })
     }
 
+    const promptText = sanitizeInput(
+      `${this.getSystemPrompt()}\n\n${this.getSystemPromptJa()}\n\nExtract information from this document and return JSON only.`
+    )
     content.push({
       type: 'text',
-      text: `${this.getSystemPrompt()}\n\n${this.getSystemPromptJa()}\n\nExtract information from this document and return JSON only.`,
+      text: promptText,
     })
 
-    const response = await this.client.messages.create({
-      model,
-      max_tokens: this.config.maxTokens || 1024,
-      messages: [
-        {
-          role: 'user',
-          content,
-        },
-      ],
-    })
+    const response = await this.withRetry(() =>
+      this.client.messages.create({
+        model,
+        max_tokens: this.config.maxTokens || 1024,
+        messages: [
+          {
+            role: 'user',
+            content,
+          },
+        ],
+      })
+    )
 
     const textBlock = response.content.find(
       (block): block is Anthropic.TextBlock => block.type === 'text'
@@ -86,32 +141,38 @@ export class ClaudeProvider extends BaseAIProvider {
   }
 
   async validateEntry(request: EntryValidationRequest): Promise<EntryValidationResult> {
-    const model = this.config.model || 'claude-sonnet-4-20250514'
+    const model = this.resolvedModel
 
-    const response = await this.client.messages.create({
-      model,
-      max_tokens: this.config.maxTokens || 1024,
-      system: this.getValidationPrompt(),
-      messages: [
-        {
-          role: 'user',
-          content: [
-            {
-              type: 'text',
-              text: `Validate the following journal entry against the document data:
+    const journalEntryStr = sanitizeInput(JSON.stringify(request.journalEntry, null, 2))
+    const documentDataStr = sanitizeInput(JSON.stringify(request.documentData, null, 2))
+    const validationPrompt = sanitizeInput(this.getValidationPrompt())
+
+    const response = await this.withRetry(() =>
+      this.client.messages.create({
+        model,
+        max_tokens: this.config.maxTokens || 1024,
+        system: validationPrompt,
+        messages: [
+          {
+            role: 'user',
+            content: [
+              {
+                type: 'text',
+                text: `Validate the following journal entry against the document data:
 
 Journal Entry:
-${JSON.stringify(request.journalEntry, null, 2)}
+${journalEntryStr}
 
 Document Data:
-${JSON.stringify(request.documentData, null, 2)}
+${documentDataStr}
 
 Return JSON with isValid, issues array, and optional suggestions.`,
-            },
-          ],
-        },
-      ],
-    })
+              },
+            ],
+          },
+        ],
+      })
+    )
 
     const textBlock = response.content.find(
       (block): block is Anthropic.TextBlock => block.type === 'text'

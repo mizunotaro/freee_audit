@@ -1,26 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/db'
+import { validateSession } from '@/lib/auth'
 import { ScheduleManager } from '@/services/social-insurance'
 
-async function getCompanyId(): Promise<string> {
-  const companies = await prisma.company.findMany({ take: 1 })
-  if (companies.length > 0) {
-    return companies[0].id
-  }
-  const company = await prisma.company.create({
-    data: { name: 'Default Company', fiscalYearStart: 1 },
-  })
-  return company.id
+async function getAuthUser(request: NextRequest) {
+  const token = request.cookies.get('session')?.value
+  if (!token) return null
+  return validateSession(token)
 }
 
 export async function GET(request: NextRequest) {
   try {
+    const user = await getAuthUser(request)
+    if (!user || !user.companyId) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
     const { searchParams } = new URL(request.url)
-    const companyId = searchParams.get('companyId') || (await getCompanyId())
     const insuranceType = searchParams.get('insuranceType') as any
     const status = searchParams.get('status') as any
 
-    const schedules = await ScheduleManager.getSchedules(companyId, {
+    const schedules = await ScheduleManager.getSchedules(user.companyId, {
       insuranceType: insuranceType || undefined,
       status: status || undefined,
     })
@@ -34,11 +33,15 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    const user = await getAuthUser(request)
+    if (!user || !user.companyId) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
     const body = await request.json()
-    const companyId = body.companyId || (await getCompanyId())
 
     const schedule = await ScheduleManager.createSchedule({
-      companyId,
+      companyId: user.companyId,
       insuranceType: body.insuranceType,
       taskName: body.taskName,
       dueDate: new Date(body.dueDate),

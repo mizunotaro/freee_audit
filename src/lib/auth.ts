@@ -1,9 +1,18 @@
 import * as bcrypt from 'bcryptjs'
+import crypto from 'crypto'
 import jwt from 'jsonwebtoken'
 import { prisma } from './db'
 import type { Session } from '@prisma/client'
 
-const JWT_SECRET = process.env.JWT_SECRET || 'default-jwt-secret-change-in-production'
+function getRequiredEnvVar(name: string): string {
+  const value = process.env[name]
+  if (!value) {
+    throw new Error(`Required environment variable ${name} is not set`)
+  }
+  return value
+}
+
+const JWT_SECRET = getRequiredEnvVar('JWT_SECRET')
 const BCRYPT_ROUNDS = parseInt(process.env.BCRYPT_ROUNDS || '12', 10)
 const SESSION_DURATION_HOURS = 24
 
@@ -30,21 +39,44 @@ export async function verifyPassword(password: string, hash: string): Promise<bo
   return bcrypt.compare(password, hash)
 }
 
-export async function generateToken(userId: string): Promise<string> {
-  return jwt.sign({ userId }, JWT_SECRET, { expiresIn: `${SESSION_DURATION_HOURS}h` })
+export async function generateToken(userId: string, sessionId: string): Promise<string> {
+  return jwt.sign(
+    {
+      userId,
+      sessionId,
+      iat: Math.floor(Date.now() / 1000),
+    },
+    JWT_SECRET,
+    {
+      expiresIn: `${SESSION_DURATION_HOURS}h`,
+      issuer: 'freee_audit',
+      audience: 'freee_audit_users',
+    }
+  )
 }
 
-export function verifyToken(token: string): { userId: string } | null {
+export function verifyToken(token: string): { userId: string; sessionId: string } | null {
   try {
-    const decoded = jwt.verify(token, JWT_SECRET) as { userId: string }
+    const decoded = jwt.verify(token, JWT_SECRET, {
+      issuer: 'freee_audit',
+      audience: 'freee_audit_users',
+    }) as { userId: string; sessionId: string }
     return decoded
   } catch {
     return null
   }
 }
 
+export function constantTimeCompare(a: string, b: string): boolean {
+  if (a.length !== b.length) {
+    return false
+  }
+  return crypto.timingSafeEqual(Buffer.from(a), Buffer.from(b))
+}
+
 export async function createSession(userId: string): Promise<Session> {
-  const token = await generateToken(userId)
+  const sessionId = crypto.randomUUID()
+  const token = await generateToken(userId, sessionId)
   const expiresAt = new Date(Date.now() + SESSION_DURATION_HOURS * 60 * 60 * 1000)
 
   return prisma.session.create({

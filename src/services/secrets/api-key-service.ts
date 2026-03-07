@@ -2,13 +2,29 @@ import { getSecretsManager } from '@/lib/secrets'
 import { decrypt } from '@/lib/crypto'
 import { prisma } from '@/lib/db'
 
+export type AIProvider =
+  | 'openai'
+  | 'gemini'
+  | 'claude'
+  | 'azure'
+  | 'aws'
+  | 'gcp'
+  | 'freee'
+  | 'openrouter'
+
+export interface APIKeyMetadata {
+  zdr?: boolean
+  dataResidency?: 'US' | 'EU' | 'GLOBAL'
+  [key: string]: string | boolean | undefined
+}
+
 export interface APIKeyConfig {
-  provider: 'openai' | 'gemini' | 'claude' | 'azure' | 'aws' | 'gcp' | 'freee'
+  provider: AIProvider
   key: string
   endpoint?: string
   region?: string
   projectId?: string
-  metadata?: Record<string, string>
+  metadata?: APIKeyMetadata
 }
 
 export interface APIKeySource {
@@ -164,6 +180,13 @@ class APIKeyService {
         config.region = settings.awsRegion || undefined
       }
 
+      if (settings.aiZdrEnabled !== undefined || settings.aiDataResidency) {
+        config.metadata = {
+          zdr: settings.aiZdrEnabled ?? undefined,
+          dataResidency: settings.aiDataResidency || undefined,
+        }
+      }
+
       return config
     } catch (error) {
       console.error(`Failed to get ${provider} API key from database:`, error)
@@ -180,6 +203,7 @@ class APIKeyService {
       aws: { key: 'AWS_ACCESS_KEY_ID' },
       gcp: { key: 'GOOGLE_APPLICATION_CREDENTIALS' },
       freee: { key: 'FREEE_CLIENT_SECRET' },
+      openrouter: { key: 'OPENROUTER_API_KEY' },
     }
 
     const mapping = envMapping[provider]
@@ -213,6 +237,7 @@ class APIKeyService {
       aws: 'awsSecretAccessKey',
       gcp: 'gcpApiKey',
       freee: 'freeeClientSecret',
+      openrouter: 'openrouterApiKey',
     }
     return fieldMapping[provider]
   }
@@ -251,6 +276,7 @@ class APIKeyService {
       'aws',
       'gcp',
       'freee',
+      'openrouter',
     ]
 
     await Promise.all(
@@ -259,7 +285,7 @@ class APIKeyService {
           const config = await this.getAPIKey(provider, { preferSecretManager: true })
           results.set(provider, {
             available: !!config,
-            source: config?.metadata?.source || 'none',
+            source: typeof config?.metadata?.source === 'string' ? config.metadata.source : 'none',
           })
         } catch {
           results.set(provider, {

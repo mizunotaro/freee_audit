@@ -16,6 +16,13 @@ import type {
 import { FreeeApiError } from './types'
 import { freeeRateLimiter, freeeCircuitBreaker, withRetry } from './rate-limiter'
 import { getToken, saveToken, deleteToken, isTokenExpired } from './token-store'
+import { fetchWithTimeout, API_TIMEOUTS } from '@/lib/utils/timeout'
+import {
+  freeeApiQuotaManager,
+  type ApiCallCategory,
+  type ApiCallPriority,
+  prioritizeApiCall,
+} from './quota-manager'
 
 const FREEE_API_BASE_URL = 'https://api.freee.co.jp'
 const FREEE_AUTH_URL = 'https://accounts.secure.freee.co.jp/public_api/authorize'
@@ -67,19 +74,23 @@ export class FreeeClient {
       return this.getMockTokenResponse()
     }
 
-    const response = await fetch(FREEE_TOKEN_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
+    const response = await fetchWithTimeout(
+      FREEE_TOKEN_URL,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: new URLSearchParams({
+          grant_type: 'authorization_code',
+          code,
+          client_id: this.clientId,
+          client_secret: this.clientSecret,
+          redirect_uri: this.redirectUri,
+        }).toString(),
       },
-      body: new URLSearchParams({
-        grant_type: 'authorization_code',
-        code,
-        client_id: this.clientId,
-        client_secret: this.clientSecret,
-        redirect_uri: this.redirectUri,
-      }).toString(),
-    })
+      API_TIMEOUTS.FREEE_API
+    )
 
     if (!response.ok) {
       const error = (await response.json()) as FreeeError
@@ -94,18 +105,22 @@ export class FreeeClient {
       return this.getMockTokenResponse()
     }
 
-    const response = await fetch(FREEE_TOKEN_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
+    const response = await fetchWithTimeout(
+      FREEE_TOKEN_URL,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: new URLSearchParams({
+          grant_type: 'refresh_token',
+          refresh_token: refreshToken,
+          client_id: this.clientId,
+          client_secret: this.clientSecret,
+        }).toString(),
       },
-      body: new URLSearchParams({
-        grant_type: 'refresh_token',
-        refresh_token: refreshToken,
-        client_id: this.clientId,
-        client_secret: this.clientSecret,
-      }).toString(),
-    })
+      API_TIMEOUTS.FREEE_API
+    )
 
     if (!response.ok) {
       const error = (await response.json()) as FreeeError
@@ -170,14 +185,18 @@ export class FreeeClient {
           })
         }
 
-        const response = await fetch(url.toString(), {
-          method,
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
-            'Content-Type': 'application/json',
+        const response = await fetchWithTimeout(
+          url.toString(),
+          {
+            method,
+            headers: {
+              Authorization: `Bearer ${accessToken}`,
+              'Content-Type': 'application/json',
+            },
+            body: options?.body ? JSON.stringify(options.body) : undefined,
           },
-          body: options?.body ? JSON.stringify(options.body) : undefined,
-        })
+          API_TIMEOUTS.FREEE_API
+        )
 
         if (!response.ok) {
           const error = (await response.json()) as FreeeError
@@ -285,13 +304,14 @@ export class FreeeClient {
     }
 
     const accessToken = await this.getValidAccessToken()
-    const response = await fetch(
+    const response = await fetchWithTimeout(
       `${FREEE_API_BASE_URL}/api/1/documents/${documentId}/download?company_id=${companyId}`,
       {
         headers: {
           Authorization: `Bearer ${accessToken}`,
         },
-      }
+      },
+      API_TIMEOUTS.FREEE_API
     )
 
     if (!response.ok) {

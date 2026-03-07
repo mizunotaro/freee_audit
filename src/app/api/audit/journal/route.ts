@@ -1,16 +1,18 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
+import { withAuth, type AuthenticatedRequest } from '@/lib/api'
+import { validateCompanyId } from '@/lib/api/auth-helpers'
 import { prisma } from '@/lib/db'
 import { analyzeJournalEntry } from '@/services/ai/analysis-service'
 
-export async function GET(request: NextRequest) {
+async function getHandler(req: AuthenticatedRequest) {
   try {
-    const { searchParams } = new URL(request.url)
+    const { searchParams } = new URL(req.url)
     const fiscalYear = parseInt(
       searchParams.get('fiscalYear') || new Date().getFullYear().toString()
     )
     const month = parseInt(searchParams.get('month') || new Date().getMonth().toString())
 
-    const companyId = await getCompanyId()
+    const companyId = await validateCompanyId(req.user, searchParams.get('companyId'))
 
     const startDate = new Date(fiscalYear, month - 1, 1)
     const endDate = new Date(fiscalYear, month, 0)
@@ -49,16 +51,22 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ entries, stats })
   } catch (error) {
     console.error('Journal audit API error:', error)
+    if (error instanceof Error && error.message.includes('Access denied')) {
+      return NextResponse.json(
+        { success: false, error: error.message, code: 'FORBIDDEN' },
+        { status: 403 }
+      )
+    }
     return NextResponse.json({ error: 'Failed to fetch journals' }, { status: 500 })
   }
 }
 
-export async function POST(request: NextRequest) {
+async function postHandler(req: AuthenticatedRequest) {
   try {
-    const body = await request.json()
-    const { fiscalYear, month } = body
+    const body = await req.json()
+    const { fiscalYear, month, companyId: requestedCompanyId } = body
 
-    const companyId = await getCompanyId()
+    const companyId = await validateCompanyId(req.user, requestedCompanyId || null)
 
     const startDate = new Date(fiscalYear, month - 1, 1)
     const endDate = new Date(fiscalYear, month, 0)
@@ -119,19 +127,14 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ entries, stats })
   } catch (error) {
     console.error('Journal analyze API error:', error)
+    if (error instanceof Error && error.message.includes('Access denied')) {
+      return NextResponse.json(
+        { success: false, error: error.message, code: 'FORBIDDEN' },
+        { status: 403 }
+      )
+    }
     return NextResponse.json({ error: 'Failed to analyze journals' }, { status: 500 })
   }
-}
-
-async function getCompanyId(): Promise<string> {
-  const companies = await prisma.company.findMany({ take: 1 })
-  if (companies.length > 0) {
-    return companies[0].id
-  }
-  const company = await prisma.company.create({
-    data: { name: 'サンプル株式会社', fiscalYearStart: 4 },
-  })
-  return company.id
 }
 
 function generateMockIssues(journal: {
@@ -167,3 +170,6 @@ function generateMockIssues(journal: {
 
   return issues
 }
+
+export const GET = withAuth(getHandler, { requireCompany: true })
+export const POST = withAuth(postHandler, { requireCompany: true })

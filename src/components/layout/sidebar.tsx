@@ -1,6 +1,5 @@
 'use client'
 
-import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useTranslations } from 'next-intl'
@@ -12,7 +11,6 @@ import {
   Settings,
   LogOut,
   Menu,
-  X,
   Shield,
   Calculator,
   Receipt,
@@ -62,7 +60,6 @@ const navItems = [
 export function Sidebar({ user, locale }: SidebarProps) {
   const t = useTranslations('navigation')
   const pathname = usePathname()
-  const [isOpen, setIsOpen] = useState(false)
 
   const handleLogout = async () => {
     window.location.href = `/${locale}/login`
@@ -79,7 +76,6 @@ export function Sidebar({ user, locale }: SidebarProps) {
           <Link
             key={item.key}
             href={href}
-            onClick={() => setIsOpen(false)}
             className={cn(
               'flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors',
               isActive
@@ -132,43 +128,24 @@ export function Sidebar({ user, locale }: SidebarProps) {
   )
 
   return (
-    <>
-      {/* Mobile header */}
-      <header className="fixed left-0 right-0 top-0 z-50 flex h-14 items-center gap-4 border-b bg-background px-4 lg:hidden">
-        <Sheet open={isOpen} onOpenChange={setIsOpen}>
-          <SheetTrigger asChild>
-            <Button variant="ghost" size="icon">
-              <Menu className="h-5 w-5" />
-            </Button>
-          </SheetTrigger>
-          <SheetContent side="left" className="w-64 p-4">
-            <div className="mb-4 flex items-center justify-between">
-              <span className="text-lg font-bold">freee_audit</span>
-              <Button variant="ghost" size="icon" onClick={() => setIsOpen(false)}>
-                <X className="h-5 w-5" />
-              </Button>
-            </div>
-            <NavLinks />
-            <div className="mt-auto pt-4">
-              <UserMenu />
-            </div>
-          </SheetContent>
-        </Sheet>
-        <span className="font-semibold">freee_audit</span>
-      </header>
-
-      {/* Desktop sidebar */}
-      <aside className="fixed left-0 top-0 z-40 hidden h-screen w-64 flex-col border-r bg-background lg:flex">
-        <div className="flex h-14 items-center border-b px-4">
-          <span className="text-lg font-bold">freee_audit</span>
-        </div>
-        <div className="flex-1 overflow-auto p-4">
+    <header className="fixed left-0 right-0 top-0 z-50 flex h-14 items-center gap-4 border-b bg-background px-4 lg:hidden">
+      <Sheet>
+        <SheetTrigger asChild>
+          <Button variant="ghost" size="icon">
+            <Menu className="h-5 w-5" />
+          </Button>
+        </SheetTrigger>
+        <SheetContent side="left" className="w-64 p-4">
+          <div className="mb-4 flex items-center justify-between">
+            <span className="text-lg font-bold">freee_audit</span>
+          </div>
           <NavLinks />
-        </div>
-        <div className="border-t p-4">
-          <UserMenu />
-        </div>
-      </aside>
-    </>
+          <div className="mt-auto pt-4">
+            <UserMenu />
+          </div>
+        </SheetContent>
+      </Sheet>
+      <span className="font-semibold">freee_audit</span>
+    </header>
   )
 }

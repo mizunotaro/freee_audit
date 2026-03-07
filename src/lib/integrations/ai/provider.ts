@@ -1,6 +1,6 @@
 import { DocumentAnalysisResult, EntryValidationResult } from '@/types/audit'
 
-export type AIProviderType = 'openai' | 'gemini' | 'claude'
+export type AIProviderType = 'openai' | 'gemini' | 'claude' | 'openrouter'
 
 export interface AIConfig {
   provider: AIProviderType

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { validateSession } from '@/lib/auth'
 import {
   getBudgets,
   createBudget,
@@ -17,8 +18,13 @@ import {
   getMonthlyBudgetTrend,
 } from '@/services/budget/actual-vs-budget'
 import { calculateDetailedActualVsBudget } from '@/services/budget/detailed-actual-vs-budget'
-import { prisma } from '@/lib/db'
 import type { ProfitLoss } from '@/types'
+
+async function getAuthUser(request: NextRequest) {
+  const token = request.cookies.get('session')?.value
+  if (!token) return null
+  return validateSession(token)
+}
 
 function generateSamplePL(
   fiscalYear: number,
@@ -61,30 +67,21 @@ function generateSamplePL(
 
 export async function GET(request: NextRequest) {
   try {
+    const user = await getAuthUser(request)
+    if (!user || !user.companyId) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
     const { searchParams } = new URL(request.url)
     const action = searchParams.get('action') || 'list'
-    const companyId = searchParams.get('companyId')
     const fiscalYear = parseInt(
       searchParams.get('fiscalYear') || new Date().getFullYear().toString()
     )
     const month = searchParams.get('month') ? parseInt(searchParams.get('month')!) : undefined
-
-    let targetCompanyId = companyId
-
-    if (!targetCompanyId) {
-      const companies = await prisma.company.findMany({ take: 1 })
-      if (companies.length === 0) {
-        const company = await prisma.company.create({
-          data: { name: 'サンプル株式会社', fiscalYearStart: 4 },
-        })
-        targetCompanyId = company.id
-      } else {
-        targetCompanyId = companies[0].id
-      }
-    }
+    const targetCompanyId = user.companyId
 
     switch (action) {
-      case 'template':
+      case 'template': {
         const template = generateBudgetTemplate()
         return new NextResponse(template, {
           headers: {
@@ -92,8 +89,9 @@ export async function GET(request: NextRequest) {
             'Content-Disposition': 'attachment; filename=budget_template.csv',
           },
         })
+      }
 
-      case 'variance':
+      case 'variance': {
         if (!month) {
           return NextResponse.json(
             { error: 'Month is required for variance analysis' },
@@ -107,8 +105,9 @@ export async function GET(request: NextRequest) {
         )
         const variance = analyzeBudgetVariance(budgetVsActual)
         return NextResponse.json({ budgetVsActual, variance })
+      }
 
-      case 'detailed':
+      case 'detailed': {
         if (!month) {
           return NextResponse.json(
             { error: 'Month is required for detailed analysis' },
@@ -123,22 +122,26 @@ export async function GET(request: NextRequest) {
           samplePL as ProfitLoss
         )
         return NextResponse.json(detailed)
+      }
 
-      case 'trend':
+      case 'trend': {
         const trends = await getMonthlyBudgetTrendWithSample(targetCompanyId, fiscalYear)
         return NextResponse.json({ trends })
+      }
 
-      case 'yearly':
+      case 'yearly': {
         const yearlyBudgets = await getBudgetsByFiscalYear(targetCompanyId, fiscalYear)
         return NextResponse.json({ budgets: yearlyBudgets })
+      }
 
-      default:
+      default: {
         const budgets = await getBudgets({
           companyId: targetCompanyId,
           fiscalYear,
           month,
         })
         return NextResponse.json({ budgets })
+      }
     }
   } catch (error) {
     console.error('Budget API error:', error)
@@ -148,16 +151,21 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    const user = await getAuthUser(request)
+    if (!user || !user.companyId) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
     const body = await request.json()
     const { action, data } = body
 
     switch (action) {
-      case 'create':
-        const budget = await createBudget(data)
+      case 'create': {
+        const budget = await createBudget({ ...data, companyId: user.companyId })
         return NextResponse.json({ budget })
+      }
 
-      case 'import':
-        const companyId = data.companyId
+      case 'import': {
         const fiscalYear = data.fiscalYear
         const csvContent = data.csvContent
         const departmentId = data.departmentId
@@ -173,8 +181,14 @@ export async function POST(request: NextRequest) {
           )
         }
 
-        const result = await importBudgetFromCsv(csvContent, companyId, fiscalYear, departmentId)
+        const result = await importBudgetFromCsv(
+          csvContent,
+          user.companyId,
+          fiscalYear,
+          departmentId
+        )
         return NextResponse.json(result)
+      }
 
       default:
         return NextResponse.json({ error: 'Invalid action' }, { status: 400 })
@@ -187,6 +201,11 @@ export async function POST(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
+    const user = await getAuthUser(request)
+    if (!user || !user.companyId) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
     const { searchParams } = new URL(request.url)
     const id = searchParams.get('id')
 
@@ -204,6 +223,11 @@ export async function DELETE(request: NextRequest) {
 
 export async function PUT(request: NextRequest) {
   try {
+    const user = await getAuthUser(request)
+    if (!user || !user.companyId) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
     const body = await request.json()
     const { id, amount, departmentId, note } = body
 
