@@ -76,7 +76,7 @@ async function postHandler(req: AuthenticatedRequest): Promise<NextResponse> {
     const { receiptId, additionalContext } = parseResult.data
 
     const cacheKey = `proposal:${receiptId}`
-    const cached = proposalCache.get(cacheKey) as { documentId: string } | null
+    const cached = proposalCache.get(cacheKey)
     if (cached && cached.documentId === receiptId) {
       return NextResponse.json(createSuccessResponse({ cached: true, proposalId: cached.id }), {
         status: 200,

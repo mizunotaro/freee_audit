@@ -1,0 +1,65 @@
+{
+  "$schema": "./target-repos.schema.json",
+  "version": "1.0.0",
+  "repositories": [
+    {
+      "name": "mizunomi/freee_audit",
+      "enabled": true,
+      "priority": 1,
+      "description": "Financial audit system with AI-powered analysis",
+      "labels": {
+        "task": "ai-task",
+        "inProgress": "ai-in-progress",
+        "completed": "ai-completed",
+        "blocked": "ai-blocked",
+        "autoMerge": "auto-merge",
+        "doNotMerge": "do-not-merge"
+      },
+      "qualityGates": {
+        "typecheck": {
+          "command": "pnpm tsc --noEmit",
+          "timeout": 120000,
+          "required": true
+        },
+        "lint": {
+          "command": "pnpm eslint src/ --max-warnings=0",
+          "timeout": 120000,
+          "required": true
+        },
+        "test": {
+          "command": "pnpm jest --passWithNoTests",
+          "timeout": 300000,
+          "required": true
+        },
+        "build": {
+          "command": "pnpm build",
+          "timeout": 300000,
+          "required": true
+        }
+      },
+      "branchProtection": {
+        "main": {
+          "requiredChecks": ["typecheck", "lint", "test", "build"],
+          "allowAutoMerge": true
+        }
+      },
+      "constraints": {
+        "maxFileSizeKB": 500,
+        "maxFilesPerTask": 50,
+        "forbiddenPaths": ["**/migrations/**", "**/*.sql", "**/.env*", "**/prisma/schema.prisma"],
+        "requiredReviewers": []
+      },
+      "notifications": {
+        "slack": null,
+        "email": null
+      }
+    }
+  ],
+  "settings": {
+    "scanIntervalMinutes": 15,
+    "maxQueueSize": 100,
+    "taskTimeoutMinutes": 30,
+    "retryAttempts": 3,
+    "retryDelayMinutes": 5
+  }
+}

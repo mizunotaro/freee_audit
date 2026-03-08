@@ -1,0 +1,56 @@
+{
+  "$schema": "./schedule.schema.json",
+  "version": "1.0.0",
+  "defaultConcurrency": 3,
+  "schedules": [
+    {
+      "name": "weekday-daytime",
+      "description": "平日昼間帯（人間がOpenCodeを使用する可能性がある時間）",
+      "cron": "0 23-10 * * 1-5",
+      "timezone": "UTC",
+      "cronDescriptionJST": "月-金 8:00-19:00 (JST)",
+      "maxConcurrency": 2,
+      "reason": "Reserve 1 session for human planning and discussions"
+    },
+    {
+      "name": "weekday-nighttime",
+      "description": "平日夜間・早朝（自動化にフルリソース割り当て可能）",
+      "cron": "0 11-22 * * 1-5",
+      "timezone": "UTC",
+      "cronDescriptionJST": "月-金 20:00-翌7:00 (JST)",
+      "maxConcurrency": 3,
+      "reason": "Full automation available during off-hours"
+    },
+    {
+      "name": "weekend",
+      "description": "週末（終日フルリソース割り当て可能）",
+      "cron": "0 0-23 * * 0,6",
+      "timezone": "UTC",
+      "cronDescriptionJST": "土日 終日 (JST)",
+      "maxConcurrency": 3,
+      "reason": "Full automation available on weekends"
+    }
+  ],
+  "overrides": [
+    {
+      "name": "maintenance-window",
+      "description": "定期メンテナンス時間（処理停止）",
+      "cron": "0 15 * * 0",
+      "timezone": "UTC",
+      "cronDescriptionJST": "日曜 0:00-1:00 (JST)",
+      "maxConcurrency": 0,
+      "reason": "Scheduled maintenance window"
+    }
+  ],
+  "rateLimitHandling": {
+    "provider": "zai",
+    "requestsPerMinute": 60,
+    "tokensPerMinute": 100000,
+    "retryStrategy": {
+      "maxRetries": 5,
+      "initialDelayMs": 1000,
+      "maxDelayMs": 60000,
+      "backoffMultiplier": 2
+    }
+  }
+}

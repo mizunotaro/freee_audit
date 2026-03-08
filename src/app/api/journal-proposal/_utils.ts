@@ -130,7 +130,21 @@ export class MemoryCache<T> {
   }
 }
 
-export const proposalCache = new MemoryCache<unknown>(50)
+export interface ProposalCacheEntry {
+  id: string
+  documentId: string
+  companyId: string
+  status: string
+  proposals: string
+  aiProvider: string
+  aiModel: string
+  createdBy: string
+  createdAt: Date
+  reviewedBy: string | null
+  reviewedAt: Date | null
+}
+
+export const proposalCache = new MemoryCache<ProposalCacheEntry>(50)
 
 export const paginationSchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
@@ -240,6 +254,11 @@ export async function verifyCompanyAccess(
   return req.user.companyId === companyId || req.user.role === 'SUPER_ADMIN'
 }
 
+export interface CachedProposalData {
+  proposal: ProposalCacheEntry & { document: { id: string; originalName: string } }
+  document: { id: string; originalName: string }
+}
+
 /**
  * Retrieve a proposal with authorization check
  * @param proposalId - Proposal ID to retrieve
@@ -251,36 +270,53 @@ export async function getProposalWithAuth(
   proposalId: string,
   req: AuthenticatedRequest,
   prisma: PrismaClient
-): Promise<{ proposal: unknown; document: unknown } | null> {
+): Promise<CachedProposalData | null> {
   const cacheKey = `proposal:${proposalId}`
   const cached = proposalCache.get(cacheKey)
   if (cached) {
-    const proposal = cached as { companyId: string }
-    const hasAccess = await verifyCompanyAccess(req, proposal.companyId)
+    const hasAccess = await verifyCompanyAccess(req, cached.companyId)
     if (!hasAccess) return null
-    return cached as { proposal: unknown; document: unknown }
+    return {
+      proposal: cached as CachedProposalData['proposal'],
+      document: { id: cached.documentId, originalName: '' },
+    }
   }
 
   const proposal = await prisma.journalProposal.findUnique({
     where: { id: proposalId },
     include: {
-      document: true,
+      document: {
+        select: { id: true, originalName: true },
+      },
       company: true,
     },
   })
 
   if (!proposal) return null
 
-  const hasAccess = await verifyCompanyAccess(req, (proposal as { companyId: string }).companyId)
+  const hasAccess = await verifyCompanyAccess(req, proposal.companyId)
   if (!hasAccess) return null
 
-  proposalCache.set(
-    cacheKey,
-    { proposal, document: (proposal as { document: unknown }).document },
-    30000
-  )
+  const cacheEntry: ProposalCacheEntry = {
+    id: proposal.id,
+    documentId: proposal.documentId,
+    companyId: proposal.companyId,
+    status: proposal.status,
+    proposals: proposal.proposals,
+    aiProvider: proposal.aiProvider,
+    aiModel: proposal.aiModel,
+    createdBy: proposal.createdBy,
+    createdAt: proposal.createdAt,
+    reviewedBy: proposal.reviewedBy,
+    reviewedAt: proposal.reviewedAt,
+  }
 
-  return { proposal, document: (proposal as { document: unknown }).document }
+  proposalCache.set(cacheKey, cacheEntry, 30000)
+
+  return {
+    proposal: { ...cacheEntry, document: proposal.document },
+    document: proposal.document,
+  }
 }
 
 export const ALLOWED_FILE_TYPES = [

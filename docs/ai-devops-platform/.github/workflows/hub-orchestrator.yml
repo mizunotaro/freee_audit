@@ -1,0 +1,306 @@
+name: AI DevOps Central Hub Orchestrator
+
+on:
+  schedule:
+    - cron: '*/15 * * * *'
+  workflow_dispatch:
+    inputs:
+      repository:
+        description: 'Target repository (owner/repo)'
+        required: false
+        default: ''
+      issue_number:
+        description: 'Specific issue number'
+        required: false
+        default: ''
+      force:
+        description: 'Force run'
+        required: false
+        default: 'false'
+        type: boolean
+
+concurrency:
+  group: ai-hub-orchestrator
+  cancel-in-progress: false
+
+env:
+  ZAI_API_KEY: ${{ secrets.ZAI_API_KEY }}
+
+jobs:
+  preflight:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      should_run: ${{ steps.check.outputs.should_run }}
+      max_concurrency: ${{ steps.schedule.outputs.max_concurrency }}
+      enabled_repos: ${{ steps.repos.outputs.enabled_repos }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Check automation
+        id: check
+        run: |
+          MODE="${{ vars.AI_AUTOMATION_MODE }}"
+          FORCE="${{ github.event.inputs.force }}"
+          
+          if [[ "$MODE" == "disabled" && "$FORCE" != "true" ]]; then
+            echo "should_run=false" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          echo "should_run=true" >> $GITHUB_OUTPUT
+
+      - name: Calculate concurrency
+        id: schedule
+        run: |
+          HOUR_JST=$(( ($(date -u +%H) + 9) % 24 ))
+          DOW=$(date -u +%u)
+          
+          if [[ $DOW -le 5 && $HOUR_JST -ge 8 && $HOUR_JST -lt 19 ]]; then
+            echo "max_concurrency=2" >> $GITHUB_OUTPUT
+          else
+            echo "max_concurrency=3" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Load repos
+        id: repos
+        run: |
+          if [ -f "config/target-repos.json" ]; then
+            REPOS=$(jq -c '[.repositories[] | select(.enabled == true)]' config/target-repos.json)
+          else
+            REPOS='[{"name":"${{ github.repository }}","priority":1}]'
+          fi
+          echo "enabled_repos=$REPOS" >> $GITHUB_OUTPUT
+
+  scan:
+    needs: preflight
+    if: needs.preflight.outputs.should_run == 'true'
+    runs-on: ubuntu-latest
+    outputs:
+      tasks: ${{ steps.scan.outputs.tasks }}
+      count: ${{ steps.scan.outputs.count }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Scan for tasks
+        id: scan
+        env:
+          GH_TOKEN: ${{ secrets.HUB_PAT }}
+          REPOS: ${{ needs.preflight.outputs.enabled_repos }}
+        run: |
+          TASKS="[]"
+          
+          for repo in $(echo "$REPOS" | jq -r '.[].name'); do
+            echo "Scanning $repo..."
+            
+            ISSUES=$(gh issue list --repo "$repo" --label "ai-task" --state open --json number,title,body,labels,createdAt --limit 20 2>/dev/null || echo '[]')
+            
+            for row in $(echo "$ISSUES" | jq -r '.[] | @base64'); do
+              issue=$(echo "$row" | base64 -d)
+              num=$(echo "$issue" | jq -r '.number')
+              labels=$(echo "$issue" | jq -r '[.labels[].name]')
+              
+              if echo "$labels" | jq -e 'index("ai-in-progress") or index("ai-blocked")' > /dev/null 2>&1; then
+                continue
+              fi
+              
+              priority="medium"
+              if echo "$labels" | jq -e 'index("priority-critical")' > /dev/null 2>&1; then
+                priority="critical"
+              elif echo "$labels" | jq -e 'index("priority-high")' > /dev/null 2>&1; then
+                priority="high"
+              elif echo "$labels" | jq -e 'index("priority-low")' > /dev/null 2>&1; then
+                priority="low"
+              fi
+              
+              title=$(echo "$issue" | jq -r '.title')
+              body=$(echo "$issue" | jq -r '.body // ""' | tr '\n' ' ' | cut -c1-500)
+              
+              TASKS=$(echo "$TASKS" | jq --arg r "$repo" --arg n "$num" --arg t "$title" --arg b "$body" --arg p "$priority" '. + [{repo: $r, num: $n, title: $t, body: $b, priority: $p}]')
+            done
+          done
+          
+          PRIORITY_ORDER='{"critical":0,"high":1,"medium":2,"low":3}'
+          TASKS=$(echo "$TASKS" | jq --argjson o "$PRIORITY_ORDER" 'sort_by([$o[.priority]])')
+          
+          echo "tasks=$(echo "$TASKS" | jq -c '.')" >> $GITHUB_OUTPUT
+          echo "count=$(echo "$TASKS" | jq 'length')" >> $GITHUB_OUTPUT
+
+  execute:
+    needs: [preflight, scan]
+    if: needs.scan.outputs.count > 0
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      max-parallel: ${{ fromJson(needs.preflight.outputs.max_concurrency) }}
+      matrix:
+        task: ${{ fromJson(needs.scan.outputs.tasks) }}
+    steps:
+      - name: Checkout target
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ matrix.task.repo }}
+          token: ${{ secrets.HUB_PAT }}
+          fetch-depth: 0
+
+      - name: Setup
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install
+        run: |
+          if [ -f pnpm-lock.yaml ]; then
+            npm install -g pnpm && pnpm install --frozen-lockfile
+          elif [ -f package-lock.json ]; then
+            npm ci
+          fi
+        continue-on-error: true
+
+      - name: Mark in progress
+        env:
+          GH_TOKEN: ${{ secrets.HUB_PAT }}
+        run: |
+          gh issue edit ${{ matrix.task.num }} --repo ${{ matrix.task.repo }} --add-label "ai-in-progress" --remove-label "ai-task" 2>/dev/null || true
+          gh issue comment ${{ matrix.task.num }} --repo ${{ matrix.task.repo }} --body "🤖 AI processing started
+
+- Model: GLM5
+- Repo: ${{ matrix.task.repo }}
+- Issue: #${{ matrix.task.num }}" 2>/dev/null || true
+
+      - name: Create branch
+        id: branch
+        run: |
+          slug=$(echo "${{ matrix.task.title }}" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]/-/g' | sed 's/--*/-/g' | cut -c1-40)
+          branch="ai-task-${{ matrix.task.num }}-${slug}"
+          git checkout -b "$branch" 2>/dev/null || git checkout "$branch"
+          echo "name=$branch" >> $GITHUB_OUTPUT
+
+      - name: Run OpenCode
+        id: opencode
+        timeout-minutes: 20
+        uses: anomalyco/opencode/github@v1.1.44
+        env:
+          ZAI_API_KEY: ${{ secrets.ZAI_API_KEY }}
+        with:
+          model: zai-coding-plan/glm-5
+          prompt: |
+            Implement: ${{ matrix.task.title }}
+            
+            Issue #${{ matrix.task.num }}: ${{ matrix.task.body }}
+            
+            Requirements:
+            1. Implement the feature/fix
+            2. Follow existing patterns
+            3. Write tests
+            4. Pass quality gates (tsc, eslint, jest, build)
+            
+            Create PR closing #${{ matrix.task.num }}
+          token: ${{ secrets.HUB_PAT }}
+        continue-on-error: true
+
+      - name: Quality gates
+        id: quality
+        continue-on-error: true
+        run: |
+          result="pass"
+          
+          echo "### Quality Gates" >> $GITHUB_STEP_SUMMARY
+          
+          echo "::group::TypeScript"
+          if pnpm tsc --noEmit 2>&1; then
+            echo "✅ tsc: pass" >> $GITHUB_STEP_SUMMARY
+            echo "tsc=pass" >> $GITHUB_OUTPUT
+          else
+            echo "❌ tsc: fail" >> $GITHUB_STEP_SUMMARY
+            echo "tsc=fail" >> $GITHUB_OUTPUT
+            result="fail"
+          fi
+          echo "::endgroup::"
+          
+          echo "::group::ESLint"
+          if pnpm eslint src/ --max-warnings=0 2>&1; then
+            echo "✅ eslint: pass" >> $GITHUB_STEP_SUMMARY
+            echo "eslint=pass" >> $GITHUB_OUTPUT
+          else
+            echo "❌ eslint: fail" >> $GITHUB_STEP_SUMMARY
+            echo "eslint=fail" >> $GITHUB_OUTPUT
+            result="fail"
+          fi
+          echo "::endgroup::"
+          
+          echo "::group::Tests"
+          if pnpm jest --passWithNoTests 2>&1; then
+            echo "✅ jest: pass" >> $GITHUB_STEP_SUMMARY
+            echo "jest=pass" >> $GITHUB_OUTPUT
+          else
+            echo "❌ jest: fail" >> $GITHUB_STEP_SUMMARY
+            echo "jest=fail" >> $GITHUB_OUTPUT
+            result="fail"
+          fi
+          echo "::endgroup::"
+          
+          echo "::group::Build"
+          if pnpm build 2>&1; then
+            echo "✅ build: pass" >> $GITHUB_STEP_SUMMARY
+            echo "build=pass" >> $GITHUB_OUTPUT
+          else
+            echo "❌ build: fail" >> $GITHUB_STEP_SUMMARY
+            echo "build=fail" >> $GITHUB_OUTPUT
+            result="fail"
+          fi
+          echo "::endgroup::"
+          
+          echo "result=$result" >> $GITHUB_OUTPUT
+
+      - name: Create PR
+        if: steps.quality.outputs.result == 'pass'
+        env:
+          GH_TOKEN: ${{ secrets.HUB_PAT }}
+        run: |
+          git push origin ${{ steps.branch.outputs.name }} 2>/dev/null || true
+          
+          pr_url=$(gh pr create --repo ${{ matrix.task.repo }} \
+            --title "feat: ${{ matrix.task.title }}" \
+            --body "Closes #${{ matrix.task.num }}
+
+Generated by AI DevOps Hub (GLM5)
+
+**Quality Gates:** ✅ All passed" \
+            --base main \
+            --label "ai-generated" 2>/dev/null || echo "")
+          
+          if [ -n "$pr_url" ]; then
+            gh issue comment ${{ matrix.task.num }} --repo ${{ matrix.task.repo }} --body "✅ PR created: $pr_url" 2>/dev/null || true
+          fi
+
+      - name: Handle failure
+        if: failure() || steps.quality.outputs.result != 'pass'
+        env:
+          GH_TOKEN: ${{ secrets.HUB_PAT }}
+        run: |
+          gh issue edit ${{ matrix.task.num }} --repo ${{ matrix.task.repo }} \
+            --add-label "ai-blocked" --remove-label "ai-in-progress" 2>/dev/null || true
+          
+          gh issue comment ${{ matrix.task.num }} --repo ${{ matrix.task.repo }} --body "❌ AI processing failed
+
+Quality gates:
+- tsc: ${{ steps.quality.outputs.tsc }}
+- eslint: ${{ steps.quality.outputs.eslint }}
+- jest: ${{ steps.quality.outputs.jest }}
+- build: ${{ steps.quality.outputs.build }}
+
+Human review required." 2>/dev/null || true
+
+  summary:
+    needs: [preflight, scan, execute]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          echo "## AI Hub Summary" >> $GITHUB_STEP_SUMMARY
+          echo "- Max concurrency: ${{ needs.preflight.outputs.max_concurrency }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Tasks found: ${{ needs.scan.outputs.count }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Execution: ${{ needs.execute.result }}" >> $GITHUB_STEP_SUMMARY

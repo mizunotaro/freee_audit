@@ -3,20 +3,34 @@ import { withAuth, type AuthenticatedRequest } from '@/lib/api'
 import { prisma } from '@/lib/db'
 import {
   updateProposalSchema,
+  approveSchema,
   verifyCompanyAccess,
   createErrorResponse,
   createSuccessResponse,
   withRetry,
   proposalCache,
-} from '../_utils'
+} from '../../_utils'
 
-interface RouteParams {
-  params: Promise<{ id: string }>
+interface ProposalData {
+  entries: Array<{
+    entryDate?: string
+    description?: string
+    amount?: number
+    [key: string]: unknown
+  }>
+  [key: string]: unknown
 }
 
-export async function POST(req: AuthenticatedRequest, context: RouteParams): Promise<NextResponse> {
+const approveUpdateSchema = updateProposalSchema.merge(approveSchema)
+
+async function postHandler(
+  req: AuthenticatedRequest,
+  context?: { params?: Record<string, string> | Promise<Record<string, string>> }
+): Promise<NextResponse> {
   try {
-    const { id } = await context.params
+    const params =
+      context?.params instanceof Promise ? await context.params : (context?.params ?? {})
+    const id = params.id
 
     if (!id) {
       return NextResponse.json(createErrorResponse('VALIDATION_ERROR', 'Proposal ID is required'), {
@@ -25,7 +39,7 @@ export async function POST(req: AuthenticatedRequest, context: RouteParams): Pro
     }
 
     const body = await req.json()
-    const parseResult = updateProposalSchema.safeParse(body)
+    const parseResult = approveUpdateSchema.safeParse(body)
 
     if (!parseResult.success) {
       return NextResponse.json(
@@ -47,28 +61,28 @@ export async function POST(req: AuthenticatedRequest, context: RouteParams): Pro
       })
     }
 
-    const hasAccess = await verifyCompanyAccess(req.user.companyId, proposal.companyId)
+    const hasAccess = await verifyCompanyAccess(req, proposal.companyId)
     if (!hasAccess) {
       return NextResponse.json(createErrorResponse('FORBIDDEN', 'Access denied'), { status: 403 })
     }
 
-    const proposals = JSON.parse(proposal.proposals)
+    const proposals = JSON.parse(proposal.proposals) as ProposalData
     const updates = parseResult.data
 
-    if (updates.entries) {
-      proposals.entries = updates.entries
-    }
-
     if (updates.entryDate) {
-      proposals.entries.forEach((entry: { entryDate?: string }) => {
-        entry.entryDate = updates.entryDate!
-      })
+      for (const entry of proposals.entries) {
+        entry.entryDate = updates.entryDate
+      }
     }
 
-    if (updates.amount !== undefined) {
-      proposals.entries.forEach((entry: { amount?: number }) => {
-        entry.amount = updates.amount!
-      })
+    if (updates.description) {
+      for (const entry of proposals.entries) {
+        entry.description = updates.description
+      }
+    }
+
+    if (updates.amount !== undefined && proposals.entries[0]) {
+      proposals.entries[0].amount = updates.amount
     }
 
     const updatedProposal = await withRetry(() =>
@@ -81,7 +95,7 @@ export async function POST(req: AuthenticatedRequest, context: RouteParams): Pro
       })
     )
 
-    proposalCache.invalidate(`proposal:${id}`)
+    proposalCache.invalidate(new RegExp(`^proposal:${id}$`))
 
     await prisma.auditLog.create({
       data: {
@@ -114,4 +128,4 @@ export async function POST(req: AuthenticatedRequest, context: RouteParams): Pro
   }
 }
 
-export const POST_WITH_AUTH = withAuth(POST, { rateLimit: 'strict', requireCompany: true })
+export const POST = withAuth(postHandler, { rateLimit: 'strict', requireCompany: true })
