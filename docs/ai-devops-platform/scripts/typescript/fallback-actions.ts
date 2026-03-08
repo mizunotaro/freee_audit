@@ -6,7 +6,6 @@
  */
 
 import { Result, AppError, ErrorCodes, createError } from './result'
-import { retry, retryWithResult, RetryConfig } from './retry'
 
 export type ErrorClassification = 'retryable' | 'recoverable' | 'fatal'
 
@@ -25,20 +24,20 @@ export interface FallbackStrategy {
 
 export const DEFAULT_FALLBACK_STRATEGY: FallbackStrategy = {
   classify(error: AppError): ErrorClassification {
-    const retryableCodes = [
+    const retryableCodes: string[] = [
       ErrorCodes.NETWORK_ERROR,
       ErrorCodes.TIMEOUT_ERROR,
       ErrorCodes.RATE_LIMIT_ERROR,
       ErrorCodes.EXTERNAL_SERVICE_ERROR,
     ]
 
-    if (retryableCodes.includes(error.code as any)) {
+    if (retryableCodes.includes(error.code)) {
       return 'retryable'
     }
 
-    const recoverableCodes = [ErrorCodes.RESOURCE_NOT_FOUND, ErrorCodes.VALIDATION_ERROR]
+    const recoverableCodes: string[] = [ErrorCodes.RESOURCE_NOT_FOUND, ErrorCodes.VALIDATION_ERROR]
 
-    if (recoverableCodes.includes(error.code as any)) {
+    if (recoverableCodes.includes(error.code)) {
       return 'recoverable'
     }
 
@@ -144,7 +143,7 @@ export class FallbackHandler {
 
         if (classification === 'retryable') {
           if (error.code === ErrorCodes.RATE_LIMIT_ERROR) {
-            const retryAfter = error.details?.retryAfter as number | undefined
+            const retryAfter = error.details?.['retryAfter'] as number | undefined
             return {
               type: 'retry',
               config: { attempt, delayMs: retryAfter || 60000 },
@@ -233,16 +232,17 @@ export class FallbackHandler {
       const action = strategy.getAction(result.error, attempt)
 
       switch (action.type) {
-        case 'retry':
-          const delayMs = (action.config?.delayMs as number) || 1000 * Math.pow(2, attempt - 1)
+        case 'retry': {
+          const delayMs = (action.config?.['delayMs'] as number) || 1000 * Math.pow(2, attempt - 1)
           await new Promise((resolve) => setTimeout(resolve, delayMs))
           continue
+        }
 
         case 'use-default':
-          return Result.ok(action.config?.defaultValue as T)
+          return Result.ok(action.config?.['defaultValue'] as T)
 
         case 'skip':
-          console.log(`Skipping due to: ${action.config?.reason || result.error.message}`)
+          console.log(`Skipping due to: ${action.config?.['reason'] || result.error.message}`)
           return Result.ok(null as T)
 
         case 'log-and-continue':

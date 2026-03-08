@@ -1,0 +1,225 @@
+name: Config Validation
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - 'config/**'
+      - '.github/workflows/**'
+      - 'schemas/**'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'config/**'
+      - '.github/workflows/**'
+      - 'schemas/**'
+  workflow_dispatch:
+
+jobs:
+  validate-json:
+    name: Validate JSON Files
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate JSON Syntax
+        run: |
+          echo "### JSON Validation" >> $GITHUB_STEP_SUMMARY
+          ERROR_COUNT=0
+
+          for f in config/*.json; do
+            if [ -f "$f" ]; then
+              echo "Validating $f..."
+              if python -c "import json; json.load(open('$f', encoding='utf-8'))" 2>&1; then
+                echo "- ✅ $f" >> $GITHUB_STEP_SUMMARY
+              else
+                echo "- ❌ $f" >> $GITHUB_STEP_SUMMARY
+                ERROR_COUNT=$((ERROR_COUNT + 1))
+              fi
+            fi
+          done
+
+          if [ $ERROR_COUNT -gt 0 ]; then
+            echo "::error::$ERROR_COUNT JSON file(s) have syntax errors"
+            exit 1
+          fi
+
+  validate-yaml:
+    name: Validate YAML Files
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install yamllint
+        run: pip install yamllint
+
+      - name: Validate YAML Syntax
+        run: |
+          echo "### YAML Validation" >> $GITHUB_STEP_SUMMARY
+
+          yamllint -d "{extends: relaxed, rules: {line-length: disable, document-start: disable}}" .github/workflows/ 2>&1 | tee yamllint-output.txt || true
+
+          if grep -q "error" yamllint-output.txt; then
+            echo "```" >> $GITHUB_STEP_SUMMARY
+            cat yamllint-output.txt >> $GITHUB_STEP_SUMMARY
+            echo "```" >> $GITHUB_STEP_SUMMARY
+            exit 1
+          fi
+
+          echo "- ✅ All YAML files valid" >> $GITHUB_STEP_SUMMARY
+
+  validate-schemas:
+    name: Validate JSON Schemas
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install ajv-cli
+        run: npm install -g ajv-cli
+
+      - name: Validate Against Schemas
+        run: |
+          echo "### Schema Validation" >> $GITHUB_STEP_SUMMARY
+          ERROR_COUNT=0
+
+          for f in config/*.json; do
+            if [ -f "$f" ]; then
+              BASENAME=$(basename "$f" .json)
+              SCHEMA="schemas/${BASENAME}.schema.json"
+              
+              if [ -f "$SCHEMA" ]; then
+                echo "Validating $f against $SCHEMA..."
+                if ajv validate -s "$SCHEMA" -d "$f" 2>&1; then
+                  echo "- ✅ $f (schema valid)" >> $GITHUB_STEP_SUMMARY
+                else
+                  echo "- ❌ $f (schema invalid)" >> $GITHUB_STEP_SUMMARY
+                  ERROR_COUNT=$((ERROR_COUNT + 1))
+                fi
+              else
+                echo "- ⏭️ $f (no schema)" >> $GITHUB_STEP_SUMMARY
+              fi
+            fi
+          done
+
+          if [ $ERROR_COUNT -gt 0 ]; then
+            echo "::error::$ERROR_COUNT file(s) failed schema validation"
+            exit 1
+          fi
+
+  validate-workflow-structure:
+    name: Validate Workflow Structure
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Check Required Workflows
+        run: |
+          echo "### Workflow Structure Check" >> $GITHUB_STEP_SUMMARY
+
+          REQUIRED_WORKFLOWS=(
+            "orchestrator.yml"
+            "hub-orchestrator.yml"
+            "instant-trigger.yml"
+            "health-monitor.yml"
+            "ci-config.yml"
+            "cleanup.yml"
+          )
+
+          MISSING=0
+          for wf in "${REQUIRED_WORKFLOWS[@]}"; do
+            if [ -f ".github/workflows/$wf" ]; then
+              echo "- ✅ $wf exists" >> $GITHUB_STEP_SUMMARY
+            else
+              echo "- ❌ $wf missing" >> $GITHUB_STEP_SUMMARY
+              MISSING=$((MISSING + 1))
+            fi
+          done
+
+          if [ $MISSING -gt 0 ]; then
+            echo "::warning::$MISSING required workflow(s) missing"
+          fi
+
+  validate-composite-actions:
+    name: Validate Composite Actions
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Check Action Files
+        run: |
+          echo "### Composite Actions Check" >> $GITHUB_STEP_SUMMARY
+
+          for action_dir in .github/actions/*/; do
+            if [ -d "$action_dir" ]; then
+              ACTION_NAME=$(basename "$action_dir")
+              ACTION_FILE="${action_dir}action.yml"
+              
+              if [ -f "$ACTION_FILE" ]; then
+                if python -c "import yaml; yaml.safe_load(open('$ACTION_FILE', encoding='utf-8'))" 2>&1; then
+                  echo "- ✅ $ACTION_NAME" >> $GITHUB_STEP_SUMMARY
+                else
+                  echo "- ❌ $ACTION_NAME (invalid YAML)" >> $GITHUB_STEP_SUMMARY
+                fi
+              else
+                echo "- ⚠️ $ACTION_NAME (missing action.yml)" >> $GITHUB_STEP_SUMMARY
+              fi
+            fi
+          done
+
+  summary:
+    name: Validation Summary
+    needs:
+      [
+        validate-json,
+        validate-yaml,
+        validate-schemas,
+        validate-workflow-structure,
+        validate-composite-actions,
+      ]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check Results
+        run: |
+          echo "## Config Validation Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          if [ "${{ needs.validate-json.result }}" == "success" ]; then
+            echo "- ✅ JSON Syntax" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "- ❌ JSON Syntax" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          if [ "${{ needs.validate-yaml.result }}" == "success" ]; then
+            echo "- ✅ YAML Syntax" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "- ❌ YAML Syntax" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          if [ "${{ needs.validate-schemas.result }}" == "success" ]; then
+            echo "- ✅ Schema Validation" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "- ❌ Schema Validation" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          if [ "${{ needs.validate-workflow-structure.result }}" == "success" ]; then
+            echo "- ✅ Workflow Structure" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "- ❌ Workflow Structure" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          if [ "${{ needs.validate-composite-actions.result }}" == "success" ]; then
+            echo "- ✅ Composite Actions" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "- ❌ Composite Actions" >> $GITHUB_STEP_SUMMARY
+          fi

@@ -1,0 +1,140 @@
+name: 'Setup Node with Cache'
+description: 'Setup Node.js environment with pnpm cache for optimal performance'
+author: 'AI DevOps Platform'
+
+inputs:
+  node-version:
+    description: 'Node.js version to use'
+    required: false
+    default: '20'
+  pnpm-version:
+    description: 'pnpm version to use'
+    required: false
+    default: '8'
+  install-command:
+    description: 'Custom install command (auto-detected if not specified)'
+    required: false
+    default: ''
+  frozen-lockfile:
+    description: 'Use frozen lockfile mode'
+    required: false
+    default: 'true'
+
+outputs:
+  cache-hit:
+    description: 'Whether cache was hit'
+    value: ${{ steps.cache-info.outputs.hit }}
+  node-version:
+    description: 'Node.js version installed'
+    value: ${{ steps.node-info.outputs.version }}
+  package-manager:
+    description: 'Package manager detected'
+    value: ${{ steps.detect-pm.outputs.manager }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Detect package manager
+      id: detect-pm
+      shell: bash
+      run: |
+        if [ -f "pnpm-lock.yaml" ]; then
+          echo "manager=pnpm" >> $GITHUB_OUTPUT
+          echo "lockfile=pnpm-lock.yaml" >> $GITHUB_OUTPUT
+        elif [ -f "package-lock.json" ]; then
+          echo "manager=npm" >> $GITHUB_OUTPUT
+          echo "lockfile=package-lock.json" >> $GITHUB_OUTPUT
+        elif [ -f "yarn.lock" ]; then
+          echo "manager=yarn" >> $GITHUB_OUTPUT
+          echo "lockfile=yarn.lock" >> $GITHUB_OUTPUT
+        else
+          echo "manager=npm" >> $GITHUB_OUTPUT
+          echo "lockfile=none" >> $GITHUB_OUTPUT
+        fi
+
+    - name: Setup pnpm
+      if: steps.detect-pm.outputs.manager == 'pnpm'
+      uses: pnpm/action-setup@v2
+      with:
+        version: ${{ inputs.pnpm-version }}
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ inputs.node-version }}
+        cache: ${{ steps.detect-pm.outputs.manager }}
+
+    - name: Get Node.js version
+      id: node-info
+      shell: bash
+      run: |
+        echo "version=$(node --version)" >> $GITHUB_OUTPUT
+
+    - name: Check cache status
+      id: cache-info
+      shell: bash
+      run: |
+        if [ "${{ steps.detect-pm.outputs.manager }}" == "pnpm" ]; then
+          if pnpm store path &>/dev/null; then
+            echo "hit=true" >> $GITHUB_OUTPUT
+          else
+            echo "hit=false" >> $GITHUB_OUTPUT
+          fi
+        else
+          echo "hit=false" >> $GITHUB_OUTPUT
+        fi
+
+    - name: Install dependencies
+      shell: bash
+      run: |
+        INSTALL_CMD="${{ inputs.install-command }}"
+        PM="${{ steps.detect-pm.outputs.manager }}"
+        FROZEN="${{ inputs.frozen-lockfile }}"
+
+        echo "### Dependency Installation" >> $GITHUB_STEP_SUMMARY
+        echo "- Package Manager: $PM" >> $GITHUB_STEP_SUMMARY
+        echo "- Node: $(node --version)" >> $GITHUB_STEP_SUMMARY
+
+        if [ -n "$INSTALL_CMD" ]; then
+          echo "- Using custom command: $INSTALL_CMD" >> $GITHUB_STEP_SUMMARY
+          eval "$INSTALL_CMD"
+          exit $?
+        fi
+
+        START_TIME=$(date +%s)
+
+        case "$PM" in
+          pnpm)
+            if [ "$FROZEN" == "true" ] && [ -f "pnpm-lock.yaml" ]; then
+              pnpm install --frozen-lockfile
+            else
+              pnpm install
+            fi
+            ;;
+          npm)
+            if [ "$FROZEN" == "true" ] && [ -f "package-lock.json" ]; then
+              npm ci
+            else
+              npm install
+            fi
+            ;;
+          yarn)
+            if [ "$FROZEN" == "true" ] && [ -f "yarn.lock" ]; then
+              yarn install --frozen-lockfile
+            else
+              yarn install
+            fi
+            ;;
+          *)
+            npm install
+            ;;
+        esac
+
+        END_TIME=$(date +%s)
+        DURATION=$((END_TIME - START_TIME))
+        echo "- Duration: ${DURATION}s" >> $GITHUB_STEP_SUMMARY
+        echo "- Status: ✅ Success" >> $GITHUB_STEP_SUMMARY
+
+branding:
+  icon: 'package'
+  color: 'green'

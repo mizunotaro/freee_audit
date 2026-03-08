@@ -19,37 +19,37 @@ Phase 4: エコシステム展開
 ## Phase 0: 基盤構築（1-2週間）
 
 ### 目標
-最小限の動作確認可能な状態を作る
+中央ハブ方式の最小限の動作確認可能な状態を作る
 
 ### タスク
 
 #### Week 1: 環境セットアップ
-- [ ] **P0-001**: 新規リポジトリ `ai-devops-platform` 作成
+- [ ] **P0-001**: ai-devops-platform リポジトリ作成
 - [ ] **P0-002**: ファイル一式を移行・コミット
 - [ ] **P0-003**: GitHub Secrets 設定
   - `ZAI_API_KEY`
-  - `OPENAI_API_KEY` (フォールバック用)
+  - `HUB_PAT` (全ターゲットリポジトリへの書き込み権限)
 - [ ] **P0-004**: GitHub Variables 設定
   - `AI_AUTOMATION_MODE=enabled`
-  - `AI_MAX_CONCURRENT_SESSIONS=2`
-- [ ] **P0-005**: ラベル作成
-  - `ai-task`, `ai-in-progress`, `ai-completed`, `ai-blocked`
-  - `auto-merge`, `do-not-merge`
-  - `priority-critical`, `priority-high`, `priority-medium`, `priority-low`
+- [ ] **P0-005**: ラベル作成（中央ハブ + ターゲット）
+  - 中央ハブ用: `ai-task`, `ai-in-progress`, `ai-completed`, `ai-blocked`
+  - ターゲット用: 同上（各ターゲットリポジトリに作成）
 
-#### Week 2: 初期動作確認
-- [ ] **P0-006**: テスト用Issue作成（シンプルなタスク）
-  - 例: "Add hello() function that returns 'Hello, World!'"
-- [ ] **P0-007**: Orchestrator ワークフロー手動トリガーで確認
-- [ ] **P0-008**: 品質ゲート動作確認
-  - tsc, eslint, jest, build が正しく実行されるか
-- [ ] **P0-009**: 自動マージ条件確認
-- [ ] **P0-010**: エラー発生時の自動修正フロー確認
+#### Week 2: 動作確認
+- [ ] **P0-006**: freee_audit にテスト用Issue作成
+  - `ai-task` ラベル付きで作成
+  - シンプルなタスクで確認（例: "Add hello() function"）
+- [ ] **P0-007**: 中央ハブのワークフローがスキャンすることを確認
+  - 15分ポーリングの動作確認
+  - ログでタスク検出を確認
+- [ ] **P0-008**: タスクが処理されPRが作成されることを確認
+  - 品質ゲート実行確認
+  - PRがターゲットリポジトリに作成されることを確認
 
 ### 完了条件
 - [ ] テストIssueが自動的に処理され、PRが作成される
 - [ ] 品質ゲートが全てPASSする
-- [ ] 自動マージが成功する（auto-mergeラベル付きの場合）
+- [ ] 中央ハブからターゲットリポジトリへのPR作成が成功する
 
 ---
 
@@ -116,6 +116,10 @@ Phase 4: エコシステム展開
 - [ ] **P2-006**: コスト最適化
   - タスク優先度によるモデル選択
   - 不要なAPI呼び出しの削減
+- [ ] **P2-007**: 環境分離
+  - 本番環境用の設定分離
+  - テスト用リポジトリの分離
+  - 環境変数による環境切り替え
 
 ### 完了条件
 - [ ] 1日あたり5個以上のタスクが自動処理される

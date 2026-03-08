@@ -28,6 +28,7 @@ export interface ResultUtils {
   tryCatch: <T>(fn: () => T) => Result<T, Error>
 }
 
+// eslint-disable-next-line no-redeclare
 export const Result: ResultUtils = {
   ok<T, E = Error>(data: T): Result<T, E> {
     return { success: true, data }
@@ -135,6 +136,7 @@ export interface AppError {
   cause?: Error
 }
 
+// eslint-disable-next-line no-redeclare
 export const AppError = {
   create(
     code: string,
@@ -142,7 +144,10 @@ export const AppError = {
     details?: Record<string, unknown>,
     cause?: Error
   ): AppError {
-    return { code, message, details, cause }
+    const error: AppError = { code, message }
+    if (details !== undefined) error.details = details
+    if (cause !== undefined) error.cause = cause
+    return error
   },
 
   isAppError(error: unknown): error is AppError {

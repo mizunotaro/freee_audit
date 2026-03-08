@@ -120,8 +120,14 @@ export async function execute(input: IssueStatusInput): Promise<IssueStatusOutpu
       title: issue.title,
       state: issue.state,
       body: issue.body,
-      labels: issue.labels?.map((l: any) => l.name || l) || [],
-      assignees: issue.assignees?.map((a: any) => a.login || a) || [],
+      labels:
+        issue.labels?.map((l: { name?: string } | string) =>
+          typeof l === 'string' ? l : l.name || ''
+        ) || [],
+      assignees:
+        issue.assignees?.map((a: { login?: string } | string) =>
+          typeof a === 'string' ? a : a.login || ''
+        ) || [],
       author: {
         login: issue.author?.login || 'unknown',
         type: issue.author?.type || 'User',
@@ -161,17 +167,29 @@ export async function execute(input: IssueStatusInput): Promise<IssueStatusOutpu
         const prResult = await $`gh ${prArgs}`.quiet()
         const prs = JSON.parse(prResult.stdout.toString().trim())
 
-        status.pullRequests = prs.map((pr: any) => ({
-          number: pr.number,
-          title: pr.title,
-          state: pr.state,
-          url: pr.url,
-          headBranch: pr.headRefName,
-          baseBranch: pr.baseRefName,
-          isDraft: pr.isDraft,
-          mergeable: pr.mergeable,
-          statusCheckRollup: pr.statusCheckRollup,
-        }))
+        status.pullRequests = prs.map(
+          (pr: {
+            number: number
+            title: string
+            state: string
+            url: string
+            headRefName: string
+            baseRefName: string
+            isDraft: boolean
+            mergeable: string
+            statusCheckRollup: unknown
+          }) => ({
+            number: pr.number,
+            title: pr.title,
+            state: pr.state,
+            url: pr.url,
+            headBranch: pr.headRefName,
+            baseBranch: pr.baseRefName,
+            isDraft: pr.isDraft,
+            mergeable: pr.mergeable,
+            statusCheckRollup: pr.statusCheckRollup,
+          })
+        )
       } catch {
         status.pullRequests = []
       }
@@ -198,17 +216,29 @@ export async function execute(input: IssueStatusInput): Promise<IssueStatusOutpu
         const workflowResult = await $`gh ${workflowArgs}`.quiet()
         const runs = JSON.parse(workflowResult.stdout.toString().trim())
 
-        status.workflowRuns = runs.map((run: any) => ({
-          id: run.id,
-          name: run.name,
-          status: run.status,
-          conclusion: run.conclusion,
-          createdAt: run.createdAt,
-          updatedAt: run.updatedAt,
-          url: run.url,
-          headBranch: run.headBranch,
-          event: run.event,
-        }))
+        status.workflowRuns = runs.map(
+          (run: {
+            id: number
+            name: string
+            status: string
+            conclusion: string
+            createdAt: string
+            headBranch: string
+            event: string
+            updatedAt?: string
+            url?: string
+          }) => ({
+            id: run.id,
+            name: run.name,
+            status: run.status,
+            conclusion: run.conclusion,
+            createdAt: run.createdAt,
+            updatedAt: run.updatedAt,
+            url: run.url,
+            headBranch: run.headBranch,
+            event: run.event,
+          })
+        )
       } catch {
         status.workflowRuns = []
       }

@@ -106,8 +106,14 @@ export async function execute(input: ListIssuesInput): Promise<ListIssuesOutput>
         number: issue.number,
         title: issue.title,
         state: issue.state,
-        labels: issue.labels?.map((l: any) => l.name || l) || [],
-        assignees: issue.assignees?.map((a: any) => a.login || a) || [],
+        labels:
+          issue.labels?.map((l: { name?: string } | string) =>
+            typeof l === 'string' ? l : l.name || ''
+          ) || [],
+        assignees:
+          issue.assignees?.map((a: { login?: string } | string) =>
+            typeof a === 'string' ? a : a.login || ''
+          ) || [],
         createdAt: issue.createdAt,
         updatedAt: issue.updatedAt,
         url: issue.url,

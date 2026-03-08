@@ -50,7 +50,6 @@ export async function execute(input: CreateIssueInput): Promise<CreateIssueOutpu
     const args: string[] = ['issue', 'create', '--title', validated.title]
 
     if (validated.body) {
-      const sanitizedBody = validated.body.replace(/"/g, '\\"').replace(/\n/g, '\\n')
       args.push('--body', validated.body)
     }
 

@@ -6,7 +6,7 @@
     {
       "name": "weekday-daytime",
       "description": "平日昼間帯（人間がOpenCodeを使用する可能性がある時間）",
-      "cron": "0 23-10 * * 1-5",
+      "cron": "0 0-10,23 * * 1-5",
       "timezone": "UTC",
       "cronDescriptionJST": "月-金 8:00-19:00 (JST)",
       "maxConcurrency": 2,

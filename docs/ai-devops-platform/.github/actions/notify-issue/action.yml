@@ -1,0 +1,108 @@
+name: 'Notify Issue'
+description: 'Post a formatted comment to a GitHub issue with status and metadata'
+author: 'AI DevOps Platform'
+
+inputs:
+  issue-number:
+    description: 'Issue number to comment on'
+    required: true
+  repository:
+    description: 'Repository (owner/repo)'
+    required: true
+  message:
+    description: 'Message content'
+    required: true
+  status:
+    description: 'Status type (info, success, warning, error)'
+    required: false
+    default: 'info'
+  details:
+    description: 'Additional details (JSON object)'
+    required: false
+    default: '{}'
+  append-run-link:
+    description: 'Append link to workflow run'
+    required: false
+    default: 'true'
+
+outputs:
+  comment-id:
+    description: 'ID of the created comment'
+    value: ${{ steps.comment.outputs.id }}
+  comment-url:
+    description: 'URL of the created comment'
+    value: ${{ steps.comment.outputs.url }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Format comment
+      id: format
+      shell: bash
+      run: |
+        STATUS="${{ inputs.status }}"
+        MESSAGE="${{ inputs.message }}"
+        DETAILS='${{ inputs.details }}'
+        APPEND_RUN="${{ inputs.append-run-link }}"
+
+        case "$STATUS" in
+          success) EMOJI="✅" ;;
+          error)   EMOJI="❌" ;;
+          warning) EMOJI="⚠️" ;;
+          info)    EMOJI="ℹ️" ;;
+          *)       EMOJI="ℹ️" ;;
+        esac
+
+        BODY="$EMOJI $MESSAGE"
+
+        if [ "$DETAILS" != "{}" ] && [ -n "$DETAILS" ]; then
+          BODY="$BODY\n\n"
+          BODY="${BODY}**Details:**\n"
+          
+          for key in $(echo "$DETAILS" | jq -r 'keys[]'); do
+            value=$(echo "$DETAILS" | jq -r ".[\"$key\"]")
+            BODY="${BODY}- $key: $value\n"
+          done
+        fi
+
+        if [ "$APPEND_RUN" == "true" ]; then
+          BODY="${BODY}\n\n---\n"
+          BODY="${BODY}Run: [${{ github.run_id }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})"
+        fi
+
+        BODY="${BODY}\n\n_Timestamp: $(date -u +%Y-%m-%dT%H:%M:%SZ)_"
+
+        echo "body<<EOF" >> $GITHUB_OUTPUT
+        echo -e "$BODY" >> $GITHUB_OUTPUT
+        echo "EOF" >> $GITHUB_OUTPUT
+
+    - name: Post comment
+      id: comment
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        REPO="${{ inputs.repository }}"
+        ISSUE="${{ inputs.issue-number }}"
+        BODY='${{ steps.format.outputs.body }}'
+
+        RESULT=$(gh issue comment --repo "$REPO" "$ISSUE" --body "$BODY" 2>&1)
+        EXIT_CODE=$?
+
+        if [ $EXIT_CODE -ne 0 ]; then
+          echo "::warning::Failed to post comment: $RESULT"
+          echo "id=" >> $GITHUB_OUTPUT
+          echo "url=" >> $GITHUB_OUTPUT
+          exit 0
+        fi
+
+        COMMENT_URL=$(echo "$RESULT" | grep -oP 'https://github.com/[^ ]+' || echo "")
+
+        echo "id=$(echo "$COMMENT_URL" | grep -oP '\d+$' || echo "")" >> $GITHUB_OUTPUT
+        echo "url=$COMMENT_URL" >> $GITHUB_OUTPUT
+
+        echo "::notice::Comment posted to $REPO#$ISSUE"
+
+branding:
+  icon: 'message-circle'
+  color: 'blue'

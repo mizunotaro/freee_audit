@@ -58,7 +58,7 @@ export function isRetryableError(error: AppError, config: RetryConfig): boolean 
     return true
   }
 
-  if (error.code === ErrorCodes.RATE_LIMIT_ERROR && error.details?.retryAfter) {
+  if (error.code === ErrorCodes.RATE_LIMIT_ERROR && error.details?.['retryAfter']) {
     return true
   }
 
@@ -72,7 +72,7 @@ export async function sleep(ms: number): Promise<void> {
 export async function withTimeout<T>(
   promise: Promise<T>,
   timeoutMs: number,
-  operation = 'Operation'
+  _operation = 'Operation'
 ): Promise<T> {
   let timeoutId: NodeJS.Timeout | null = null
 
@@ -124,8 +124,8 @@ export async function retry<T>(
 
       let delayMs = calculateDelay(state.attempt, fullConfig)
 
-      if (appError.code === ErrorCodes.RATE_LIMIT_ERROR && appError.details?.retryAfter) {
-        delayMs = Math.max(delayMs, appError.details.retryAfter as number)
+      if (appError.code === ErrorCodes.RATE_LIMIT_ERROR && appError.details?.['retryAfter']) {
+        delayMs = Math.max(delayMs, appError.details['retryAfter'] as number)
       }
 
       state.totalDelayMs += delayMs
@@ -175,8 +175,11 @@ export async function retryWithResult<T>(
 
       let delayMs = calculateDelay(state.attempt, fullConfig)
 
-      if (result.error.code === ErrorCodes.RATE_LIMIT_ERROR && result.error.details?.retryAfter) {
-        delayMs = Math.max(delayMs, result.error.details.retryAfter as number)
+      if (
+        result.error.code === ErrorCodes.RATE_LIMIT_ERROR &&
+        result.error.details?.['retryAfter']
+      ) {
+        delayMs = Math.max(delayMs, result.error.details['retryAfter'] as number)
       }
 
       state.totalDelayMs += delayMs

@@ -7,398 +7,91 @@ on:
     inputs:
       target_repo:
         description: 'Target repository (owner/repo)'
-        required: true
-        default: 'mizunotaro/ai-devops-sandbox'
+        required: false
+        default: 'mizunomi/freee_audit'
       force_run:
         description: 'Force run even if paused'
-        type: boolean
+        required: false
         default: false
+        type: boolean
 
 env:
-  TARGET_REPO: ${{ github.event.inputs.target_repo || 'mizunotaro/ai-devops-sandbox' }}
-  MAX_FIX_ATTEMPTS: '3'
+  DEFAULT_REPO: 'mizunomi/freee_audit'
 
 jobs:
   preflight:
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    permissions:
-      contents: read
-      issues: read
-    outputs:
-      mode_ok: ${{ steps.mode.outputs.ok }}
-      rate_limit_ok: ${{ steps.rate.outputs.ok }}
-    steps:
-      - name: Check Automation Mode
-        id: mode
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
-          MODE=$(gh api /repos/${{ env.TARGET_REPO }}/actions/variables/AI_AUTOMATION_MODE --jq '.value' 2>/dev/null || echo "PAUSE")
-          echo "::notice::AI_AUTOMATION_MODE=$MODE"
-          if [ "$MODE" != "RUN" ] && [ "${{ inputs.force_run }}" != "true" ]; then
-            echo "::notice::Automation paused"
-            echo "ok=false" >> $GITHUB_OUTPUT
-          else
-            echo "ok=true" >> $GITHUB_OUTPUT
-          fi
+    uses: ./.github/workflows/orchestrator-preflight.yml
+    with:
+      target_repo: ${{ inputs.target_repo || env.DEFAULT_REPO }}
+      force_run: ${{ inputs.force_run || false }}
 
-      - name: Check Rate Limit
-        id: rate
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
-          ONE_HOUR_AGO=$(date -u -d '1 hour ago' +%Y-%m-%dT%H:%M:%SZ)
-          RUNS=$(gh api /repos/${{ env.TARGET_REPO }}/actions/runs --paginate --jq "[.workflow_runs[] | select(.created_at > \"$ONE_HOUR_AGO\" and (.status == \"in_progress\" or .status == \"queued\")] | length")
-          MAX_CONCURRENT=2
-          echo "::notice::Current runs: $RUNS (max: $MAX_CONCURRENT)"
-          if [ "$RUNS" -lt "$MAX_CONCURRENT" ]; then
-            echo "ok=true" >> $GITHUB_OUTPUT
-          else
-            echo "::warning::Rate limit reached ($RUNS/$MAX_CONCURRENT runs)"
-            echo "ok=false" >> $GITHUB_OUTPUT
-          fi
-
-  select-task:
+  select:
     needs: preflight
     if: needs.preflight.outputs.mode_ok == 'true' && needs.preflight.outputs.rate_limit_ok == 'true'
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    permissions:
-      contents: read
-      issues: write
-    outputs:
-      has_task: ${{ steps.select.outputs.has_task }}
-      issue_number: ${{ steps.select.outputs.issue_number }}
-      issue_title: ${{ steps.select.outputs.issue_title }}
-      issue_body_b64: ${{ steps.select.outputs.issue_body_b64 }}
-    steps:
-      - name: Select Next Task
-        id: select
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
-          for PRIORITY in "ai:p1" "ai:p2" "ai:p3"; do
-            ISSUE=$(gh issue list --repo "${{ env.TARGET_REPO }}" --label "ai:ready,$PRIORITY" --state open --limit 1 --json number,title,body --jq '.[0] // empty')
-            if [ -n "$ISSUE" ]; then
-              echo "::notice::Found issue with $PRIORITY"
-              break
-            fi
-          done
-
-          if [ -z "$ISSUE" ]; then
-            ISSUE=$(gh issue list --repo "${{ env.TARGET_REPO }}" --label "ai:ready" --state open --limit 1 --json number,title,body --jq '.[0] // empty')
-          fi
-
-          if [ -z "$ISSUE" ]; then
-            echo "::notice::No ai:ready issues found"
-            echo "has_task=false" >> $GITHUB_OUTPUT
-            exit 0
-          fi
-
-          NUMBER=$(echo "$ISSUE" | jq -r '.number')
-          TITLE=$(echo "$ISSUE" | jq -r '.title')
-          BODY=$(echo "$ISSUE" | jq -r '.body // empty')
-          SANITIZED_BODY=$(echo "$BODY" | tr -d '\000-\037\177' | head -c 10000 | base64 -w0)
-
-          gh issue edit --repo "${{ env.TARGET_REPO }}" "$NUMBER" --remove-label "ai:ready" --add-label "ai:in-progress"
-          gh issue comment --repo "${{ env.TARGET_REPO }}" "$NUMBER" --body "🚀 **Execution Started** - Run ID: ${{ github.run_id }} - Run Number: ${{ github.run_number }} - Started: $(date -u +%Y-%m-%dT%H:%M:%SZ) - Target: ${{ env.TARGET_REPO }}"
-
-          echo "has_task=true" >> $GITHUB_OUTPUT
-          echo "issue_number=$NUMBER" >> $GITHUB_OUTPUT
-          echo "issue_title=$(echo "$TITLE" | sed 's/[[:cntrl:]]//g')" >> $GITHUB_OUTPUT
-          echo "issue_body_b64=$SANITIZED_BODY" >> $GITHUB_OUTPUT
+    uses: ./.github/workflows/orchestrator-select.yml
+    with:
+      target_repo: ${{ needs.preflight.outputs.target_repo }}
 
   execute:
-    needs: select-task
-    if: needs.select-task.outputs.has_task == 'true'
+    needs: [preflight, select]
+    if: needs.select.outputs.has_task == 'true'
+    uses: ./.github/workflows/orchestrator-execute.yml
+    with:
+      target_repo: ${{ needs.preflight.outputs.target_repo }}
+      issue_number: ${{ needs.select.outputs.issue_number }}
+      issue_title: ${{ needs.select.outputs.issue_title }}
+      issue_body: ${{ needs.select.outputs.issue_body }}
+
+  quality:
+    needs: [preflight, select, execute]
+    if: always() && needs.select.outputs.has_task == 'true'
+    uses: ./.github/workflows/orchestrator-quality.yml
+    with:
+      target_repo: ${{ needs.preflight.outputs.target_repo }}
+      issue_number: ${{ needs.select.outputs.issue_number }}
+
+  merge:
+    needs: [preflight, select, quality]
+    if: needs.quality.outputs.passed == 'true'
+    uses: ./.github/workflows/orchestrator-merge.yml
+    with:
+      target_repo: ${{ needs.preflight.outputs.target_repo }}
+      issue_number: ${{ needs.select.outputs.issue_number }}
+
+  fix:
+    needs: [preflight, select, quality]
+    if: needs.quality.outputs.passed == 'false' && needs.quality.outputs.attempt <= 3
+    uses: ./.github/workflows/orchestrator-fix.yml
+    with:
+      target_repo: ${{ needs.preflight.outputs.target_repo }}
+      issue_number: ${{ needs.select.outputs.issue_number }}
+      attempt: ${{ needs.quality.outputs.attempt }}
+
+  idle:
+    needs: [preflight, select]
+    if: needs.preflight.outputs.mode_ok == 'true' && needs.select.outputs.has_task == 'false'
+    uses: ./.github/workflows/orchestrator-idle.yml
+    with:
+      target_repo: ${{ needs.preflight.outputs.target_repo }}
+
+  summary:
+    needs: [preflight, select, execute, quality, merge, fix, idle]
+    if: always()
     runs-on: ubuntu-latest
-    timeout-minutes: 30
-    permissions:
-      id-token: write
-      contents: write
-      pull-requests: write
-      issues: write
-    outputs:
-      outcome: ${{ steps.execute.outputs.outcome }}
     steps:
-      - name: Checkout Target Repo
-        uses: actions/checkout@v4
-        with:
-          repository: ${{ env.TARGET_REPO }}
-          token: ${{ github.token }}
-          fetch-depth: 0
-
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-
-      - name: Install Dependencies
+      - name: Generate Summary
         run: |
-          if [ -f "pnpm-lock.yaml" ]; then
-            pnpm install --frozen-lockfile
-          elif [ -f "package-lock.json" ]; then
-            npm ci
-          elif [ -f "yarn.lock" ]; then
-            yarn install --frozen-lockfile
-          else
-            npm install
-          fi
-
-      - name: Run OpenCode
-        id: execute
-        timeout-minutes: 20
-        uses: anomalyco/opencode/github@v1.1.44
-        env:
-          ZAI_API_KEY: ${{ secrets.ZAI_API_KEY }}
-          OPENCODE_DISABLE_AUTOUPDATE: 'true'
-        with:
-          model: zai-coding-plan/glm-5
-          prompt: |
-            # 自動開発タスク
-
-            ## 対象Issue
-            - Issue番号: ${{ needs.select-task.outputs.issue_number }}
-            - タイトル: ${{ needs.select-task.outputs.issue_title }}
-
-            ## 必須品質ゲート
-
-            1. pnpm tsc --noEmit
-            2. pnpm eslint src/ --max-warnings=0
-            3. pnpm jest --passWithNoTests --coverage
-            4. pnpm build
-
-            ## 完了条件
-            - 全品質ゲートパス
-            - PR作成（Closes #${{ needs.select-task.outputs.issue_number }}）
-          token: ${{ github.token }}
-        continue-on-error: true
-
-      - name: Record Result
-        if: always()
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          ISSUE="${{ needs.select-task.outputs.issue_number }}"
-          OUTCOME="${{ steps.execute.outcome }}"
-          echo "outcome=$OUTCOME" >> $GITHUB_OUTPUT
-          if [ "$OUTCOME" == "success" ]; then
-            gh issue comment --repo "${{ env.TARGET_REPO }}" "$ISSUE" --body "✅ **Execution Completed** - Run: [${{ github.run_id }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})"
-          else
-            gh issue comment --repo "${{ env.TARGET_REPO }}" "$ISSUE" --body "⚠️ **Execution Failed** - Outcome: $OUTCOME - Run: [${{ github.run_id }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})"
-          fi
-
-  quality-gate:
-    needs: [select-task, execute]
-    if: always() && needs.select-task.outputs.has_task == 'true'
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    permissions:
-      contents: read
-      issues: write
-    outputs:
-      passed: ${{ steps.gate.outputs.passed }}
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          repository: ${{ env.TARGET_REPO }}
-          token: ${{ github.token }}
-
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-
-      - name: Install Dependencies
-        run: |
-          if [ -f "pnpm-lock.yaml" ]; then
-            pnpm install --frozen-lockfile
-          elif [ -f "package-lock.json" ]; then
-            npm ci
-          fi
-
-      - name: Run Quality Gate
-        id: gate
-        run: |
-          set +e
-          PASSED=true
-          if [ -f "tsconfig.json" ]; then
-            pnpm tsc --noEmit || PASSED=false
-          fi
-          if [ -f ".eslintrc.json" ] || [ -f "eslint.config.js" ]; then
-            pnpm eslint src/ --max-warnings=0 || PASSED=false
-          fi
-          pnpm jest --passWithNoTests || PASSED=false
-          pnpm build || PASSED=false
-          if [ "$PASSED" == "true" ]; then
-            echo "passed=true" >> $GITHUB_OUTPUT
-            echo "::notice::Quality gate passed"
-          else
-            echo "passed=false" >> $GITHUB_OUTPUT
-            echo "::error::Quality gate failed"
-          fi
-
-      - name: Comment Result
-        if: always()
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          ISSUE="${{ needs.select-task.outputs.issue_number }}"
-          if [ "${{ steps.gate.outputs.passed }}" == "true" ]; then
-            gh issue comment --repo "${{ env.TARGET_REPO }}" "$ISSUE" --body "✅ **Quality Gate Passed**"
-          else
-            gh issue comment --repo "${{ env.TARGET_REPO }}" "$ISSUE" --body "❌ **Quality Gate Failed** - Auto-fix will be attempted"
-          fi
-
-  auto-merge:
-    needs: [select-task, quality-gate]
-    if: needs.quality-gate.outputs.passed == 'true'
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    permissions:
-      contents: write
-      pull-requests: write
-      issues: write
-    steps:
-      - name: Detect PR
-        id: pr
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          ISSUE="${{ needs.select-task.outputs.issue_number }}"
-          PR=$(gh pr list --repo "${{ env.TARGET_REPO }}" --state open --search "#$ISSUE" --json number --jq '.[0].number // empty')
-          echo "pr=$PR" >> $GITHUB_OUTPUT
-
-      - name: Auto Merge
-        if: steps.pr.outputs.pr != ''
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          PR="${{ steps.pr.outputs.pr }}"
-          ISSUE="${{ needs.select-task.outputs.issue_number }}"
-          gh pr merge --repo "${{ env.TARGET_REPO }}" "$PR" --auto --squash --delete-branch
-          gh issue edit --repo "${{ env.TARGET_REPO }}" "$ISSUE" --remove-label "ai:in-progress" --add-label "ai:done"
-          gh issue comment --repo "${{ env.TARGET_REPO }}" "$ISSUE" --body "🎉 **Auto-Merged** - PR #$PR"
-
-  auto-fix:
-    needs: [select-task, quality-gate]
-    if: needs.quality-gate.outputs.passed == 'false'
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    permissions:
-      contents: write
-      pull-requests: write
-      issues: write
-    steps:
-      - name: Check Attempts
-        id: attempts
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          ISSUE="${{ needs.select-task.outputs.issue_number }}"
-          ATTEMPTS=$(gh issue view --repo "${{ env.TARGET_REPO }}" "$ISSUE" --json comments --jq '[.comments[] | select(.body | contains("Auto-fix attempt"))] | length')
-          NEW_ATTEMPT=$((ATTEMPTS + 1))
-          MAX_ATTEMPTS=${{ env.MAX_FIX_ATTEMPTS }}
-          echo "attempt=$NEW_ATTEMPT" >> $GITHUB_OUTPUT
-          if [ "$NEW_ATTEMPT" -gt "$MAX_ATTEMPTS" ]; then
-            gh issue edit --repo "${{ env.TARGET_REPO }}" "$ISSUE" --remove-label "ai:in-progress" --add-label "ai:blocked"
-            gh issue comment --repo "${{ env.TARGET_REPO }}" "$ISSUE" --body "⚠️ **Max Fix Attempts Reached** - Human review required"
-            echo "can_fix=false" >> $GITHUB_OUTPUT
-          else
-            gh issue comment --repo "${{ env.TARGET_REPO }}" "$ISSUE" --body "🔧 **Auto-fix attempt $NEW_ATTEMPT/$MAX_ATTEMPTS**"
-            echo "can_fix=true" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Checkout
-        if: steps.attempts.outputs.can_fix == 'true'
-        uses: actions/checkout@v4
-        with:
-          repository: ${{ env.TARGET_REPO }}
-          token: ${{ github.token }}
-
-      - name: Run Auto-Fix
-        if: steps.attempts.outputs.can_fix == 'true'
-        timeout-minutes: 20
-        uses: anomalyco/opencode/github@v1.1.44
-        env:
-          ZAI_API_KEY: ${{ secrets.ZAI_API_KEY }}
-        with:
-          model: zai-coding-plan/glm-5
-          prompt: |
-            # Auto-Fix Task
-            Issue #${{ needs.select-task.outputs.issue_number }} quality gate failed.
-            Fix attempt: ${{ steps.attempts.outputs.attempt }}/${{ env.MAX_FIX_ATTEMPTS }}
-            Analyze errors and apply minimal fixes.
-            Do not add new features. Only fix existing issues.
-          token: ${{ github.token }}
-        continue-on-error: true
-
-  idle-mode:
-    needs: [preflight, select-task]
-    if: needs.preflight.outputs.mode_ok == 'true' && needs.select-task.outputs.has_task == 'false'
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    permissions:
-      contents: read
-      issues: write
-    steps:
-      - name: Coverage Check
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          EXISTING=$(gh issue list --repo "${{ env.TARGET_REPO }}" --label "ai:coverage" --state open --json number --jq 'length')
-          if [ "$EXISTING" -eq 0 ]; then
-            gh issue create --repo "${{ env.TARGET_REPO }}" --title "🔧 Coverage Improvement" --body "Improve test coverage to 100%" --label "ai:ready,ai:test,ai:p3,ai:coverage"
-          fi
-
-      - name: Security Audit
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          SINCE=$(date -u -d '7 days ago' +%Y-%m-%dT%H:%M:%SZ)
-          RECENT=$(gh issue list --repo "${{ env.TARGET_REPO }}" --label "ai:security" --state all --json createdAt --jq "[.[] | select(.createdAt > \"$SINCE\")] | length")
-          if [ "$RECENT" -eq 0 ]; then
-            gh issue create --repo "${{ env.TARGET_REPO }}" --title "🔒 Security Audit" --body "Weekly security vulnerability scan" --label "ai:ready,ai:security,ai:p1"
-          fi
-
-      - name: Quality Check
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          SINCE=$(date -u -d '3 days ago' +%Y-%m-%dT%H:%M:%SZ)
-          RECENT=$(gh issue list --repo "${{ env.TARGET_REPO }}" --label "ai:quality" --state all --json createdAt --jq "[.[] | select(.createdAt > \"$SINCE\")] | length")
-          if [ "$RECENT" -eq 0 ]; then
-            gh issue create --repo "${{ env.TARGET_REPO }}" --title "📊 Quality Standards Audit" --body "10 quality standards review" --label "ai:ready,ai:refactor,ai:p2,ai:quality"
-          fi
-
-  cleanup:
-    needs: [select-task, execute, quality-gate, auto-merge, auto-fix]
-    if: always() && needs.select-task.outputs.issue_number != ''
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    permissions:
-      issues: write
-    steps:
-      - name: Final Report
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          ISSUE="${{ needs.select-task.outputs.issue_number }}"
-          MERGE="${{ needs.auto-merge.result }}"
-          FIX="${{ needs.auto-fix.result }}"
-          QUALITY="${{ needs.quality-gate.result }}"
-
-          if [ "$MERGE" == "success" ]; then
-            STATUS="✅ SUCCESS: Task completed and merged"
-          elif [ "$FIX" == "success" ]; then
-            STATUS="🔧 FIX APPLIED: Fix applied, pending verification"
-          else
-            STATUS="⚠️ BLOCKED: Task requires human review"
-          fi
-
-          gh issue comment --repo "${{ env.TARGET_REPO }}" "$ISSUE" --body "## 📊 Session Complete - **Status:** $STATUS - **Details:** Quality: $QUALITY | Merge: $MERGE | Fix: $FIX"
+          echo "## AI Orchestrator Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Phase | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Preflight | ${{ needs.preflight.result == 'success' && '✅' || '❌' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Select | ${{ needs.select.result == 'success' && '✅' || needs.select.result == 'skipped' && '⏭️' || '❌' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Execute | ${{ needs.execute.result == 'success' && '✅' || needs.execute.result == 'skipped' && '⏭️' || '❌' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Quality | ${{ needs.quality.result == 'success' && '✅' || needs.quality.result == 'skipped' && '⏭️' || '❌' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Merge | ${{ needs.merge.result == 'success' && '✅' || needs.merge.result == 'skipped' && '⏭️' || '❌' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Fix | ${{ needs.fix.result == 'success' && '✅' || needs.fix.result == 'skipped' && '⏭️' || '❌' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Idle | ${{ needs.idle.result == 'success' && '✅' || needs.idle.result == 'skipped' && '⏭️' || '❌' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Target:** ${{ needs.preflight.outputs.target_repo }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Max Concurrency:** ${{ needs.preflight.outputs.max_concurrency }}" >> $GITHUB_STEP_SUMMARY

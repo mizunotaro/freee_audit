@@ -1,0 +1,117 @@
+name: 'Validate Input'
+description: 'Validate and sanitize user input from issues'
+author: 'AI DevOps Platform'
+
+inputs:
+  input_text:
+    description: 'Text to validate'
+    required: true
+  max_length:
+    description: 'Maximum allowed length in bytes'
+    required: false
+    default: '10000'
+  forbidden_patterns:
+    description: 'Comma-separated regex patterns to reject'
+    required: false
+    default: 'ignore.*instruction,forget.*previous,print.*secret'
+  sanitize_html:
+    description: 'Remove HTML tags'
+    required: false
+    default: 'true'
+  sanitize_commands:
+    description: 'Remove shell command patterns'
+    required: false
+    default: 'true'
+
+outputs:
+  valid:
+    description: 'Whether input passed validation'
+    value: ${{ steps.validate.outputs.valid }}
+  sanitized:
+    description: 'Sanitized text'
+    value: ${{ steps.validate.outputs.sanitized }}
+  warnings:
+    description: 'Validation warnings (JSON array)'
+    value: ${{ steps.validate.outputs.warnings }}
+  truncated:
+    description: 'Whether input was truncated'
+    value: ${{ steps.validate.outputs.truncated }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Validate and sanitize
+      id: validate
+      shell: bash
+      run: |
+        INPUT='${{ inputs.input_text }}'
+        MAX_LEN=${{ inputs.max_length }}
+        FORBIDDEN='${{ inputs.forbidden_patterns }}'
+        SANITIZE_HTML='${{ inputs.sanitize_html }}'
+        SANITIZE_CMD='${{ inputs.sanitize_commands }}'
+
+        WARNINGS="[]"
+        TRUNCATED="false"
+        VALID="true"
+
+        echo "### Input Validation" >> $GITHUB_STEP_SUMMARY
+
+        TEXT=$(echo "$INPUT")
+        ORIGINAL_LEN=$(echo -n "$TEXT" | wc -c)
+
+        echo "- Original length: $ORIGINAL_LEN bytes" >> $GITHUB_STEP_SUMMARY
+
+        if [ $ORIGINAL_LEN -gt $MAX_LEN ]; then
+          TEXT=$(echo "$TEXT" | head -c $MAX_LEN)
+          WARNINGS=$(echo "$WARNINGS" | jq --arg w "Input truncated from $ORIGINAL_LEN to $MAX_LEN bytes" '. + [$w]')
+          TRUNCATED="true"
+          echo "- ⚠️ Truncated to $MAX_LEN bytes" >> $GITHUB_STEP_SUMMARY
+        fi
+
+        IFS=',' read -ra PATTERNS <<< "$FORBIDDEN"
+        for pattern in "${PATTERNS[@]}"; do
+          pattern=$(echo "$pattern" | xargs)
+          if [ -n "$pattern" ] && echo "$TEXT" | grep -qiE "$pattern"; then
+            echo "::error::Forbidden pattern detected: $pattern"
+            WARNINGS=$(echo "$WARNINGS" | jq --arg w "Forbidden pattern: $pattern" '. + [$w]')
+            VALID="false"
+            echo "- ❌ Forbidden pattern: $pattern" >> $GITHUB_STEP_SUMMARY
+          fi
+        done
+
+        if [ "$SANITIZE_HTML" == "true" ]; then
+          TEXT=$(echo "$TEXT" | sed 's/<[^>]*>//g')
+          echo "- HTML tags removed" >> $GITHUB_STEP_SUMMARY
+        fi
+
+        if [ "$SANITIZE_CMD" == "true" ]; then
+          TEXT=$(echo "$TEXT" | sed 's/\$\([^A-Za-z_]\)/\$\1/g' | sed 's/`[^`]*`//g')
+          echo "- Shell commands sanitized" >> $GITHUB_STEP_SUMMARY
+        fi
+
+        TEXT=$(echo "$TEXT" | tr -d '\000-\010\013\014\016-\037\177')
+
+        FINAL_LEN=$(echo -n "$TEXT" | wc -c)
+        echo "- Final length: $FINAL_LEN bytes" >> $GITHUB_STEP_SUMMARY
+
+        if [ "$VALID" == "true" ]; then
+          echo "- ✅ Validation passed" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "- ❌ Validation failed" >> $GITHUB_STEP_SUMMARY
+        fi
+
+        echo "valid=$VALID" >> $GITHUB_OUTPUT
+        echo "truncated=$TRUNCATED" >> $GITHUB_OUTPUT
+        echo "warnings=$(echo "$WARNINGS" | jq -c '.')" >> $GITHUB_OUTPUT
+
+        echo "sanitized<<EOF" >> $GITHUB_OUTPUT
+        echo "$TEXT" >> $GITHUB_OUTPUT
+        echo "EOF" >> $GITHUB_OUTPUT
+
+        if [ "$VALID" != "true" ]; then
+          exit 1
+        fi
+
+branding:
+  icon: 'shield'
+  color: 'green'

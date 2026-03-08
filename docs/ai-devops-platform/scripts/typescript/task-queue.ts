@@ -50,7 +50,7 @@ export interface Task {
   dependencies: number[]
   status: 'pending' | 'queued' | 'running' | 'completed' | 'failed'
   retryCount: number
-  lastError?: string
+  lastError?: string | undefined
 }
 
 export interface TaskQueueConfig {
@@ -241,7 +241,7 @@ export function parseDependenciesFromBody(body: string): number[] {
   let match
 
   while ((match = depPattern.exec(body)) !== null) {
-    const issueNum = parseInt(match[1], 10)
+    const issueNum = parseInt(match[1] ?? '', 10)
     if (!isNaN(issueNum) && !dependencies.includes(issueNum)) {
       dependencies.push(issueNum)
     }
@@ -315,11 +315,11 @@ function matchesCron(date: Date, cron: string, timezone: string): boolean {
   }
 
   return (
-    matchesCronField(fields.minute, minute) &&
-    matchesCronField(fields.hour, hour) &&
-    matchesCronField(fields.dayOfMonth, dayOfMonth) &&
-    matchesCronField(fields.month, month) &&
-    matchesCronField(fields.dayOfWeek, dayOfWeek === '0' ? '7' : dayOfWeek)
+    matchesCronField(fields.minute, minute ?? '*') &&
+    matchesCronField(fields.hour, hour ?? '*') &&
+    matchesCronField(fields.dayOfMonth, dayOfMonth ?? '*') &&
+    matchesCronField(fields.month, month ?? '*') &&
+    matchesCronField(fields.dayOfWeek, (dayOfWeek === '0' ? '7' : dayOfWeek) ?? '*')
   )
 }
 
@@ -331,7 +331,10 @@ function matchesCronField(value: number, pattern: string): boolean {
   }
 
   if (pattern.includes('-')) {
-    const [start, end] = pattern.split('-').map(Number)
+    const parts = pattern.split('-').map(Number)
+    const start = parts[0]
+    const end = parts[1]
+    if (start === undefined || end === undefined) return false
     return value >= start && value <= end
   }
 

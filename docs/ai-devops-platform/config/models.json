@@ -1,6 +1,6 @@
 {
   "$schema": "./schemas/models.schema.json",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "primary": {
     "provider": "zai-coding-plan",
     "model": "glm-5",
@@ -38,22 +38,78 @@
       "outputTokens": 0.0,
       "currency": "JPY"
     },
-    "capabilities": ["code_generation", "code_review", "debugging"]
+    "capabilities": ["code_generation", "code_review", "debugging"],
+    "triggerConditions": {
+      "primaryError": true,
+      "primaryTimeout": true,
+      "rateLimitExceeded": true,
+      "maxPrimaryAttempts": 3
+    }
+  },
+  "retry": {
+    "maxAttempts": 3,
+    "backoffMs": [1000, 2000, 4000],
+    "retryableErrors": [
+      "ECONNRESET",
+      "ETIMEDOUT",
+      "ENOTFOUND",
+      "RATE_LIMIT",
+      "SERVER_ERROR",
+      "SERVICE_UNAVAILABLE"
+    ],
+    "fatalErrors": ["INVALID_API_KEY", "INSUFFICIENT_QUOTA", "CONTENT_FILTERED"]
+  },
+  "fallbackStrategy": {
+    "enabled": true,
+    "maxPrimaryAttempts": 3,
+    "fallbackOn": {
+      "consecutiveFailures": 2,
+      "timeoutExceeded": true,
+      "rateLimitHit": true
+    },
+    "backoffBeforeFallback": {
+      "enabled": true,
+      "delayMs": 5000
+    }
   },
   "rateLimits": {
     "maxConcurrent": 2,
     "requestsPerMinute": 30,
+    "tokensPerMinute": 100000,
     "timeWindowHours": 5,
     "backoffStrategy": {
       "initialDelaySeconds": 60,
       "maxDelaySeconds": 300,
       "multiplier": 2
+    },
+    "circuitBreaker": {
+      "enabled": true,
+      "failureThreshold": 5,
+      "resetTimeoutSeconds": 300
     }
   },
   "timeouts": {
     "stepTimeoutMinutes": 20,
     "apiTimeoutSeconds": 60,
     "jobTimeoutMinutes": 30,
+    "connectionTimeoutSeconds": 30,
+    "readTimeoutSeconds": 60,
     "maxRetries": 3
+  },
+  "monitoring": {
+    "logPrompts": true,
+    "logResponses": false,
+    "logTokenUsage": true,
+    "logLatency": true,
+    "alertThresholds": {
+      "latencyMs": 30000,
+      "errorRate": 0.1,
+      "tokenUsageRate": 0.8
+    }
+  },
+  "caching": {
+    "enabled": false,
+    "ttlSeconds": 0,
+    "reason": "Temperature=0 ensures deterministic output, caching not required"
   }
 }

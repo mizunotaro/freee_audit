@@ -1,0 +1,133 @@
+name: Orchestrator Fix
+
+on:
+  workflow_call:
+    inputs:
+      target_repo:
+        description: 'Target repository (owner/repo)'
+        required: true
+        type: string
+      issue_number:
+        description: 'Issue number'
+        required: true
+        type: string
+      attempt:
+        description: 'Current attempt number'
+        required: true
+        type: string
+
+env:
+  AI_MODEL: 'zai-coding-plan/glm-5'
+  MAX_FIX_ATTEMPTS: 3
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+    steps:
+      - name: Check attempt limit
+        id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          ATTEMPT=${{ inputs.attempt }}
+
+          if [ "$ATTEMPT" -gt $MAX_FIX_ATTEMPTS ]; then
+            REPO="${{ inputs.target_repo }}"
+            NUMBER="${{ inputs.issue_number }}"
+            
+            gh issue edit --repo "$REPO" "$NUMBER" --remove-label "ai:in-progress" --add-label "ai:blocked"
+            
+            BODY="⚠️ **Max Fix Attempts Reached** - Auto-fix has been attempted $MAX_FIX_ATTEMPTS times without success. Human review is required. Status: ai:blocked"
+            gh issue comment --repo "$REPO" "$NUMBER" --body "$BODY"
+            
+            echo "can_fix=false" >> $GITHUB_OUTPUT
+            echo "::warning::Max fix attempts ($MAX_FIX_ATTEMPTS) reached"
+          else
+            echo "can_fix=true" >> $GITHUB_OUTPUT
+            echo "::notice::Proceeding with auto-fix attempt $ATTEMPT/$MAX_FIX_ATTEMPTS"
+          fi
+
+      - name: Checkout
+        if: steps.check.outputs.can_fix == 'true'
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ inputs.target_repo }}
+          token: ${{ github.token }}
+
+      - name: Setup Node with cache
+        if: steps.check.outputs.can_fix == 'true'
+        uses: ./.github/actions/setup-node
+        with:
+          node-version: '20'
+
+      - name: Notify fix attempt
+        if: steps.check.outputs.can_fix == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          REPO="${{ inputs.target_repo }}"
+          NUMBER="${{ inputs.issue_number }}"
+          ATTEMPT=${{ inputs.attempt }}
+
+          BODY="🔧 **Auto-Fix Attempt $ATTEMPT/$MAX_FIX_ATTEMPTS** - Analyzing errors and applying minimal fixes..."
+          gh issue comment --repo "$REPO" "$NUMBER" --body "$BODY"
+
+      - name: Run auto-fix
+        if: steps.check.outputs.can_fix == 'true'
+        id: fix
+        timeout-minutes: 20
+        uses: anomalyco/opencode/github@v1.1.44
+        env:
+          ZAI_API_KEY: ${{ secrets.ZAI_API_KEY }}
+        with:
+          model: ${{ env.AI_MODEL }}
+          prompt: |
+            # Auto-Fix Task
+
+            Issue #${{ inputs.issue_number }} quality gates failed.
+            Fix attempt: ${{ inputs.attempt }}/${{ env.MAX_FIX_ATTEMPTS }}
+
+            ## Instructions
+
+            1. Analyze the errors from the failed quality gates
+            2. Apply minimal fixes only - do not add new features
+            3. Focus on fixing the specific issues identified
+            4. Run quality gates locally to verify fixes
+
+            ## Quality Gates
+
+            - pnpm tsc --noEmit
+            - pnpm eslint src/ --max-warnings=0
+            - pnpm jest --passWithNoTests
+            - pnpm build
+          token: ${{ github.token }}
+        continue-on-error: true
+
+      - name: Record fix result
+        if: always() && steps.check.outputs.can_fix == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          REPO="${{ inputs.target_repo }}"
+          NUMBER="${{ inputs.issue_number }}"
+          OUTCOME="${{ steps.fix.outcome }}"
+
+          if [ "$OUTCOME" == "success" ]; then
+            BODY="✅ **Auto-Fix Completed** - Fix attempt ${{ inputs.attempt }} completed. Quality gates will be re-run."
+          else
+            BODY="⚠️ **Auto-Fix Failed** - Fix attempt ${{ inputs.attempt }} did not resolve all issues. Outcome: $OUTCOME"
+          fi
+          gh issue comment --repo "$REPO" "$NUMBER" --body "$BODY"
+
+      - name: Audit log
+        if: always()
+        uses: ./.github/actions/audit-log
+        with:
+          event-type: 'auto_fix'
+          event-data: '{"issue_number": "${{ inputs.issue_number }}", "attempt": "${{ inputs.attempt }}", "can_fix": "${{ steps.check.outputs.can_fix }}", "outcome": "${{ steps.fix.outcome }}"}'
+          severity: 'info'
