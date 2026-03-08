@@ -32,15 +32,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import {
-  CalendarDays,
-  Plus,
-  CheckCircle,
-  Clock,
-  AlertTriangle,
-  Shield,
-  ArrowLeft,
-} from 'lucide-react'
+import { Plus, CheckCircle, Clock, AlertTriangle, Shield, ArrowLeft } from 'lucide-react'
 import { toast } from 'sonner'
 
 interface Schedule {
@@ -168,7 +160,7 @@ export default function SocialInsurancePage() {
         setScheduleForm({ insuranceType: 'health', taskName: '', dueDate: '', notes: '' })
         fetchData()
       }
-    } catch (error) {
+    } catch {
       toast.error('スケジュールの追加に失敗しました')
     }
   }
@@ -182,7 +174,7 @@ export default function SocialInsurancePage() {
         toast.success('スケジュールを完了しました')
         fetchData()
       }
-    } catch (error) {
+    } catch {
       toast.error('完了処理に失敗しました')
     }
   }
@@ -214,7 +206,7 @@ export default function SocialInsurancePage() {
         })
         fetchData()
       }
-    } catch (error) {
+    } catch {
       toast.error('納付記録の追加に失敗しました')
     }
   }

@@ -4,7 +4,6 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { validateSession } from '@/lib/auth'
 
 interface UserInfo {
   id: string
@@ -42,7 +41,7 @@ export default function InvestorPortalPage() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ action: 'view_portal' }),
         })
-      } catch (err) {
+      } catch (_err) {
         setError('Failed to authenticate')
       } finally {
         setIsLoading(false)

@@ -60,7 +60,6 @@ export function DockSidebar({ user, locale }: DockSidebarProps) {
   const t = useTranslations('navigation')
   const pathname = usePathname()
   const [isExpanded, setIsExpanded] = useState(false)
-  const [isPinned, setIsPinned] = useState(false)
   const hideTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
   const handleMouseEnter = () => {

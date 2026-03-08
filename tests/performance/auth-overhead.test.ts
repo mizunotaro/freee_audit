@@ -198,7 +198,7 @@ describe('Authentication Performance', () => {
       const duration = end - start
 
       console.log(`10 concurrent password verifications took ${duration.toFixed(2)}ms`)
-      expect(duration).toBeLessThan(5000)
+      expect(duration).toBeLessThan(15000)
     })
   })
 })

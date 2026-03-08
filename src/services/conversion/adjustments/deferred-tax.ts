@@ -36,8 +36,7 @@ export class DeferredTaxAdjustment implements AdjustmentStrategy {
       return null
     }
 
-    const { dtaChange, dtlChange, affectedAccounts } =
-      this.calculateDeferredTaxChanges(temporaryDifferences)
+    const { dtaChange, dtlChange } = this.calculateDeferredTaxChanges(temporaryDifferences)
 
     if (dtaChange === 0 && dtlChange === 0) {
       return null

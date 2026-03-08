@@ -1,4 +1,4 @@
-import { freeeClient, type FreeeAccountItem } from '@/integrations/freee/client'
+import { freeeClient } from '@/integrations/freee/client'
 import { prisma } from '@/lib/db'
 
 export interface AccountItem {

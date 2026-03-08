@@ -34,6 +34,15 @@ vi.mock('@/lib/auth', () => ({
   hasPermission: vi.fn((role: string, requiredRoles: string[]) => requiredRoles.includes(role)),
 }))
 
+vi.mock('@/lib/api/auth-helpers', () => ({
+  validateCompanyId: vi.fn(),
+  requireRole: vi.fn(),
+  requireCompanyAccess: vi.fn(),
+  getAuthenticatedUser: vi.fn(),
+  AuthenticationError: class AuthenticationError extends Error {},
+  AuthorizationError: class AuthorizationError extends Error {},
+}))
+
 describe('Authentication Flow Security', () => {
   beforeEach(() => {
     vi.clearAllMocks()

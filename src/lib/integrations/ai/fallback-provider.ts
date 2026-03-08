@@ -5,8 +5,8 @@ import {
   EntryValidationRequest,
 } from './provider'
 import { DocumentAnalysisResult, EntryValidationResult } from '@/types/audit'
-import { CircuitBreaker, CircuitBreakerConfig, CircuitState } from './circuit-breaker'
-import { DataResidency, filterProvidersBySecurity, PROVIDER_REGISTRY } from './provider-registry'
+import { CircuitBreaker, CircuitState } from './circuit-breaker'
+import { DataResidency, filterProvidersBySecurity } from './provider-registry'
 
 export type { DataResidency }
 

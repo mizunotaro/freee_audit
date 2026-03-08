@@ -113,7 +113,7 @@ export async function generateClosingEntries(
 
 async function calculateDepreciationEntries(
   companyId: string,
-  fiscalYear: number
+  _fiscalYear: number
 ): Promise<DepreciationEntry[]> {
   const assets = await prisma.fixedAsset.findMany({
     where: { companyId },

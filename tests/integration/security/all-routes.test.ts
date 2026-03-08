@@ -13,6 +13,7 @@ const PUBLIC_ROUTES = [
 const AUTH_PATTERNS = [
   'withAuth',
   'withAdminAuth',
+  'withAccountantAuth',
   'validateSession',
   'getAuthenticatedUser',
   'requireRole',

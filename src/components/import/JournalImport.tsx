@@ -85,10 +85,8 @@ export function JournalImport() {
       } else {
         setError(data.error || 'インポートに失敗しました')
       }
-    } catch (err) {
+    } catch {
       setError('通信エラーが発生しました')
-    } finally {
-      setUploading(false)
     }
   }
 

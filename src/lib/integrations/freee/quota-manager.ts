@@ -1,5 +1,5 @@
-import type { FreeePlanType, FreeePlanInfo } from '@/lib/integrations/freee/types'
-import { FREEE_PLAN_DAILY_LIMITS, getFreeePlanInfo } from '@/lib/integrations/freee/types'
+import type { FreeePlanType } from '@/lib/integrations/freee/types'
+import { FREEE_PLAN_DAILY_LIMITS } from '@/lib/integrations/freee/types'
 
 export type ApiCallPriority = 'critical' | 'high' | 'normal' | 'low' | 'background'
 

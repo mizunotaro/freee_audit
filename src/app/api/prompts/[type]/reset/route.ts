@@ -21,7 +21,7 @@ async function handler(request: NextRequest, { params }: { params: Promise<{ typ
     try {
       await resetToDefault(analysisType, user.companyId)
       return NextResponse.json({ success: true })
-    } catch (error) {
+    } catch {
       return NextResponse.json({ error: 'Failed to reset prompt' }, { status: 500 })
     }
   }

@@ -7,8 +7,11 @@ export default defineConfig({
   test: {
     globals: true,
     environment: 'node',
-    include: ['tests/unit/**/*.test.ts', 'tests/unit/**/*.test.tsx'],
-    exclude: ['tests/e2e/**', 'tests/integration/**', 'node_modules/**'],
+    include: ['tests/**/*.test.ts', 'tests/**/*.test.tsx'],
+    exclude: ['node_modules/**', 'dist/**', '.next/**'],
+    testTimeout: 30000,
+    hookTimeout: 10000,
+    setupFiles: ['./tests/setup.ts'],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html', 'lcov'],
@@ -32,9 +35,6 @@ export default defineConfig({
         statements: 80,
       },
     },
-    setupFiles: ['./tests/setup.ts'],
-    testTimeout: 10000,
-    hookTimeout: 10000,
   },
   resolve: {
     alias: {

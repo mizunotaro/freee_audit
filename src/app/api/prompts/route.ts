@@ -1,12 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { validateSession } from '@/lib/auth'
-import {
-  getPrompt,
-  setPrompt,
-  resetToDefault,
-  DEFAULT_PROMPTS,
-  getAnalysisTypes,
-} from '@/services/ai/prompt-service'
+import { getAnalysisTypes } from '@/services/ai/prompt-service'
 
 async function handler(request: NextRequest) {
   const token = request.headers.get('authorization')?.replace('Bearer ', '')

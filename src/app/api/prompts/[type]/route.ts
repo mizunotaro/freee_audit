@@ -1,11 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { validateSession } from '@/lib/auth'
-import {
-  getPrompt,
-  setPrompt,
-  resetToDefault,
-  type AnalysisType,
-} from '@/services/ai/prompt-service'
+import { getPrompt, setPrompt, type AnalysisType } from '@/services/ai/prompt-service'
 
 async function handler(request: NextRequest, { params }: { params: Promise<{ type: string }> }) {
   const token = request.headers.get('authorization')?.replace('Bearer ', '')
@@ -26,7 +21,7 @@ async function handler(request: NextRequest, { params }: { params: Promise<{ typ
     try {
       const prompt = await getPrompt(analysisType, user.companyId)
       return NextResponse.json({ prompt })
-    } catch (error) {
+    } catch {
       return NextResponse.json({ error: 'Prompt not found' }, { status: 404 })
     }
   }
@@ -43,7 +38,7 @@ async function handler(request: NextRequest, { params }: { params: Promise<{ typ
         variables: body.variables,
       })
       return NextResponse.json({ prompt })
-    } catch (error) {
+    } catch {
       return NextResponse.json({ error: 'Failed to save prompt' }, { status: 500 })
     }
   }

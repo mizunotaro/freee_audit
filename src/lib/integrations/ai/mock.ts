@@ -14,7 +14,7 @@ export class MockAIProvider extends BaseAIProvider {
     super(config)
   }
 
-  async analyzeDocument(request: DocumentAnalysisRequest): Promise<DocumentAnalysisResult> {
+  async analyzeDocument(_request: DocumentAnalysisRequest): Promise<DocumentAnalysisResult> {
     await this.simulateDelay(200, 500)
 
     const mockVendors = [

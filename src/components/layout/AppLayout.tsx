@@ -5,7 +5,6 @@ import { usePathname } from 'next/navigation'
 import {
   Settings,
   Home,
-  FileText,
   DollarSign,
   BarChart3,
   ClipboardCheck,
@@ -16,7 +15,6 @@ import {
   TrendingUp,
   FileSearch,
   FileSpreadsheet,
-  LayoutDashboard,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 

@@ -8,7 +8,6 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Textarea } from '@/components/ui/textarea'
-import { Label } from '@/components/ui/label'
 import { toast } from 'sonner'
 import { ArrowLeft, Download, Save, RefreshCw, CheckCircle, FileText } from 'lucide-react'
 
@@ -112,7 +111,7 @@ export default function BoardReportDetailPage() {
       } else {
         toast.error('保存に失敗しました')
       }
-    } catch (error) {
+    } catch {
       toast.error('保存に失敗しました')
     } finally {
       setSaving(false)
@@ -131,7 +130,7 @@ export default function BoardReportDetailPage() {
         toast.success('ステータスを更新しました')
         fetchReport()
       }
-    } catch (error) {
+    } catch {
       toast.error('ステータスの更新に失敗しました')
     }
   }
@@ -148,7 +147,7 @@ export default function BoardReportDetailPage() {
         a.click()
         URL.revokeObjectURL(url)
       }
-    } catch (error) {
+    } catch {
       toast.error('PDFエクスポートに失敗しました')
     }
   }

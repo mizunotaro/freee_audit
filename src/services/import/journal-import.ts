@@ -26,7 +26,6 @@ export interface JournalImportOptions {
 }
 
 const REQUIRED_HEADERS = ['entryDate', 'description', 'debitAccount', 'creditAccount', 'amount']
-const OPTIONAL_HEADERS = ['taxAmount', 'taxType']
 
 const HEADER_MAPPINGS: Record<string, string> = {
   日付: 'entryDate',

@@ -36,7 +36,7 @@ export class RetirementBenefitAdjustment implements AdjustmentStrategy {
       return null
     }
 
-    const { dboChange, planAssetAdjustment, pastServiceCost, actuarialGainLoss, netAdjustment } =
+    const { planAssetAdjustment, pastServiceCost, actuarialGainLoss, netAdjustment } =
       retirementAnalysis
 
     if (Math.abs(netAdjustment) < 1000) {

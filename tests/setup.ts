@@ -1,9 +1,25 @@
 import { beforeAll, afterAll, vi } from 'vitest'
 
-process.env.DATABASE_URL = 'file:./test.db'
+process.env.DATABASE_URL = process.env.TEST_DATABASE_URL || 'file:./test.db'
+process.env.NEXTAUTH_SECRET = 'test-secret-key-for-testing'
+process.env.NEXTAUTH_URL = 'http://localhost:3000'
 process.env.JWT_SECRET = 'test-jwt-secret-for-testing'
 process.env.ENCRYPTION_KEY = '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef'
 process.env.CSRF_SECRET = 'test-csrf-secret-for-testing-320'
+
+beforeAll(() => {
+  ;(process.env as Record<string, string | undefined>).NODE_ENV = 'test'
+})
+
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({
+    push: vi.fn(),
+    replace: vi.fn(),
+    back: vi.fn(),
+  }),
+  usePathname: () => '/test',
+  useSearchParams: () => new URLSearchParams(),
+}))
 
 vi.mock('@/lib/integrations/ai', () => ({
   AIProvider: vi.fn(),
@@ -146,10 +162,4 @@ vi.mock('@/lib/db', () => {
   }
 })
 
-beforeAll(() => {
-  console.log('Test setup complete')
-})
-
-afterAll(() => {
-  console.log('Test teardown complete')
-})
+afterAll(() => {})

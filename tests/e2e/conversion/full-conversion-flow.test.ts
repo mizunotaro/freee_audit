@@ -76,43 +76,51 @@ vi.mock('@/lib/db', () => ({
 }))
 
 vi.mock('@/lib/conversion/exporters/pdf-exporter', () => ({
-  PDFExporter: vi.fn().mockImplementation(() => ({
-    export: vi.fn().mockResolvedValue({
-      buffer: Buffer.from('<html>test</html>'),
-      fileName: 'conversion_test.html',
-      mimeType: 'text/html',
-    }),
-  })),
+  PDFExporter: class {
+    async export() {
+      return {
+        buffer: Buffer.from('<html>test</html>'),
+        fileName: 'conversion_test.html',
+        mimeType: 'text/html',
+      }
+    }
+  },
 }))
 
 vi.mock('@/lib/conversion/exporters/excel-exporter', () => ({
-  ExcelExporter: vi.fn().mockImplementation(() => ({
-    export: vi.fn().mockResolvedValue({
-      buffer: Buffer.from('csv,data'),
-      fileName: 'conversion_test.csv',
-      mimeType: 'text/csv',
-    }),
-  })),
+  ExcelExporter: class {
+    async export() {
+      return {
+        buffer: Buffer.from('csv,data'),
+        fileName: 'conversion_test.csv',
+        mimeType: 'text/csv',
+      }
+    }
+  },
 }))
 
 vi.mock('@/lib/conversion/exporters/csv-exporter', () => ({
-  CSVExporter: vi.fn().mockImplementation(() => ({
-    export: vi.fn().mockResolvedValue({
-      buffer: Buffer.from('record_type,account_code'),
-      fileName: 'conversion_data_test.csv',
-      mimeType: 'text/csv',
-    }),
-  })),
+  CSVExporter: class {
+    async export() {
+      return {
+        buffer: Buffer.from('record_type,account_code'),
+        fileName: 'conversion_data_test.csv',
+        mimeType: 'text/csv',
+      }
+    }
+  },
 }))
 
 vi.mock('@/lib/conversion/exporters/json-exporter', () => ({
-  JSONExporter: vi.fn().mockImplementation(() => ({
-    export: vi.fn().mockResolvedValue({
-      buffer: Buffer.from('{"test": true}'),
-      fileName: 'conversion_test.json',
-      mimeType: 'application/json',
-    }),
-  })),
+  JSONExporter: class {
+    async export() {
+      return {
+        buffer: Buffer.from('{"test": true}'),
+        fileName: 'conversion_test.json',
+        mimeType: 'application/json',
+      }
+    }
+  },
 }))
 
 describe('Full Conversion Flow E2E', () => {
@@ -141,13 +149,21 @@ describe('Full Conversion Flow E2E', () => {
   }
 
   const mockSourceItems = [
-    { id: 'item-1', code: '1000', name: '現金', nameEn: 'Cash', category: 'current_asset' },
+    {
+      id: 'item-1',
+      code: '1000',
+      name: '現金',
+      nameEn: 'Cash',
+      category: 'current_asset',
+      coaId: 'coa-source-1',
+    },
     {
       id: 'item-2',
       code: '1100',
       name: '普通預金',
       nameEn: 'Ordinary Deposits',
       category: 'current_asset',
+      coaId: 'coa-source-1',
     },
     {
       id: 'item-3',
@@ -155,10 +171,32 @@ describe('Full Conversion Flow E2E', () => {
       name: '買掛金',
       nameEn: 'Accounts Payable',
       category: 'current_liability',
+      coaId: 'coa-source-1',
     },
-    { id: 'item-4', code: '3000', name: '資本金', nameEn: 'Capital Stock', category: 'equity' },
-    { id: 'item-5', code: '4000', name: '売上高', nameEn: 'Sales', category: 'revenue' },
-    { id: 'item-6', code: '5000', name: '売上原価', nameEn: 'Cost of Sales', category: 'cogs' },
+    {
+      id: 'item-4',
+      code: '3000',
+      name: '資本金',
+      nameEn: 'Capital Stock',
+      category: 'equity',
+      coaId: 'coa-source-1',
+    },
+    {
+      id: 'item-5',
+      code: '4000',
+      name: '売上高',
+      nameEn: 'Sales',
+      category: 'revenue',
+      coaId: 'coa-source-1',
+    },
+    {
+      id: 'item-6',
+      code: '5000',
+      name: '売上原価',
+      nameEn: 'Cost of Sales',
+      category: 'cogs',
+      coaId: 'coa-source-1',
+    },
   ]
 
   const mockTargetItems = [
@@ -168,6 +206,7 @@ describe('Full Conversion Flow E2E', () => {
       name: 'Cash and Cash Equivalents',
       nameEn: 'Cash and Cash Equivalents',
       category: 'current_asset',
+      coaId: 'coa-target-1',
     },
     {
       id: 'target-2',
@@ -175,6 +214,7 @@ describe('Full Conversion Flow E2E', () => {
       name: 'Accounts Payable',
       nameEn: 'Accounts Payable',
       category: 'current_liability',
+      coaId: 'coa-target-1',
     },
     {
       id: 'target-3',
@@ -182,14 +222,23 @@ describe('Full Conversion Flow E2E', () => {
       name: 'Common Stock',
       nameEn: 'Common Stock',
       category: 'equity',
+      coaId: 'coa-target-1',
     },
-    { id: 'target-4', code: '4100', name: 'Revenue', nameEn: 'Revenue', category: 'revenue' },
+    {
+      id: 'target-4',
+      code: '4100',
+      name: 'Revenue',
+      nameEn: 'Revenue',
+      category: 'revenue',
+      coaId: 'coa-target-1',
+    },
     {
       id: 'target-5',
       code: '5100',
       name: 'Cost of Revenue',
       nameEn: 'Cost of Revenue',
       category: 'cogs',
+      coaId: 'coa-target-1',
     },
   ]
 
@@ -289,6 +338,10 @@ describe('Full Conversion Flow E2E', () => {
     })
 
     it('should create account mappings', async () => {
+      vi.mocked(prisma.chartOfAccountItem.findUnique)
+        .mockResolvedValueOnce(mockSourceItems[0] as any)
+        .mockResolvedValueOnce(mockTargetItems[0] as any)
+
       const mockMappings = mockSourceItems.map((item, idx) => ({
         id: `mapping-${idx}`,
         companyId: 'company-1',
@@ -568,6 +621,7 @@ describe('Full Conversion Flow E2E', () => {
         periodEnd: new Date('2024-12-31'),
         status: 'converting',
         progress: 50,
+        createdAt: new Date(Date.now() - 60000),
         settings: JSON.stringify({}),
       }
 

@@ -26,22 +26,10 @@ export {
 export { rateLimiters } from './rate-limiters'
 
 import { NextRequest } from 'next/server'
-import { validateSession, type AuthUser } from '@/lib/auth'
+import type { AuthUser } from '@/lib/auth'
 import { getAuthenticatedUser } from './auth-helpers'
 
 export type { AuthUser }
-
-function getTokenFromRequest(request: NextRequest): string | null {
-  const cookieToken = request.cookies.get('session')?.value
-  if (cookieToken) return cookieToken
-
-  const authHeader = request.headers.get('authorization')
-  if (authHeader?.startsWith('Bearer ')) {
-    return authHeader.slice(7)
-  }
-
-  return null
-}
 
 export async function getAuthUser(request: NextRequest): Promise<AuthUser | null> {
   try {

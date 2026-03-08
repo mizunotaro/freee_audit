@@ -88,7 +88,7 @@ export default function BoardReportsPage() {
         const data = await res.json()
         toast.error(data.error || 'レポートの生成に失敗しました')
       }
-    } catch (error) {
+    } catch {
       toast.error('レポートの生成に失敗しました')
     }
   }

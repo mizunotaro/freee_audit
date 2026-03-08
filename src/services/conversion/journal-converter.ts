@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/db'
 import { MappingRuleEngine } from './mapping-rule-engine'
+import { conversionCache } from '@/lib/cache/conversion-cache'
 import type {
   AccountMapping,
   ConversionRule,
@@ -7,6 +8,17 @@ import type {
   JournalConversion,
   ConvertedJournalLine,
 } from '@/types/conversion'
+
+const MIN_BATCH_SIZE = 100
+const MAX_BATCH_SIZE = 1000
+const PARALLEL_BATCH_SIZE = 50
+const STREAM_BATCH_SIZE = 1000
+
+export function getOptimalBatchSize(totalJournals: number): number {
+  if (totalJournals < 1000) return MIN_BATCH_SIZE
+  if (totalJournals < 10000) return 500
+  return MAX_BATCH_SIZE
+}
 
 export interface UnmappedAccount {
   accountCode: string
@@ -42,7 +54,7 @@ interface JournalRecord {
   taxType: string | null
 }
 
-interface MappingWithTargets extends AccountMapping {
+interface MappingWithTarget extends AccountMapping {
   conversionRule?: ConversionRule
   targetAccountId: string
   targetAccountCode: string
@@ -62,18 +74,61 @@ export class JournalConverter {
     }
   }
 
+  async *streamJournals(
+    companyId: string,
+    periodStart: Date,
+    periodEnd: Date,
+    batchSize: number = STREAM_BATCH_SIZE
+  ): AsyncGenerator<JournalRecord[]> {
+    let offset = 0
+
+    while (true) {
+      const journals = await prisma.journal.findMany({
+        where: {
+          companyId,
+          entryDate: {
+            gte: periodStart,
+            lte: periodEnd,
+          },
+        },
+        orderBy: {
+          entryDate: 'asc',
+        },
+        skip: offset,
+        take: batchSize,
+      })
+
+      if (journals.length === 0) break
+
+      yield journals as JournalRecord[]
+      offset += batchSize
+    }
+  }
+
   async convert(
     companyId: string,
     periodStart: Date,
     periodEnd: Date,
     mappings: Map<string, AccountMapping>,
-    settings: ConversionSettings
+    _settings: ConversionSettings
   ): Promise<JournalConversion[]> {
-    const journals = await this.fetchJournals(companyId, periodStart, periodEnd)
+    const totalJournals = await prisma.journal.count({
+      where: {
+        companyId,
+        entryDate: {
+          gte: periodStart,
+          lte: periodEnd,
+        },
+      },
+    })
+
+    const batchSize = getOptimalBatchSize(totalJournals)
     const results: JournalConversion[] = []
 
-    for await (const batchResult of this.convertBatch(journals, mappings, this.config.batchSize)) {
-      results.push(...batchResult.conversions)
+    for await (const journalBatch of this.streamJournals(companyId, periodStart, periodEnd)) {
+      for await (const batchResult of this.convertBatch(journalBatch, mappings, batchSize)) {
+        results.push(...batchResult.conversions)
+      }
     }
 
     return results
@@ -141,29 +196,44 @@ export class JournalConverter {
       const end = Math.min(start + batchSize, journals.length)
       const batch = journals.slice(start, end)
 
-      const conversions: JournalConversion[] = []
-      const errors: Array<{ journalId: string; message: string }> = []
+      const parallelBatches = this.chunkArray(batch, PARALLEL_BATCH_SIZE)
+      const allConversions: JournalConversion[] = []
+      const allErrors: Array<{ journalId: string; message: string }> = []
 
-      for (const journal of batch) {
-        try {
-          const conversion = await this.convertSingleWithRetry(journal, mappings)
-          conversions.push(conversion)
-        } catch (error) {
-          errors.push({
-            journalId: journal.id,
-            message: error instanceof Error ? error.message : 'Unknown error',
-          })
+      for (const parallelBatch of parallelBatches) {
+        const results = await Promise.allSettled(
+          parallelBatch.map((journal) => this.convertSingleWithRetry(journal, mappings))
+        )
+
+        for (let i = 0; i < results.length; i++) {
+          const result = results[i]
+          if (result.status === 'fulfilled') {
+            allConversions.push(result.value)
+          } else {
+            allErrors.push({
+              journalId: parallelBatch[i].id,
+              message: result.reason instanceof Error ? result.reason.message : 'Unknown error',
+            })
+          }
         }
       }
 
       yield {
         processedCount: batch.length,
-        successCount: conversions.length,
-        failedCount: errors.length,
-        errors,
-        conversions,
+        successCount: allConversions.length,
+        failedCount: allErrors.length,
+        errors: allErrors,
+        conversions: allConversions,
       }
     }
+  }
+
+  private chunkArray<T>(array: T[], chunkSize: number): T[][] {
+    const chunks: T[][] = []
+    for (let i = 0; i < array.length; i += chunkSize) {
+      chunks.push(array.slice(i, i + chunkSize))
+    }
+    return chunks
   }
 
   async findUnmappedAccounts(
@@ -196,25 +266,6 @@ export class JournalConverter {
     }
 
     return Array.from(unmapped.values()).sort((a, b) => b.totalAmount - a.totalAmount)
-  }
-
-  private async fetchJournals(
-    companyId: string,
-    periodStart: Date,
-    periodEnd: Date
-  ): Promise<JournalRecord[]> {
-    return prisma.journal.findMany({
-      where: {
-        companyId,
-        entryDate: {
-          gte: periodStart,
-          lte: periodEnd,
-        },
-      },
-      orderBy: {
-        entryDate: 'asc',
-      },
-    })
   }
 
   private async convertSingleWithRetry(

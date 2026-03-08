@@ -102,10 +102,8 @@ function PromptEditor({
         const data = await res.json()
         toast.error(data.error || '保存に失敗しました')
       }
-    } catch (error) {
+    } catch {
       toast.error('保存に失敗しました')
-    } finally {
-      setSaving(false)
     }
   }
 
@@ -118,7 +116,7 @@ function PromptEditor({
         toast.success('デフォルトに戻しました')
         fetchPrompt()
       }
-    } catch (error) {
+    } catch {
       toast.error('リセットに失敗しました')
     }
   }

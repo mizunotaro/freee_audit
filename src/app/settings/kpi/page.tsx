@@ -5,7 +5,6 @@ import { AppLayout } from '@/components/layout/AppLayout'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Switch } from '@/components/ui/switch'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import {
   Select,
@@ -250,7 +249,7 @@ export default function KPISettingsPage() {
         toast.success(`${data.count}件のデフォルトKPIを追加しました`)
         fetchKPIs()
       }
-    } catch (error) {
+    } catch {
       toast.error('デフォルトKPIの初期化に失敗しました')
     }
   }
@@ -265,7 +264,7 @@ export default function KPISettingsPage() {
       if (res.ok) {
         setKpis((prev) => prev.map((k) => (k.id === id ? { ...k, isVisible } : k)))
       }
-    } catch (error) {
+    } catch {
       toast.error('表示設定の変更に失敗しました')
     }
   }
@@ -279,7 +278,7 @@ export default function KPISettingsPage() {
         setKpis((prev) => prev.filter((k) => k.id !== id))
         toast.success('KPIを削除しました')
       }
-    } catch (error) {
+    } catch {
       toast.error('KPIの削除に失敗しました')
     }
   }
@@ -359,7 +358,7 @@ export default function KPISettingsPage() {
         const data = await res.json()
         toast.error(data.error || 'KPIの保存に失敗しました')
       }
-    } catch (error) {
+    } catch {
       toast.error('KPIの保存に失敗しました')
     }
   }

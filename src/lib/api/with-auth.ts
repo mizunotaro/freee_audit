@@ -4,7 +4,6 @@ import {
   requireRole,
   handleAuthError,
   createAuthenticatedRequest,
-  type AuthenticatedRequest,
   type ApiHandler,
   type AuthOptions,
 } from './auth-helpers'

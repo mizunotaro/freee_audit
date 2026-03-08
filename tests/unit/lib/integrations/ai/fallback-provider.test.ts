@@ -439,11 +439,13 @@ describe('FallbackAIProvider', () => {
 
       expect(fallback.getCircuitBreakerState('openai')).toBe('open')
 
-      const result = await fallback.analyzeDocument({
-        documentBase64: 'test',
-        documentType: 'pdf',
-        mimeType: 'application/pdf',
-      })
+      await expect(
+        fallback.analyzeDocument({
+          documentBase64: 'test',
+          documentType: 'pdf',
+          mimeType: 'application/pdf',
+        })
+      ).rejects.toThrow()
 
       consoleWarnSpy.mockRestore()
     })

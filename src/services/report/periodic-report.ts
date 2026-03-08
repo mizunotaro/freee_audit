@@ -1,6 +1,4 @@
 import { prisma } from '@/lib/db'
-import { calculateFinancialKPIs } from '@/services/analytics/financial-kpi'
-import { calculateCashFlow } from '@/services/cashflow/calculator'
 
 export interface PeriodicReportConfig {
   companyId: string

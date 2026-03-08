@@ -41,7 +41,7 @@ import { StatusBadge } from '@/components/conversion/status-badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { toast } from 'sonner'
 import Link from 'next/link'
-import type { ChartOfAccounts, AccountingStandard } from '@/types/conversion'
+import type { ChartOfAccounts } from '@/types/conversion'
 
 export default function COAListPage() {
   const [loading, setLoading] = useState(true)

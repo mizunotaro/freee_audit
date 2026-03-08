@@ -47,7 +47,6 @@ export interface ScheduledBatch {
   estimatedQuotaCost: number
 }
 
-const MAX_BATCH_SIZE = 50
 const MIN_CALL_INTERVAL_MS = 200
 const HOUR_IN_MS = 60 * 60 * 1000
 

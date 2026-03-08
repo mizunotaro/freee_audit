@@ -562,7 +562,7 @@ export function validateFormula(formula: string): { valid: boolean; error?: stri
   const matches = formula.match(varPattern) || []
 
   for (const match of matches) {
-    if (!allowedVariables.includes(match) && !Math.hasOwnProperty(match)) {
+    if (!allowedVariables.includes(match) && !Object.prototype.hasOwnProperty.call(Math, match)) {
       return { valid: false, error: `不明な変数: ${match}` }
     }
   }

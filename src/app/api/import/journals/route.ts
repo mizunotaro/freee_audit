@@ -5,7 +5,6 @@ import {
   parseJournalCsv,
   importJournals,
   generateJournalTemplate,
-  type JournalImportRow,
 } from '@/services/import/journal-import'
 
 async function handler(req: AuthenticatedRequest) {

@@ -485,7 +485,7 @@ export class COAImporter {
     const codeSet = new Set<string>()
     const duplicates = new Set<string>()
 
-    items.forEach((item, index) => {
+    items.forEach((item, _index) => {
       if (codeSet.has(item.code)) {
         duplicates.add(item.code)
       } else {

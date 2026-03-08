@@ -1,9 +1,8 @@
 import { prisma } from '@/lib/db'
-import { JournalConverter } from './journal-converter'
+import { JournalConverter, getOptimalBatchSize } from './journal-converter'
 import { FinancialStatementConverter } from './financial-statement-converter'
 import { AccountMappingService } from './account-mapping-service'
 import type {
-  ConversionProject,
   ConversionResult,
   ConversionSettings,
   ConversionStatus,
@@ -95,12 +94,13 @@ export class ConversionEngine {
         }
       }
 
-      const batchSize = options?.batchSize ?? DEFAULT_BATCH_SIZE
       const totalJournals = await this.countJournals(
         project.companyId,
         project.periodStart,
         project.periodEnd
       )
+
+      const batchSize = options?.batchSize ?? getOptimalBatchSize(totalJournals)
 
       const journalConversions = await this.convertJournals(
         project,
@@ -122,26 +122,26 @@ export class ConversionEngine {
         const fiscalYear = project.periodStart.getFullYear()
         const month = project.periodEnd.getMonth() + 1
 
-        balanceSheet = await this.fsConverter.convertBalanceSheet(
-          project.companyId,
-          fiscalYear,
-          month,
-          journalConversions,
-          project.targetCoaId
-        )
+        const [bs, pl, cf] = await Promise.all([
+          this.fsConverter.convertBalanceSheet(
+            project.companyId,
+            fiscalYear,
+            month,
+            journalConversions,
+            project.targetCoaId
+          ),
+          this.fsConverter.convertProfitLoss(
+            project.companyId,
+            fiscalYear,
+            month,
+            journalConversions
+          ),
+          this.fsConverter.convertCashFlow(project.companyId, fiscalYear, journalConversions),
+        ])
 
-        profitLoss = await this.fsConverter.convertProfitLoss(
-          project.companyId,
-          fiscalYear,
-          month,
-          journalConversions
-        )
-
-        cashFlow = await this.fsConverter.convertCashFlow(
-          project.companyId,
-          fiscalYear,
-          journalConversions
-        )
+        balanceSheet = bs
+        profitLoss = pl
+        cashFlow = cf
       }
 
       await this.updateProjectStatus(projectId, 'completed', 100, new Date())
@@ -171,7 +171,6 @@ export class ConversionEngine {
 
   async dryRun(projectId: string): Promise<DryRunResult> {
     const project = await this.getProject(projectId)
-    const startTime = Date.now()
 
     const mappings = await this.loadMappings(project.companyId, project.targetCoaId)
 
@@ -401,33 +400,26 @@ export class ConversionEngine {
     const allConversions: JournalConversion[] = []
     let processedCount = 0
 
-    const journals = await prisma.journal.findMany({
-      where: {
-        companyId: project.companyId,
-        entryDate: {
-          gte: project.periodStart,
-          lte: project.periodEnd,
-        },
-      },
-      orderBy: {
-        entryDate: 'asc',
-      },
-    })
-
-    for await (const batchResult of this.journalConverter.convertBatch(
-      journals,
-      mappings,
-      batchSize
+    for await (const journalBatch of this.journalConverter.streamJournals(
+      project.companyId,
+      project.periodStart,
+      project.periodEnd
     )) {
       if (signal.aborted) {
         throw new Error('Conversion aborted')
       }
 
-      allConversions.push(...batchResult.conversions)
-      processedCount += batchResult.processedCount
+      for await (const batchResult of this.journalConverter.convertBatch(
+        journalBatch,
+        mappings,
+        batchSize
+      )) {
+        allConversions.push(...batchResult.conversions)
+        processedCount += batchResult.processedCount
 
-      const progress = Math.round((processedCount / totalJournals) * 100)
-      await this.updateProjectStatus(project.id, 'converting', progress)
+        const progress = Math.round((processedCount / totalJournals) * 100)
+        await this.updateProjectStatus(project.id, 'converting', progress)
+      }
     }
 
     return allConversions

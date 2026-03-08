@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { validateSession } from '@/lib/auth'
 import { analyzeFinancialData } from '@/services/ai/analysis-service'
-import { getKPIBenchmarks, calculateFinancialKPIs } from '@/services/analytics/financial-kpi'
+import { calculateFinancialKPIs } from '@/services/analytics/financial-kpi'
 
 async function getAuthUser(request: NextRequest) {
   const token = request.cookies.get('session')?.value

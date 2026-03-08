@@ -28,14 +28,9 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { toast } from 'sonner'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import type {
-  ChartOfAccounts,
-  ChartOfAccountItem,
-  AccountCategory,
-  AccountingStandard,
-} from '@/types/conversion'
+import type { ChartOfAccountItem, AccountCategory, AccountingStandard } from '@/types/conversion'
 
-interface PageProps {
+interface EditPageProps {
   params: Promise<{ id: string }>
 }
 
@@ -56,12 +51,11 @@ const CATEGORY_OPTIONS: { value: AccountCategory; label: string }[] = [
   { value: 'extraordinary_loss', label: '特別損失' },
 ]
 
-export default function COAEditPage({ params }: PageProps) {
+export default function COAEditPage({ params }: EditPageProps) {
   const router = useRouter()
   const [id, setId] = useState<string>('')
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
-  const [coa, setCoa] = useState<ChartOfAccounts | null>(null)
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -80,7 +74,6 @@ export default function COAEditPage({ params }: PageProps) {
       const response = await fetch(`/api/conversion/coa/${id}`)
       if (response.ok) {
         const data = await response.json()
-        setCoa(data.data)
         setFormData({
           name: data.data.name || '',
           description: data.data.description || '',

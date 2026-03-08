@@ -1,12 +1,44 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { NextRequest } from 'next/server'
-import { GET, POST } from '@/app/api/conversion/mappings/route'
-import { GET as GetById, PUT, DELETE } from '@/app/api/conversion/mappings/[id]/route'
-import { POST as BatchPost } from '@/app/api/conversion/mappings/batch/route'
-import { POST as SuggestPost } from '@/app/api/conversion/mappings/suggest/route'
-import { GET as StatsGet } from '@/app/api/conversion/mappings/statistics/route'
-import { GET as ExportGet } from '@/app/api/conversion/mappings/export/route'
 import type { AuthenticatedRequest } from '@/lib/api'
+
+vi.mock('@/lib/api/auth-helpers', () => {
+  const defaultMockUser = {
+    id: 'user-1',
+    email: 'test@example.com',
+    name: 'Test User',
+    role: 'ACCOUNTANT' as const,
+    companyId: 'company-1',
+  }
+  return {
+    getAuthenticatedUser: vi.fn().mockImplementation((req: { user?: typeof defaultMockUser }) => {
+      return Promise.resolve(req.user || defaultMockUser)
+    }),
+    requireRole: vi.fn().mockResolvedValue(undefined),
+    requireCompanyAccess: vi.fn().mockResolvedValue(undefined),
+    createAuthenticatedRequest: vi.fn((req: NextRequest, user: typeof defaultMockUser) => {
+      const authReq = req as AuthenticatedRequest
+      authReq.user = user
+      return authReq
+    }),
+    handleAuthError: vi.fn((error: unknown) => {
+      const status = error instanceof Error && error.message.includes('Unauthorized') ? 401 : 500
+      return { status, json: vi.fn() }
+    }),
+    AuthenticationError: class AuthenticationError extends Error {
+      constructor(message: string = 'Unauthorized') {
+        super(message)
+        this.name = 'AuthenticationError'
+      }
+    },
+    AuthorizationError: class AuthorizationError extends Error {
+      constructor(message: string = 'Insufficient permissions') {
+        super(message)
+        this.name = 'AuthorizationError'
+      }
+    },
+  }
+})
 
 vi.mock('@/lib/db', () => ({
   prisma: {
@@ -69,9 +101,16 @@ const mockUser = {
   id: 'user-1',
   email: 'test@example.com',
   name: 'Test User',
-  role: 'ACCOUNTANT',
+  role: 'ACCOUNTANT' as const,
   companyId: 'company-1',
 }
+
+import { GET, POST } from '@/app/api/conversion/mappings/route'
+import { GET as GetById, PUT, DELETE } from '@/app/api/conversion/mappings/[id]/route'
+import { POST as BatchPost } from '@/app/api/conversion/mappings/batch/route'
+import { POST as SuggestPost } from '@/app/api/conversion/mappings/suggest/route'
+import { GET as StatsGet } from '@/app/api/conversion/mappings/statistics/route'
+import { GET as ExportGet } from '@/app/api/conversion/mappings/export/route'
 
 const mockMapping = {
   id: 'mapping-1',
@@ -97,12 +136,14 @@ const mockMapping = {
     code: '1000',
     name: '現金',
     nameEn: 'Cash',
+    coaId: 'source-coa-1',
   },
   targetItem: {
     id: 'target-item-1',
     code: '1100',
     name: 'Cash and Cash Equivalents',
     nameEn: 'Cash and Cash Equivalents',
+    coaId: 'target-coa-1',
   },
 }
 

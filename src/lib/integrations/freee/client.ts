@@ -17,12 +17,6 @@ import { FreeeApiError } from './types'
 import { freeeRateLimiter, freeeCircuitBreaker, withRetry } from './rate-limiter'
 import { getToken, saveToken, deleteToken, isTokenExpired } from './token-store'
 import { fetchWithTimeout, API_TIMEOUTS } from '@/lib/utils/timeout'
-import {
-  freeeApiQuotaManager,
-  type ApiCallCategory,
-  type ApiCallPriority,
-  prioritizeApiCall,
-} from './quota-manager'
 
 const FREEE_API_BASE_URL = 'https://api.freee.co.jp'
 const FREEE_AUTH_URL = 'https://accounts.secure.freee.co.jp/public_api/authorize'

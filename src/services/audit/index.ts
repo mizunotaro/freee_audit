@@ -92,9 +92,9 @@ function extractAmountFromDocument(content: string): number | null {
 }
 
 function extractDateFromDocument(content: string): Date | null {
-  const patterns = [
-    /(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})/g,
-    /(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/g,
+  const patterns: RegExp[] = [
+    /(\d{4})[-/](\d{1,2})[-/](\d{1,2})/g,
+    /(\d{1,2})[-/](\d{1,2})[-/](\d{4})/g,
     /(\d{4})年(\d{1,2})月(\d{1,2})日/g,
   ]
 

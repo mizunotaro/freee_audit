@@ -289,7 +289,7 @@ export async function skipInventoryAdjustment(
   companyId: string,
   fiscalYear: number,
   month: number,
-  reason: string
+  _reason: string
 ): Promise<void> {
   await prisma.inventoryAdjustment.upsert({
     where: {

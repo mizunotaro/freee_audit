@@ -86,10 +86,6 @@ const formatCurrency = (value: number): string => {
   return value.toLocaleString()
 }
 
-const formatPercent = (value: number): string => {
-  return `${value.toFixed(1)}%`
-}
-
 const getTrendIcon = (value: number | null) => {
   if (value === null) return <Minus className="h-4 w-4 text-muted-foreground" />
   if (value > 0) return <TrendingUp className="h-4 w-4 text-green-500" />
@@ -140,7 +136,7 @@ export default function PeriodicReportPage() {
         export: 'csv',
       })
       window.open(`/api/reports/periodic?${params}`, '_blank')
-    } catch (error) {
+    } catch {
       toast.error('エクスポートに失敗しました')
     }
   }

@@ -91,7 +91,7 @@ export interface AIProviderInterface {
 }
 
 export function createAIProviderFromEnvLegacy(
-  config?: Partial<import('./factory').AIConfig>
+  _config?: Partial<import('./factory').AIConfig>
 ): AIProviderInterface {
   return {
     analyzeDocument: async () => ({

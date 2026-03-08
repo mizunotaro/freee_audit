@@ -1,4 +1,4 @@
-import type { AccountCategory, AccountingStandard } from '@/types/conversion'
+import type { AccountCategory } from '@/types/conversion'
 
 export interface DefaultMappingSuggestion {
   sourceCodePattern: string | RegExp

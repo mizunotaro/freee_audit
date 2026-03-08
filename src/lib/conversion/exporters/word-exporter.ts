@@ -7,7 +7,6 @@ import {
   TableRow,
   TableCell,
   WidthType,
-  BorderStyle,
   AlignmentType,
   Packer,
   type ISectionOptions,

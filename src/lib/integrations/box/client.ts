@@ -8,7 +8,6 @@ import type {
   BoxItemList,
   BoxUploadResponse,
   UploadFileOptions,
-  CreateFolderOptions,
   ListItemsOptions,
   BoxSearchResult,
   SearchOptions,

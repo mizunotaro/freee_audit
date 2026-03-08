@@ -232,7 +232,7 @@ export class AdjustmentCalculator {
     return 'low'
   }
 
-  private generateReasoning(type: AdjustmentType, targetStandard: 'USGAAP' | 'IFRS'): string {
+  private generateReasoning(type: AdjustmentType, _targetStandard: 'USGAAP' | 'IFRS'): string {
     const reasoningMap: Record<AdjustmentType, string> = {
       revenue_recognition:
         'JGAAPとIFRS 15/ASC 606の間で収益認識のタイミングと基準に差異があります。',

@@ -1,4 +1,4 @@
-import type { DisclosureCategory, DisclosureSection, DisclosureTable } from '@/types/conversion'
+import type { DisclosureCategory, DisclosureSection } from '@/types/conversion'
 
 export interface DisclosureTemplateContext {
   targetStandard: string
@@ -320,7 +320,7 @@ ${ctx.fairValueHierarchy || ''}
 ### Valuation Techniques
 
 ${ctx.measurementMethods || 'Valuation techniques such as the market approach, cost approach, and income approach are used to measure fair value.'}`,
-    generateSections: (ctx) => [
+    generateSections: (_ctx) => [
       {
         id: 'sec-1',
         title: '公正価値階層',
@@ -357,7 +357,7 @@ The Company's functional currency is the Japanese Yen.
 ### Translation Method
 
 ${ctx.foreignCurrencyDetails || 'The financial statements of foreign subsidiaries are translated into Japanese Yen using the exchange rate at the balance sheet date for assets and liabilities, and the average exchange rate for the period for revenues and expenses. The resulting translation adjustments are recorded in other comprehensive income within equity.'}`,
-    generateSections: (ctx) => [
+    generateSections: (_ctx) => [
       {
         id: 'sec-1',
         title: '機能通貨',

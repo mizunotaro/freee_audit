@@ -1,6 +1,5 @@
 'use client'
 
-import Link from 'next/link'
 import { useState, useEffect, useCallback } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -25,7 +24,7 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Plus, Clock, CheckCircle, AlertTriangle, Calculator, ArrowLeft } from 'lucide-react'
+import { Plus, Clock, AlertTriangle, Calculator, ArrowLeft } from 'lucide-react'
 import { toast } from 'sonner'
 
 interface PrepaidExpense {
@@ -174,7 +173,7 @@ export default function DeferredAccrualPage() {
         })
         fetchData()
       }
-    } catch (error) {
+    } catch {
       toast.error('前払費用の追加に失敗しました')
     }
   }
@@ -206,7 +205,7 @@ export default function DeferredAccrualPage() {
         })
         fetchData()
       }
-    } catch (error) {
+    } catch {
       toast.error('未払費用の追加に失敗しました')
     }
   }

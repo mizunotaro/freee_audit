@@ -1,7 +1,6 @@
 import { prisma } from '@/lib/db'
 import type {
   JournalConversion,
-  ConvertedJournalLine,
   ConvertedBalanceSheet,
   ConvertedProfitLoss,
   ConvertedCashFlow,
@@ -347,8 +346,10 @@ export class FinancialStatementConverter {
     sourcePL: ConvertedProfitLoss,
     targetPL: ConvertedProfitLoss
   ): Promise<ComparisonReport> {
-    const bsItems = this.compareBalanceSheets(sourceBS, targetBS)
-    const plItems = this.compareProfitLoss(sourcePL, targetPL)
+    const [bsItems, plItems] = await Promise.all([
+      this.compareBalanceSheets(sourceBS, targetBS),
+      this.compareProfitLoss(sourcePL, targetPL),
+    ])
 
     const significantDifferences = this.identifySignificantDifferences(bsItems, plItems)
 

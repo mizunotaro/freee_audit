@@ -1,5 +1,4 @@
-import type { DisclosureCategory, DisclosureSection } from '@/types/conversion'
-import type { DisclosureTemplate, DisclosureTemplateContext } from './usgaap'
+import type { DisclosureTemplate } from './usgaap'
 
 export const IFRS_DISCLOSURE_TEMPLATES: Record<string, DisclosureTemplate> = {
   significant_accounting_policies: {
@@ -279,7 +278,7 @@ Fair value measurements are classified based on the following three-level fair v
 - **Level 3**: Unobservable inputs for the asset or liability not based on observable market data
 
 ${ctx.fairValueHierarchy || ''}`,
-    generateSections: (ctx) => [
+    generateSections: (_ctx) => [
       {
         id: 'sec-1',
         title: '公正価値の定義',
@@ -326,7 +325,7 @@ ${ctx.foreignCurrencyDetails || 'The financial statements of foreign operations 
 ### Foreign Currency Transactions
 
 Foreign currency denominated financial instruments are translated into Yen at the exchange rate on the transaction date at initial recognition.`,
-    generateSections: (ctx) => [
+    generateSections: (_ctx) => [
       {
         id: 'sec-1',
         title: '機能通貨',
