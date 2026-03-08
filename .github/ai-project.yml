@@ -8,7 +8,7 @@ project:
   framework: Next.js
 
 repository:
-  owner: mizunomi
+  owner: mizunotaro
   name: freee_audit
   defaultBranch: main
 
