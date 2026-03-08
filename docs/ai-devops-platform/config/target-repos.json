@@ -1,17 +1,19 @@
 {
   "$schema": "./target-repos.schema.json",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "repositories": [
     {
-      "name": "mizunomi/freee_audit",
+      "name": "mizunotaro/freee_audit",
       "enabled": true,
       "priority": 1,
       "description": "Financial audit system with AI-powered analysis",
       "labels": {
         "task": "ai-task",
-        "inProgress": "ai-in-progress",
-        "completed": "ai-completed",
-        "blocked": "ai-blocked",
+        "ready": "ai:ready",
+        "inProgress": "ai:in-progress",
+        "completed": "ai:done",
+        "blocked": "ai:blocked",
+        "prOpen": "ai:pr-open",
         "autoMerge": "auto-merge",
         "doNotMerge": "do-not-merge"
       },
@@ -19,39 +21,58 @@
         "typecheck": {
           "command": "pnpm tsc --noEmit",
           "timeout": 120000,
-          "required": true
+          "required": true,
+          "order": 1,
+          "description": "TypeScript type checking"
         },
         "lint": {
           "command": "pnpm eslint src/ --max-warnings=0",
           "timeout": 120000,
-          "required": true
+          "required": true,
+          "order": 2,
+          "description": "ESLint code quality check"
         },
         "test": {
-          "command": "pnpm jest --passWithNoTests",
+          "command": "pnpm jest --passWithNoTests --coverage",
           "timeout": 300000,
-          "required": true
+          "required": true,
+          "order": 3,
+          "description": "Unit tests with coverage"
         },
         "build": {
           "command": "pnpm build",
           "timeout": 300000,
-          "required": true
+          "required": true,
+          "order": 4,
+          "description": "Production build"
         }
       },
       "branchProtection": {
         "main": {
           "requiredChecks": ["typecheck", "lint", "test", "build"],
-          "allowAutoMerge": true
+          "allowAutoMerge": true,
+          "requiredReviewers": 0
         }
       },
       "constraints": {
         "maxFileSizeKB": 500,
         "maxFilesPerTask": 50,
-        "forbiddenPaths": ["**/migrations/**", "**/*.sql", "**/.env*", "**/prisma/schema.prisma"],
+        "maxLinesPerFile": 500,
+        "forbiddenPaths": [
+          "**/migrations/**",
+          "**/*.sql",
+          "**/.env*",
+          "**/prisma/schema.prisma",
+          "**/secrets/**",
+          "**/*.pem",
+          "**/*.key"
+        ],
         "requiredReviewers": []
       },
       "notifications": {
         "slack": null,
-        "email": null
+        "email": null,
+        "githubComment": true
       }
     }
   ],
@@ -60,6 +81,40 @@
     "maxQueueSize": 100,
     "taskTimeoutMinutes": 30,
     "retryAttempts": 3,
-    "retryDelayMinutes": 5
+    "retryDelayMinutes": 5,
+    "maxConcurrentTasks": 2,
+    "idleMode": {
+      "enabled": true,
+      "coverageThreshold": 100,
+      "securityAuditIntervalDays": 7,
+      "qualityAuditIntervalDays": 3
+    }
+  },
+  "autoMerge": {
+    "enabled": true,
+    "method": "squash",
+    "deleteBranch": true,
+    "conditions": {
+      "allQualityGatesPass": true,
+      "noDoNotMergeLabel": true,
+      "minCoverage": 80,
+      "noBreakingChanges": true
+    },
+    "exclusions": {
+      "labels": ["ai:security", "ai:infra", "do-not-merge"],
+      "paths": [
+        "**/auth/**",
+        "**/middleware/auth*",
+        "**/crypto/**",
+        ".github/workflows/*",
+        "prisma/schema.prisma"
+      ]
+    }
+  },
+  "performance": {
+    "useCache": true,
+    "sparseCheckout": true,
+    "parallelScans": true,
+    "graphqlQueries": true
   }
 }
