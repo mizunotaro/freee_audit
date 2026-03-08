@@ -18,20 +18,25 @@ export class MockAIProvider extends BaseAIProvider {
     await this.simulateDelay(200, 500)
 
     const mockVendors = [
-      '株式会社サンプル',
-      'Sample Corp.',
-      'テスト商事株式会社',
-      'Test Trading Co., Ltd.',
-      '株式会社デモシステム',
+      '株式会社医薬開発研究所',
+      'バイオシグマ株式会社',
+      'クロニクル・ファーマ株式会社',
+      'ABCバイオサイエンス株式会社',
+      '日本CRO協会',
+      '株式会社メディデータ・ソリューションズ',
+      '東京臨床試験センター',
+      '株式会社バイオ・アナリシス',
     ]
 
     const mockDescriptions = [
-      '事務用品購入',
-      'Office supplies purchase',
-      'Consulting services',
-      'コンサルティングサービス',
-      'Software license fee',
-      'ソフトウェアライセンス料',
+      '非臨床毒性試験委託費',
+      '薬物動態試験費用（ラット）',
+      '原薬製造委託費（CDMO）',
+      '製剤開発委託費',
+      '特許出願費用（米国）',
+      '実験用試薬購入費',
+      '分析機器保守点検費',
+      '臨床試験準備費',
     ]
 
     const randomAmount = Math.floor(Math.random() * 1000000) + 10000

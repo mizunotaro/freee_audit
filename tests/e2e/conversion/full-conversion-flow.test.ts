@@ -22,6 +22,7 @@ vi.mock('@/lib/db', () => ({
     conversionProject: {
       create: vi.fn(),
       findUnique: vi.fn(),
+      findFirst: vi.fn(),
       findMany: vi.fn(),
       update: vi.fn(),
       delete: vi.fn(),
@@ -124,11 +125,6 @@ vi.mock('@/lib/conversion/exporters/json-exporter', () => ({
 }))
 
 describe('Full Conversion Flow E2E', () => {
-  const mockUser = {
-    id: 'user-1',
-    companyId: 'company-1',
-  }
-
   const mockJgaapStandard = {
     id: 'jgaap-id',
     code: 'JGAAP',
@@ -341,6 +337,8 @@ describe('Full Conversion Flow E2E', () => {
       vi.mocked(prisma.chartOfAccountItem.findUnique)
         .mockResolvedValueOnce(mockSourceItems[0] as any)
         .mockResolvedValueOnce(mockTargetItems[0] as any)
+      vi.mocked(prisma.accountMapping.findMany).mockResolvedValue([])
+      vi.mocked(prisma.conversionProject.findFirst).mockResolvedValue(null)
 
       const mockMappings = mockSourceItems.map((item, idx) => ({
         id: `mapping-${idx}`,
@@ -392,10 +390,11 @@ describe('Full Conversion Flow E2E', () => {
         progress: 0,
         settings: JSON.stringify({
           includeJournals: true,
-          includeFinancialStatements: true,
+          includeFinancialStatements: false,
           generateAdjustingEntries: false,
           aiAssistedMapping: false,
         }),
+        createdAt: new Date(),
       }
 
       const mockMappings = [
@@ -433,7 +432,9 @@ describe('Full Conversion Flow E2E', () => {
 
       vi.mocked(prisma.conversionProject.findUnique).mockResolvedValue(mockProject as any)
       vi.mocked(prisma.journal.count).mockResolvedValue(2)
-      vi.mocked(prisma.journal.findMany).mockResolvedValue(mockJournals as any)
+      vi.mocked(prisma.journal.findMany)
+        .mockResolvedValueOnce(mockJournals as any)
+        .mockResolvedValueOnce([] as any)
       vi.mocked(prisma.accountMapping.findMany).mockResolvedValue(mockMappings as any)
       vi.mocked(prisma.accountMapping.count).mockResolvedValue(mockMappings.length)
       vi.mocked(prisma.accountMapping.groupBy).mockResolvedValue([])
@@ -546,15 +547,18 @@ describe('Full Conversion Flow E2E', () => {
         progress: 0,
         settings: JSON.stringify({
           includeJournals: true,
-          includeFinancialStatements: true,
+          includeFinancialStatements: false,
           generateAdjustingEntries: false,
           aiAssistedMapping: false,
         }),
+        createdAt: new Date(),
       }
 
       vi.mocked(prisma.conversionProject.findUnique).mockResolvedValue(mockProject as any)
       vi.mocked(prisma.journal.count).mockResolvedValue(2)
-      vi.mocked(prisma.journal.findMany).mockResolvedValue(mockJournals as any)
+      vi.mocked(prisma.journal.findMany)
+        .mockResolvedValueOnce(mockJournals as any)
+        .mockResolvedValueOnce([] as any)
       vi.mocked(prisma.accountMapping.findMany).mockResolvedValue([])
       vi.mocked(prisma.accountMapping.count).mockResolvedValue(0)
       vi.mocked(prisma.accountMapping.groupBy).mockResolvedValue([])

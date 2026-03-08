@@ -1,7 +1,98 @@
-import type { BalanceSheet, ProfitLoss, FinancialKPIs, CashFlowStatement } from '@/types'
+import type {
+  BalanceSheet,
+  ProfitLoss,
+  FinancialKPIs,
+  CashFlowStatement,
+  IndustrySector,
+  CompanySize,
+  BenchmarkComparison,
+} from '@/types'
+import type { AccountingStandard } from '@/types/accounting-standard'
 import { safeDivide, calculateGrowthRate } from '@/lib/utils'
 import { calculateFreeCashFlow } from '@/services/cashflow/calculator'
 import { kpiCache } from '@/lib/cache'
+
+export interface IndustryBenchmark {
+  sector: IndustrySector
+  grossProfitMargin: { min: number; median: number; max: number }
+  operatingMargin: { min: number; median: number; max: number }
+  currentRatio: { min: number; median: number; max: number }
+  debtToEquity: { min: number; median: number; max: number }
+  inventoryTurnover: { min: number; median: number; max: number }
+}
+
+export const INDUSTRY_BENCHMARKS: Record<IndustrySector, IndustryBenchmark> = {
+  manufacturing: {
+    sector: 'manufacturing',
+    grossProfitMargin: { min: 15, median: 25, max: 40 },
+    operatingMargin: { min: 3, median: 8, max: 15 },
+    currentRatio: { min: 100, median: 140, max: 200 },
+    debtToEquity: { min: 0.5, median: 1.0, max: 2.0 },
+    inventoryTurnover: { min: 4, median: 8, max: 12 },
+  },
+  retail: {
+    sector: 'retail',
+    grossProfitMargin: { min: 20, median: 30, max: 50 },
+    operatingMargin: { min: 2, median: 5, max: 10 },
+    currentRatio: { min: 100, median: 150, max: 250 },
+    debtToEquity: { min: 0.3, median: 0.8, max: 1.5 },
+    inventoryTurnover: { min: 6, median: 12, max: 20 },
+  },
+  service: {
+    sector: 'service',
+    grossProfitMargin: { min: 30, median: 45, max: 70 },
+    operatingMargin: { min: 5, median: 12, max: 25 },
+    currentRatio: { min: 100, median: 160, max: 250 },
+    debtToEquity: { min: 0.2, median: 0.6, max: 1.2 },
+    inventoryTurnover: { min: 0, median: 0, max: 0 },
+  },
+  technology: {
+    sector: 'technology',
+    grossProfitMargin: { min: 40, median: 60, max: 80 },
+    operatingMargin: { min: 5, median: 15, max: 30 },
+    currentRatio: { min: 120, median: 200, max: 350 },
+    debtToEquity: { min: 0.1, median: 0.4, max: 1.0 },
+    inventoryTurnover: { min: 0, median: 0, max: 0 },
+  },
+  finance: {
+    sector: 'finance',
+    grossProfitMargin: { min: 50, median: 70, max: 90 },
+    operatingMargin: { min: 15, median: 25, max: 40 },
+    currentRatio: { min: 100, median: 120, max: 180 },
+    debtToEquity: { min: 5.0, median: 10.0, max: 20.0 },
+    inventoryTurnover: { min: 0, median: 0, max: 0 },
+  },
+  real_estate: {
+    sector: 'real_estate',
+    grossProfitMargin: { min: 20, median: 35, max: 50 },
+    operatingMargin: { min: 10, median: 20, max: 35 },
+    currentRatio: { min: 80, median: 120, max: 200 },
+    debtToEquity: { min: 2.0, median: 4.0, max: 8.0 },
+    inventoryTurnover: { min: 0.5, median: 1.0, max: 2.0 },
+  },
+  construction: {
+    sector: 'construction',
+    grossProfitMargin: { min: 10, median: 18, max: 30 },
+    operatingMargin: { min: 2, median: 5, max: 10 },
+    currentRatio: { min: 100, median: 130, max: 180 },
+    debtToEquity: { min: 1.0, median: 2.0, max: 4.0 },
+    inventoryTurnover: { min: 3, median: 6, max: 10 },
+  },
+  other: {
+    sector: 'other',
+    grossProfitMargin: { min: 10, median: 25, max: 50 },
+    operatingMargin: { min: 2, median: 8, max: 20 },
+    currentRatio: { min: 100, median: 150, max: 250 },
+    debtToEquity: { min: 0.5, median: 1.0, max: 2.5 },
+    inventoryTurnover: { min: 2, median: 6, max: 12 },
+  },
+}
+
+export interface KPIOptions {
+  standard?: AccountingStandard
+  sector?: IndustrySector
+  companySize?: CompanySize
+}
 
 export interface StartupKPIs {
   burnRate: number
@@ -52,26 +143,35 @@ export function calculateFinancialKPIs(
   bs: BalanceSheet,
   pl: ProfitLoss,
   cf: CashFlowStatement,
-  previousPL?: ProfitLoss
+  previousPL?: ProfitLoss,
+  options: KPIOptions = {}
 ): FinancialKPIs {
-  const cacheKey = generateKPIHash(bs, pl, cf, previousPL)
+  const standard = options.standard || 'JGAAP'
+  const sector = options.sector || 'other'
+  const benchmark = INDUSTRY_BENCHMARKS[sector]
+
+  const cacheKey = generateKPIHash(bs, pl, cf, previousPL, options)
 
   const cached = kpiCache.get(cacheKey)
   if (cached) {
     return cached as unknown as FinancialKPIs
   }
 
-  const kpis = {
+  const kpis: FinancialKPIs = {
     fiscalYear: pl.fiscalYear,
     month: pl.month,
-    profitability: calculateProfitabilityKPIs(bs, pl),
-    efficiency: calculateEfficiencyKPIs(bs, pl),
-    safety: calculateSafetyKPIs(bs),
+    profitability: calculateProfitabilityKPIs(bs, pl, standard),
+    efficiency: calculateEfficiencyKPIs(bs, pl, sector),
+    safety: calculateSafetyKPIs(bs, standard),
     growth: calculateGrowthKPIs(pl, previousPL),
     cashFlow: calculateCashFlowKPIs(pl, cf),
+    benchmark: {
+      sector,
+      comparison: generateBenchmarkComparison(bs, pl, benchmark),
+    },
   }
 
-  kpiCache.set(cacheKey, kpis)
+  kpiCache.set(cacheKey, kpis as unknown as Record<string, unknown>)
   return kpis
 }
 
@@ -79,13 +179,16 @@ function generateKPIHash(
   bs: BalanceSheet,
   pl: ProfitLoss,
   cf: CashFlowStatement,
-  previousPL?: ProfitLoss
+  previousPL?: ProfitLoss,
+  options?: KPIOptions
 ): string {
   return JSON.stringify({
     bsTotal: bs.assets.total,
     plNetIncome: pl.netIncome,
     cfNetCash: cf.netChangeInCash,
     prevNetIncome: previousPL?.netIncome,
+    standard: options?.standard,
+    sector: options?.sector,
   })
 }
 
@@ -424,9 +527,67 @@ function generateKPIAdvice(
   return advice
 }
 
+function generateBenchmarkComparison(
+  bs: BalanceSheet,
+  pl: ProfitLoss,
+  benchmark: IndustryBenchmark
+): BenchmarkComparison[] {
+  const comparisons: BenchmarkComparison[] = []
+
+  comparisons.push(
+    createComparison('売上総利益率', pl.grossProfitMargin, benchmark.grossProfitMargin)
+  )
+
+  comparisons.push(createComparison('営業利益率', pl.operatingMargin, benchmark.operatingMargin))
+
+  const currentAssets = bs.assets.current.reduce((sum, a) => sum + a.amount, 0)
+  const currentLiabilities = bs.liabilities.current.reduce((sum, l) => sum + l.amount, 0)
+  const currentRatio = currentLiabilities > 0 ? (currentAssets / currentLiabilities) * 100 : 999
+  comparisons.push(createComparison('流動比率', currentRatio, benchmark.currentRatio))
+
+  const totalDebt = bs.totalLiabilities
+  const debtToEquity = bs.totalEquity > 0 ? totalDebt / bs.totalEquity : 999
+  comparisons.push(createComparison('D/E比率', debtToEquity, benchmark.debtToEquity))
+
+  return comparisons
+}
+
+function createComparison(
+  metric: string,
+  value: number,
+  benchmarkRange: { min: number; median: number; max: number }
+): BenchmarkComparison {
+  let percentile = 50
+  let status: BenchmarkComparison['status'] = 'above_median'
+
+  if (value < benchmarkRange.min) {
+    percentile = 0
+    status = 'below_range'
+  } else if (value > benchmarkRange.max) {
+    percentile = 100
+    status = 'above_range'
+  } else if (value < benchmarkRange.median) {
+    percentile = ((value - benchmarkRange.min) / (benchmarkRange.median - benchmarkRange.min)) * 50
+    status = 'below_median'
+  } else {
+    percentile =
+      50 + ((value - benchmarkRange.median) / (benchmarkRange.max - benchmarkRange.median)) * 50
+    status = 'above_median'
+  }
+
+  return {
+    metric,
+    value,
+    benchmark: benchmarkRange,
+    percentile: Math.round(percentile),
+    status,
+  }
+}
+
 function calculateProfitabilityKPIs(
   bs: BalanceSheet,
-  pl: ProfitLoss
+  pl: ProfitLoss,
+  _standard: AccountingStandard
 ): FinancialKPIs['profitability'] {
   const totalAssets = bs.totalAssets
   const equity = bs.totalEquity
@@ -449,7 +610,11 @@ function calculateProfitabilityKPIs(
   }
 }
 
-function calculateEfficiencyKPIs(bs: BalanceSheet, pl: ProfitLoss): FinancialKPIs['efficiency'] {
+function calculateEfficiencyKPIs(
+  bs: BalanceSheet,
+  pl: ProfitLoss,
+  sector: IndustrySector
+): FinancialKPIs['efficiency'] {
   const revenue = getTotalRevenue(pl)
   const costOfSales = pl.costOfSales.reduce((sum, item) => sum + item.amount, 0)
 
@@ -459,7 +624,12 @@ function calculateEfficiencyKPIs(bs: BalanceSheet, pl: ProfitLoss): FinancialKPI
   const payables = getTotalPayables(bs)
 
   const assetTurnover = safeDivide(revenue, totalAssets)
-  const inventoryTurnover = safeDivide(costOfSales, inventory)
+
+  let inventoryTurnover = 0
+  if (!['service', 'technology', 'finance'].includes(sector) && inventory > 0) {
+    inventoryTurnover = safeDivide(costOfSales, inventory)
+  }
+
   const receivablesTurnover = safeDivide(revenue, receivables)
   const payablesTurnover = safeDivide(costOfSales, payables)
 
@@ -471,7 +641,10 @@ function calculateEfficiencyKPIs(bs: BalanceSheet, pl: ProfitLoss): FinancialKPI
   }
 }
 
-function calculateSafetyKPIs(bs: BalanceSheet): FinancialKPIs['safety'] {
+function calculateSafetyKPIs(
+  bs: BalanceSheet,
+  _standard: AccountingStandard
+): FinancialKPIs['safety'] {
   const currentAssets = bs.assets.current.reduce((sum, item) => sum + item.amount, 0)
   const currentLiabilities = bs.liabilities.current.reduce((sum, item) => sum + item.amount, 0)
   const inventory = getTotalInventory(bs)

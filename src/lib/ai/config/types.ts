@@ -1,4 +1,28 @@
-export type AIProviderType = 'openai' | 'claude' | 'gemini' | 'openrouter'
+export type AIProviderType =
+  | 'openai'
+  | 'claude'
+  | 'gemini'
+  | 'openrouter'
+  | 'deepseek'
+  | 'kimi'
+  | 'qwen'
+  | 'groq'
+  | 'azure'
+  | 'aws'
+  | 'gcp'
+  | 'freee'
+  | 'custom'
+
+export type OpenAICompatibleProviderType = 'deepseek' | 'kimi' | 'qwen' | 'groq' | 'custom'
+
+export interface OpenAICompatibleConfig {
+  provider: OpenAICompatibleProviderType
+  baseUrl: string
+  defaultModel: string
+  apiKeyEnvVar: string
+  modelEnvVar: string
+  headers?: Record<string, string>
+}
 
 export interface ModelPricing {
   inputToken: number

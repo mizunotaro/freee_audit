@@ -204,6 +204,8 @@ function generateSampleCashFlow(fiscalYear: number, month: number) {
     operatingActivities: {
       netIncome: 1000000,
       depreciation: 50000,
+      amortization: 0,
+      deferredTaxChange: 0,
       increaseInReceivables: -100000,
       decreaseInInventory: 50000,
       increaseInPayables: 80000,
@@ -219,6 +221,7 @@ function generateSampleCashFlow(fiscalYear: number, month: number) {
       proceedsFromBorrowing: 0,
       repaymentOfBorrowing: -50000,
       dividendPaid: 0,
+      interestPaid: 0,
       netCashFromFinancing: -50000,
     },
     netChangeInCash: 850000,

@@ -1,16 +1,9 @@
 import { getSecretsManager } from '@/lib/secrets'
 import { decrypt } from '@/lib/crypto'
 import { prisma } from '@/lib/db'
+import type { AIProviderType } from '@/lib/ai/config/types'
 
-export type AIProvider =
-  | 'openai'
-  | 'gemini'
-  | 'claude'
-  | 'azure'
-  | 'aws'
-  | 'gcp'
-  | 'freee'
-  | 'openrouter'
+export type AIProvider = AIProviderType
 
 export interface APIKeyMetadata {
   zdr?: boolean
@@ -204,6 +197,11 @@ class APIKeyService {
       gcp: { key: 'GOOGLE_APPLICATION_CREDENTIALS' },
       freee: { key: 'FREEE_CLIENT_SECRET' },
       openrouter: { key: 'OPENROUTER_API_KEY' },
+      deepseek: { key: 'DEEPSEEK_API_KEY' },
+      kimi: { key: 'KIMI_API_KEY' },
+      qwen: { key: 'QWEN_API_KEY' },
+      groq: { key: 'GROQ_API_KEY' },
+      custom: { key: 'CUSTOM_LLM_API_KEY' },
     }
 
     const mapping = envMapping[provider]
@@ -238,6 +236,11 @@ class APIKeyService {
       gcp: 'gcpApiKey',
       freee: 'freeeClientSecret',
       openrouter: 'openrouterApiKey',
+      deepseek: 'deepseekApiKey',
+      kimi: 'kimiApiKey',
+      qwen: 'qwenApiKey',
+      groq: 'groqApiKey',
+      custom: 'customLLMApiKey',
     }
     return fieldMapping[provider]
   }

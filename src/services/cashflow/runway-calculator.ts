@@ -1,90 +1,134 @@
 import type { RunwayCalculation, CashFlowStatement } from '@/types'
 import { addMonths, sumValues } from '@/lib/utils'
 
-export function calculateRunway(
-  currentCash: number,
-  monthlyCashFlows: CashFlowStatement[],
-  scenarioAdjustments: {
+export interface RunwayCalculationOptions {
+  scenarioAdjustments?: {
     optimistic: number
     realistic: number
     pessimistic: number
-  } = { optimistic: 0.8, realistic: 1.0, pessimistic: 1.3 }
+  }
+  adjustmentReasons?: {
+    optimistic: string
+    pessimistic: string
+  }
+}
+
+export function calculateRunway(
+  currentCash: number,
+  monthlyCashFlows: CashFlowStatement[],
+  options: RunwayCalculationOptions = {}
 ): RunwayCalculation {
-  const avgRevenue = calculateAverageMonthlyRevenue(monthlyCashFlows)
-  const avgExpenses = calculateAverageMonthlyExpenses(monthlyCashFlows)
+  if (monthlyCashFlows.length === 0) {
+    return createEmptyRunwayResult(currentCash)
+  }
 
-  const monthlyBurnRate = avgExpenses - avgRevenue
+  const monthlyNetCashFlows = monthlyCashFlows.map((cf) => {
+    const operating =
+      cf.operatingActivities?.netCashFromOperating ?? cf.operating?.netCashFromOperating ?? 0
+    return operating
+  })
 
-  const realisticBurnRate = monthlyBurnRate * scenarioAdjustments.realistic
-  const optimisticBurnRate = monthlyBurnRate * scenarioAdjustments.optimistic
-  const pessimisticBurnRate = monthlyBurnRate * scenarioAdjustments.pessimistic
+  const avgMonthlyNetCashFlow = sumValues(monthlyNetCashFlows) / monthlyNetCashFlows.length
+
+  const baseBurnRate = avgMonthlyNetCashFlow < 0 ? Math.abs(avgMonthlyNetCashFlow) : 0
+
+  const adjustments = validateAndApplyAdjustments(
+    options.scenarioAdjustments,
+    options.adjustmentReasons
+  )
+
+  const realisticBurnRate = baseBurnRate * adjustments.realistic
+  const optimisticBurnRate = baseBurnRate * adjustments.optimistic
+  const pessimisticBurnRate = baseBurnRate * adjustments.pessimistic
 
   const realisticRunway = realisticBurnRate > 0 ? currentCash / realisticBurnRate : Infinity
   const optimisticRunway = optimisticBurnRate > 0 ? currentCash / optimisticBurnRate : Infinity
   const pessimisticRunway = pessimisticBurnRate > 0 ? currentCash / pessimisticBurnRate : Infinity
 
   const runwayMonths = realisticRunway
-  const zeroCashDate = addMonths(new Date(), Math.floor(runwayMonths))
+  const zeroCashDate =
+    runwayMonths !== Infinity
+      ? addMonths(new Date(), Math.floor(runwayMonths))
+      : new Date('9999-12-31')
 
   return {
     monthlyBurnRate: Math.round(realisticBurnRate),
-    runwayMonths: Math.round(runwayMonths * 10) / 10,
+    runwayMonths: runwayMonths === Infinity ? 999 : Math.round(runwayMonths * 10) / 10,
     zeroCashDate,
-    currentCash: monthlyCashFlows[monthlyCashFlows.length - 1]?.endingCash || currentCash,
+    currentCash,
     scenarios: {
       optimistic: {
         burnRate: Math.round(optimisticBurnRate),
-        runwayMonths: Math.round(optimisticRunway * 10) / 10,
+        runwayMonths: optimisticRunway === Infinity ? 999 : Math.round(optimisticRunway * 10) / 10,
       },
       realistic: {
         burnRate: Math.round(realisticBurnRate),
-        runwayMonths: Math.round(realisticRunway * 10) / 10,
+        runwayMonths: runwayMonths === Infinity ? 999 : Math.round(runwayMonths * 10) / 10,
       },
       pessimistic: {
         burnRate: Math.round(pessimisticBurnRate),
-        runwayMonths: Math.round(pessimisticRunway * 10) / 10,
+        runwayMonths:
+          pessimisticRunway === Infinity ? 999 : Math.round(pessimisticRunway * 10) / 10,
       },
+    },
+    calculationBasis: {
+      avgMonthlyNetCashFlow: Math.round(avgMonthlyNetCashFlow),
+      dataPoints: monthlyCashFlows.length,
+      adjustmentReasons: options.adjustmentReasons,
     },
   }
 }
 
-function calculateAverageMonthlyRevenue(cashFlows: CashFlowStatement[]): number {
-  if (cashFlows.length === 0) return 0
-
-  const revenues = cashFlows.map((cf) => {
-    const op = cf.operatingActivities
-    if (!op) return 0
-    let revenue = 0
-    if (op.netIncome > 0) revenue += op.netIncome
-    if (op.increaseInReceivables > 0) revenue += op.increaseInReceivables
-    if (op.increaseInPayables > 0) revenue += op.increaseInPayables
-    return revenue
-  })
-
-  return sumValues(revenues) / revenues.length
+function createEmptyRunwayResult(currentCash: number): RunwayCalculation {
+  return {
+    monthlyBurnRate: 0,
+    runwayMonths: 999,
+    zeroCashDate: new Date('9999-12-31'),
+    currentCash,
+    scenarios: {
+      optimistic: { burnRate: 0, runwayMonths: 999 },
+      realistic: { burnRate: 0, runwayMonths: 999 },
+      pessimistic: { burnRate: 0, runwayMonths: 999 },
+    },
+    calculationBasis: {
+      avgMonthlyNetCashFlow: 0,
+      dataPoints: 0,
+    },
+  }
 }
 
-function calculateAverageMonthlyExpenses(cashFlows: CashFlowStatement[]): number {
-  if (cashFlows.length === 0) return 0
+function validateAndApplyAdjustments(
+  adjustments?: RunwayCalculationOptions['scenarioAdjustments'],
+  reasons?: RunwayCalculationOptions['adjustmentReasons']
+): { optimistic: number; realistic: number; pessimistic: number } {
+  const defaultAdjustments = {
+    optimistic: 1.0,
+    realistic: 1.0,
+    pessimistic: 1.0,
+  }
 
-  const expenses = cashFlows.map((cf) => {
-    const op = cf.operatingActivities
-    let expense = 0
-    if (op) {
-      if (op.netIncome < 0) expense += Math.abs(op.netIncome)
-      if (op.increaseInReceivables < 0) expense += Math.abs(op.increaseInReceivables)
-      if (op.decreaseInInventory < 0) expense += Math.abs(op.decreaseInInventory)
-      if (op.increaseInPayables < 0) expense += Math.abs(op.increaseInPayables)
-    }
+  if (!adjustments) {
+    return defaultAdjustments
+  }
 
-    expense += Math.abs(cf.investingActivities?.purchaseOfFixedAssets ?? 0)
-    expense += Math.abs(cf.financingActivities?.repaymentOfBorrowing ?? 0)
-    expense += Math.abs(cf.financingActivities?.dividendPaid ?? 0)
+  let optimistic = adjustments.optimistic
+  let pessimistic = adjustments.pessimistic
 
-    return expense
-  })
+  if (optimistic !== 1.0 && !reasons?.optimistic) {
+    console.warn('Optimistic adjustment without reason - using default 1.0')
+    optimistic = 1.0
+  }
 
-  return sumValues(expenses) / expenses.length
+  if (pessimistic !== 1.0 && !reasons?.pessimistic) {
+    console.warn('Pessimistic adjustment without reason - using default 1.0')
+    pessimistic = 1.0
+  }
+
+  return {
+    optimistic: Math.max(0.5, Math.min(2.0, optimistic)),
+    realistic: 1.0,
+    pessimistic: Math.max(0.5, Math.min(2.0, pessimistic)),
+  }
 }
 
 export interface RunwayAlert {

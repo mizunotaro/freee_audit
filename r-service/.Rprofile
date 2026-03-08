@@ -1,0 +1,4 @@
+options(
+  repos = c(CRAN = "https://cloud.r-project.org"),
+  renv.settings.snapshot.type = "all"
+)

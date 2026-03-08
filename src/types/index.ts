@@ -1,6 +1,9 @@
 export * from './journal'
 export * from './audit'
 export * from './conversion'
+export * from './result'
+export type { AccountingStandardConfig } from './accounting-standard'
+export { ACCOUNTING_STANDARD_CONFIGS, getAccountingStandardConfig } from './accounting-standard'
 
 export interface User {
   id: string
@@ -114,6 +117,8 @@ export interface CashFlowStatement {
   operatingActivities?: {
     netIncome: number
     depreciation: number
+    amortization: number
+    deferredTaxChange: number
     increaseInReceivables: number
     decreaseInInventory: number
     increaseInPayables: number
@@ -129,6 +134,7 @@ export interface CashFlowStatement {
     proceedsFromBorrowing: number
     repaymentOfBorrowing: number
     dividendPaid: number
+    interestPaid: number
     netCashFromFinancing: number
   }
   netChangeInCash: number
@@ -171,6 +177,45 @@ export interface RunwayCalculation {
     realistic: { burnRate: number; runwayMonths: number }
     pessimistic: { burnRate: number; runwayMonths: number }
   }
+  calculationBasis?: {
+    avgMonthlyNetCashFlow: number
+    dataPoints: number
+    adjustmentReasons?: {
+      optimistic: string
+      pessimistic: string
+    }
+  }
+}
+
+export type IndustrySector =
+  | 'manufacturing'
+  | 'retail'
+  | 'service'
+  | 'technology'
+  | 'finance'
+  | 'real_estate'
+  | 'construction'
+  | 'other'
+
+export type CompanySize = 'startup' | 'small' | 'medium' | 'large'
+
+export interface BenchmarkRange {
+  min: number
+  median: number
+  max: number
+}
+
+export interface BenchmarkComparison {
+  metric: string
+  value: number
+  benchmark: BenchmarkRange
+  percentile: number
+  status: 'below_range' | 'below_median' | 'above_median' | 'above_range'
+}
+
+export interface KPIBenchmarkData {
+  sector: IndustrySector
+  comparison: BenchmarkComparison[]
 }
 
 export interface FinancialKPIs {
@@ -204,6 +249,7 @@ export interface FinancialKPIs {
     fcf: number
     fcfMargin: number
   }
+  benchmark?: KPIBenchmarkData
 }
 
 export interface BudgetItem {

@@ -17,7 +17,7 @@ describe('BOJExchangeRateService', () => {
       const date = new Date('2024-01-15')
       const rate = await service.getRate(date, 'JPY', 'USD')
 
-      expect(rate.date).toBeInstanceOf(Date)
+      expect(rate.rateDate).toBeInstanceOf(Date)
       expect(rate.fromCurrency).toBe('JPY')
       expect(rate.toCurrency).toBe('USD')
       expect(rate.rate).toBeGreaterThan(0)
@@ -47,7 +47,7 @@ describe('BOJExchangeRateService', () => {
     it('should return rate for last business day', async () => {
       const rate = await service.getLatestRate('JPY', 'USD')
 
-      expect(rate.date).toBeInstanceOf(Date)
+      expect(rate.rateDate).toBeInstanceOf(Date)
       expect(rate.fromCurrency).toBe('JPY')
       expect(rate.toCurrency).toBe('USD')
       expect(rate.rate).toBeGreaterThan(0)

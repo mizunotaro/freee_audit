@@ -1,6 +1,7 @@
-import { describe, it, expect } from 'vitest'
-import { calculateFinancialKPIs } from '@/services/analytics/financial-kpi'
+import { describe, it, expect, beforeEach } from 'vitest'
+import { calculateFinancialKPIs, INDUSTRY_BENCHMARKS } from '@/services/analytics/financial-kpi'
 import type { BalanceSheet, ProfitLoss, CashFlowStatement } from '@/types'
+import { kpiCache } from '@/lib/cache'
 
 describe('calculateFinancialKPIs', () => {
   const mockBalanceSheet: BalanceSheet = {
@@ -78,6 +79,10 @@ describe('calculateFinancialKPIs', () => {
     beginningCash: 2100000,
     endingCash: 5000000,
   }
+
+  beforeEach(() => {
+    kpiCache.clear()
+  })
 
   describe('profitability', () => {
     it('should calculate ROE correctly', () => {
@@ -181,6 +186,159 @@ describe('calculateFinancialKPIs', () => {
 
       expect(result.fiscalYear).toBe(2024)
       expect(result.month).toBe(12)
+    })
+  })
+
+  describe('Industry Benchmarks', () => {
+    it('should apply manufacturing benchmarks', () => {
+      const result = calculateFinancialKPIs(
+        mockBalanceSheet,
+        mockProfitLoss,
+        mockCashFlow,
+        undefined,
+        {
+          standard: 'JGAAP',
+          sector: 'manufacturing',
+        }
+      )
+
+      expect(result.benchmark).toBeDefined()
+      expect(result.benchmark?.sector).toBe('manufacturing')
+      expect(result.benchmark?.comparison).toBeDefined()
+      expect(result.benchmark?.comparison.length).toBeGreaterThan(0)
+    })
+
+    it('should return zero inventory turnover for service sector', () => {
+      const result = calculateFinancialKPIs(
+        mockBalanceSheet,
+        mockProfitLoss,
+        mockCashFlow,
+        undefined,
+        {
+          sector: 'service',
+        }
+      )
+
+      expect(result.efficiency.inventoryTurnover).toBe(0)
+    })
+
+    it('should return zero inventory turnover for technology sector', () => {
+      const result = calculateFinancialKPIs(
+        mockBalanceSheet,
+        mockProfitLoss,
+        mockCashFlow,
+        undefined,
+        {
+          sector: 'technology',
+        }
+      )
+
+      expect(result.efficiency.inventoryTurnover).toBe(0)
+    })
+
+    it('should return zero inventory turnover for finance sector', () => {
+      const result = calculateFinancialKPIs(
+        mockBalanceSheet,
+        mockProfitLoss,
+        mockCashFlow,
+        undefined,
+        {
+          sector: 'finance',
+        }
+      )
+
+      expect(result.efficiency.inventoryTurnover).toBe(0)
+    })
+
+    it('should calculate percentile within benchmark range', () => {
+      const result = calculateFinancialKPIs(
+        mockBalanceSheet,
+        mockProfitLoss,
+        mockCashFlow,
+        undefined,
+        {
+          sector: 'technology',
+        }
+      )
+
+      const grossMarginComparison = result.benchmark?.comparison.find(
+        (c) => c.metric === '売上総利益率'
+      )
+
+      expect(grossMarginComparison?.percentile).toBeGreaterThanOrEqual(0)
+      expect(grossMarginComparison?.percentile).toBeLessThanOrEqual(100)
+    })
+
+    it('should include correct benchmark values in comparison', () => {
+      const result = calculateFinancialKPIs(
+        mockBalanceSheet,
+        mockProfitLoss,
+        mockCashFlow,
+        undefined,
+        {
+          sector: 'retail',
+        }
+      )
+
+      const grossMarginComparison = result.benchmark?.comparison.find(
+        (c) => c.metric === '売上総利益率'
+      )
+
+      expect(grossMarginComparison?.value).toBe(40)
+      expect(grossMarginComparison?.benchmark.min).toBe(
+        INDUSTRY_BENCHMARKS.retail.grossProfitMargin.min
+      )
+      expect(grossMarginComparison?.benchmark.median).toBe(
+        INDUSTRY_BENCHMARKS.retail.grossProfitMargin.median
+      )
+      expect(grossMarginComparison?.benchmark.max).toBe(
+        INDUSTRY_BENCHMARKS.retail.grossProfitMargin.max
+      )
+    })
+
+    it('should classify status correctly based on benchmark', () => {
+      const result = calculateFinancialKPIs(
+        mockBalanceSheet,
+        mockProfitLoss,
+        mockCashFlow,
+        undefined,
+        {
+          sector: 'technology',
+        }
+      )
+
+      const grossMarginComparison = result.benchmark?.comparison.find(
+        (c) => c.metric === '売上総利益率'
+      )
+
+      expect(grossMarginComparison?.status).toBeDefined()
+      expect(['below_range', 'below_median', 'above_median', 'above_range']).toContain(
+        grossMarginComparison?.status
+      )
+    })
+
+    it('should use other sector as default when no sector specified', () => {
+      const result = calculateFinancialKPIs(mockBalanceSheet, mockProfitLoss, mockCashFlow)
+
+      expect(result.benchmark?.sector).toBe('other')
+    })
+
+    it('should include all four comparison metrics', () => {
+      const result = calculateFinancialKPIs(
+        mockBalanceSheet,
+        mockProfitLoss,
+        mockCashFlow,
+        undefined,
+        {
+          sector: 'manufacturing',
+        }
+      )
+
+      const metrics = result.benchmark?.comparison.map((c) => c.metric)
+      expect(metrics).toContain('売上総利益率')
+      expect(metrics).toContain('営業利益率')
+      expect(metrics).toContain('流動比率')
+      expect(metrics).toContain('D/E比率')
     })
   })
 })

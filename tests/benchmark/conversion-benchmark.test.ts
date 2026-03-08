@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { JournalConverter, getOptimalBatchSize } from '@/services/conversion/journal-converter'
-import type { AccountMapping, ConversionSettings } from '@/types/conversion'
+import type { AccountMapping } from '@/types/conversion'
 
 const PERFORMANCE_THRESHOLD_10K_MS = 30000
 const MEMORY_THRESHOLD_MB = 1024
@@ -26,6 +26,7 @@ function generateMockMappings(count: number): Map<string, AccountMapping> {
     const code = `${String(i).padStart(4, '0')}`
     mappings.set(`D${code}`, {
       id: `mapping-d-${i}`,
+      sourceAccountId: `source-d-${i}`,
       sourceAccountCode: `D${code}`,
       sourceAccountName: `Debit Account ${i}`,
       targetAccountId: `target-${i}`,
@@ -34,12 +35,11 @@ function generateMockMappings(count: number): Map<string, AccountMapping> {
       mappingType: '1to1',
       confidence: 0.9,
       isManualReview: false,
-      conversionRule: null,
-      createdAt: new Date(),
-      updatedAt: new Date(),
+      conversionRule: undefined,
     })
     mappings.set(`C${code}`, {
       id: `mapping-c-${i}`,
+      sourceAccountId: `source-c-${i}`,
       sourceAccountCode: `C${code}`,
       sourceAccountName: `Credit Account ${i}`,
       targetAccountId: `target-${i}`,
@@ -48,9 +48,7 @@ function generateMockMappings(count: number): Map<string, AccountMapping> {
       mappingType: '1to1',
       confidence: 0.9,
       isManualReview: false,
-      conversionRule: null,
-      createdAt: new Date(),
-      updatedAt: new Date(),
+      conversionRule: undefined,
     })
   }
   return mappings
@@ -58,13 +56,6 @@ function generateMockMappings(count: number): Map<string, AccountMapping> {
 
 describe('Conversion Performance', () => {
   let converter: JournalConverter
-  const mockSettings: ConversionSettings = {
-    sourceStandard: 'jp-gaap',
-    targetStandard: 'ifrs',
-    includeFinancialStatements: true,
-    generateAdjustingEntries: true,
-    fiscalYearStartMonth: 4,
-  }
 
   beforeEach(() => {
     converter = new JournalConverter()
@@ -175,13 +166,6 @@ describe('Performance Benchmark - 10,000 Journals', () => {
 
     const journals = generateMockJournals(10000)
     const mappings = generateMockMappings(100)
-    const settings: ConversionSettings = {
-      sourceStandard: 'jp-gaap',
-      targetStandard: 'ifrs',
-      includeFinancialStatements: true,
-      generateAdjustingEntries: true,
-      fiscalYearStartMonth: 4,
-    }
 
     const start = Date.now()
 

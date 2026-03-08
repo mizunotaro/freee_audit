@@ -68,6 +68,10 @@ model Company {
   chartOfAccounts        ChartOfAccount[]
   accountMappings        AccountMapping[]
   conversionProjects     ConversionProject[]
+  foreignTransactions    ForeignCurrencyTransaction[]
+  settings               CompanySettings?
+  receiptDocuments       ReceiptDocument[]
+  journalProposals       JournalProposal[]
   createdAt              DateTime                @default(now()) @map("created_at")
   updatedAt              DateTime                @updatedAt @map("updated_at")
 
@@ -106,6 +110,7 @@ model Journal {
   document       Document?     @relation(fields: [documentId], references: [id])
   auditStatus    String        @default("PENDING") @map("audit_status")
   auditResults   AuditResult[]
+  foreignCurrencyTransactions ForeignCurrencyTransaction[]
   syncedAt       DateTime      @map("synced_at")
   createdAt      DateTime      @default(now()) @map("created_at")
 
@@ -206,19 +211,136 @@ model CashFlow {
   @@map("cash_flows")
 }
 
+model Currency {
+  id            String   @id @default(cuid())
+  code          String   @unique
+  name          String
+  nameJa        String   @map("name_ja")
+  symbol        String
+  decimalPlaces Int      @default(2) @map("decimal_places")
+  sortOrder     Int      @default(0) @map("sort_order")
+  isActive      Boolean  @default(true) @map("is_active")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  foreignTransactions ForeignCurrencyTransaction[]
+
+  @@map("currencies")
+}
+
 model ExchangeRate {
-  id           String         @id @default(cuid())
-  rateDate     DateTime       @map("rate_date")
-  fromCurrency String         @map("from_currency")
-  toCurrency   String         @map("to_currency")
+  id           String   @id @default(cuid())
+  rateDate     DateTime @map("rate_date")
+  fromCurrency String   @map("from_currency")
+  toCurrency   String   @map("to_currency")
   rate         Float
   source       String
+  sourceUrl    String?  @map("source_url")
+  confidence   Float    @default(1.0)
+  isOfficial   Boolean  @default(false) @map("is_official")
   kpis         FinancialKPI[]
-  createdAt    DateTime       @default(now()) @map("created_at")
+  transactionRates    ForeignCurrencyTransaction[] @relation("TransactionRate")
+  settlementRates     ForeignCurrencyTransaction[] @relation("SettlementRate")
+  revaluationRates    ForeignCurrencyTransaction[] @relation("RevaluationRate")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
 
-  @@unique([rateDate, fromCurrency, toCurrency])
+  @@unique([rateDate, fromCurrency, toCurrency, source])
   @@index([rateDate])
+  @@index([toCurrency])
   @@map("exchange_rates")
+}
+
+model ForeignCurrencyTransaction {
+  id                String    @id @default(cuid())
+  companyId         String    @map("company_id")
+  company           Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  transactionDate   DateTime  @map("transaction_date")
+  transactionType   String    @map("transaction_type")
+  currencyCode      String    @map("currency_code")
+  currency          Currency  @relation(fields: [currencyCode], references: [code])
+
+  originalAmount    Float     @map("original_amount")
+  exchangeRateId    String    @map("exchange_rate_id")
+  exchangeRate      ExchangeRate @relation("TransactionRate", fields: [exchangeRateId], references: [id])
+  exchangedAmount   Float     @map("exchanged_amount")
+
+  referenceNumber   String?   @map("reference_number")
+  partnerId         String?   @map("partner_id")
+  partnerName       String?   @map("partner_name")
+  documentId        String?   @map("document_id")
+  description       String?
+
+  settlementDate        DateTime?   @map("settlement_date")
+  settlementRateId      String?     @map("settlement_rate_id")
+  settlementRate        ExchangeRate? @relation("SettlementRate", fields: [settlementRateId], references: [id])
+  settlementAmount      Float?      @map("settlement_amount")
+  exchangeGainLoss      Float?      @map("exchange_gain_loss")
+  exchangeGainLossType  String?     @map("exchange_gain_loss_type")
+
+  revaluationDate       DateTime?   @map("revaluation_date")
+  revaluationRateId     String?     @map("revaluation_rate_id")
+  revaluationRate       ExchangeRate? @relation("RevaluationRate", fields: [revaluationRateId], references: [id])
+  revaluationGainLoss   Float?      @map("revaluation_gain_loss")
+
+  journalId             String?     @map("journal_id")
+  journal               Journal?    @relation(fields: [journalId], references: [id])
+  settlementJournalId   String?     @map("settlement_journal_id")
+  revaluationJournalId  String?     @map("revaluation_journal_id")
+
+  status                String      @default("open")
+
+  createdAt             DateTime    @default(now()) @map("created_at")
+  updatedAt             DateTime    @updatedAt @map("updated_at")
+
+  @@index([companyId, transactionDate])
+  @@index([companyId, status])
+  @@index([companyId, referenceNumber])
+  @@index([companyId, partnerName])
+  @@map("foreign_currency_transactions")
+}
+
+model ExchangeRateFetchLog {
+  id           String   @id @default(cuid())
+  source       String
+  fetchedAt    DateTime @default(now()) @map("fetched_at")
+  rateDate     DateTime @map("rate_date")
+  status       String
+  recordsCount Int      @default(0) @map("records_count")
+  errorMessage String?  @map("error_message")
+  durationMs   Int      @map("duration_ms")
+  retryCount   Int      @default(0) @map("retry_count")
+
+  @@index([source, fetchedAt])
+  @@index([rateDate, status])
+  @@map("exchange_rate_fetch_logs")
+}
+
+model ExchangeRateSettings {
+  id                        String   @id @default(cuid())
+  companyId                 String   @unique @map("company_id")
+
+  slackEnabled              Boolean  @default(false) @map("slack_enabled")
+  slackWebhookUrl           String?  @map("slack_webhook_url")
+  slackChannel              String?  @map("slack_channel")
+  slackNotifyOnFailure      Boolean  @default(true) @map("slack_notify_on_failure")
+  slackNotifyOnSuccess      Boolean  @default(false) @map("slack_notify_on_success")
+
+  emailEnabled              Boolean  @default(false) @map("email_enabled")
+  emailRecipients           String?  @map("email_recipients")
+  emailNotifyOnFailure      Boolean  @default(true) @map("email_notify_on_failure")
+
+  autoFetchEnabled          Boolean  @default(true) @map("auto_fetch_enabled")
+  fetchTime                 String   @default("11:00") @map("fetch_time")
+  retryDelays               String   @default("[300000,900000,3600000]") @map("retry_delays")
+
+  autoRevaluationEnabled    Boolean  @default(true) @map("auto_revaluation_enabled")
+  revaluationMonths         String   @default("[3,12]") @map("revaluation_months")
+
+  createdAt                 DateTime @default(now()) @map("created_at")
+  updatedAt                 DateTime @updatedAt @map("updated_at")
+
+  @@map("exchange_rate_settings")
 }
 
 model FinancialKPI {
@@ -1251,4 +1373,84 @@ model DisclosureRationaleLink {
   @@index([disclosureId])
   @@index([rationaleId])
   @@map("disclosure_rationale_links")
+}
+
+model CompanySettings {
+  id              String   @id @default(cuid())
+  companyId       String   @unique @map("company_id")
+  company         Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  
+  ocrEngine       String   @default("ndlocr") @map("ocr_engine")
+  
+  aiProvider      String?  @map("ai_provider")
+  aiModel         String?  @map("ai_model")
+  aiTemperature   Float?   @map("ai_temperature")
+  aiMaxTokens     Int?     @map("ai_max_tokens")
+  
+  updatedAt       DateTime @updatedAt @map("updated_at")
+  updatedBy       String   @map("updated_by")
+  
+  @@index([companyId])
+  @@map("company_settings")
+}
+
+model ReceiptDocument {
+  id              String   @id @default(cuid())
+  companyId       String   @map("company_id")
+  company         Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  
+  encryptedPath   String   @map("encrypted_path")
+  originalName    String   @map("original_name")
+  contentType     String   @map("content_type")
+  fileSize        Int      @map("file_size")
+  fileHash        String   @map("file_hash")
+  
+  ocrResult       String?  @map("ocr_result")
+  ocrEngine       String?  @map("ocr_engine")
+  ocrConfidence   Float?   @map("ocr_confidence")
+  
+  status          String   @default("uploaded")
+  
+  expiresAt       DateTime? @map("expires_at")
+  deletedAt       DateTime? @map("deleted_at")
+  
+  uploadedBy      String   @map("uploaded_by")
+  uploadedAt      DateTime @default(now()) @map("uploaded_at")
+  lastAccessedAt  DateTime? @map("last_accessed_at")
+  
+  journalProposal JournalProposal?
+  
+  @@index([companyId])
+  @@index([status])
+  @@index([expiresAt])
+  @@index([uploadedAt])
+  @@map("receipt_documents")
+}
+
+model JournalProposal {
+  id              String   @id @default(cuid())
+  companyId       String   @map("company_id")
+  company         Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  
+  documentId      String   @unique @map("document_id")
+  document        ReceiptDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  
+  userContext     String   @map("user_context")
+  
+  proposals       String   @map("proposals")
+  
+  aiProvider      String   @map("ai_provider")
+  aiModel         String   @map("ai_model")
+  
+  status          String   @default("pending")
+  
+  createdBy       String   @map("created_by")
+  createdAt       DateTime @default(now()) @map("created_at")
+  reviewedBy      String?  @map("reviewed_by")
+  reviewedAt      DateTime? @map("reviewed_at")
+  
+  @@index([companyId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("journal_proposals")
 }

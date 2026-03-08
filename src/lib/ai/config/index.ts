@@ -18,6 +18,8 @@ export {
 
 export type {
   AIProviderType,
+  OpenAICompatibleProviderType,
+  OpenAICompatibleConfig,
   ModelConfig,
   ResolvedConfig,
   ConfigSource,

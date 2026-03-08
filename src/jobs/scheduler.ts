@@ -1,6 +1,7 @@
 import cron, { ScheduledTask } from 'node-cron'
 import { runAuditJob } from './audit-job'
 import { syncJournals } from './journal-sync'
+import { fetchExchangeRates } from './exchange-rate-fetch-job'
 import { subDays, subMonths, startOfMonth, endOfMonth, format } from 'date-fns'
 
 type JobHandler = () => Promise<unknown>
@@ -28,6 +29,12 @@ const jobs: ScheduledJob[] = [
     name: 'audit-job',
     schedule: '0 2 * * *',
     handler: () => runAuditJob(),
+    timezone: 'Asia/Tokyo',
+  },
+  {
+    name: 'exchange-rate-fetch',
+    schedule: '0 11 * * 1-5',
+    handler: () => fetchExchangeRates(),
     timezone: 'Asia/Tokyo',
   },
   {

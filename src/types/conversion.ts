@@ -3,11 +3,9 @@
  * Accounting Standard Conversion Type Definitions
  */
 
-/**
- * サポートされる会計基準
- * Supported accounting standards
- */
-export type AccountingStandard = 'JGAAP' | 'USGAAP' | 'IFRS'
+import type { AccountingStandard } from './accounting-standard'
+
+export type { AccountingStandard }
 
 /**
  * 会計基準の詳細情報

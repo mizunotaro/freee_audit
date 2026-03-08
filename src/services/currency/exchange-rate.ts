@@ -1,4 +1,10 @@
-import { ExchangeRate, ExchangeRateService, ExchangeRateSource, Currency } from './types'
+import {
+  ExchangeRate,
+  ExchangeRateService,
+  ExchangeRateSource,
+  Currency,
+  CurrencyCode,
+} from './types'
 import { exchangeRateCache } from '@/lib/cache'
 
 export class BOJExchangeRateService implements ExchangeRateService {
@@ -9,13 +15,7 @@ export class BOJExchangeRateService implements ExchangeRateService {
 
     const cachedRate = exchangeRateCache.get(cacheKey)
     if (cachedRate !== null) {
-      return {
-        date: new Date(date),
-        fromCurrency: from,
-        toCurrency: to,
-        rate: cachedRate,
-        source: 'BOJ' as ExchangeRateSource,
-      }
+      return this.createExchangeRate(new Date(date), from, to, cachedRate, 'BOJ')
     }
 
     const rate = await this.fetchBOJRate(date, from, to)
@@ -49,17 +49,65 @@ export class BOJExchangeRateService implements ExchangeRateService {
     return rates
   }
 
-  private async fetchBOJRate(date: Date, from: Currency, to: Currency): Promise<ExchangeRate> {
-    // BOJ API integration (actual implementation would use real API)
-    // This is a placeholder that returns mock data
-    const mockRate = this.getMockRate(date)
+  async getRatesInRange(
+    startDate: Date,
+    endDate: Date,
+    from: CurrencyCode,
+    to: CurrencyCode
+  ): Promise<ExchangeRate[]> {
+    const rates: ExchangeRate[] = []
+    const date = new Date(startDate)
 
+    while (date <= endDate) {
+      if (this.isBusinessDay(date)) {
+        try {
+          const rate = await this.getRate(new Date(date), from as Currency, to as Currency)
+          rates.push(rate)
+        } catch {
+          // Skip holidays/weekends without data
+        }
+      }
+      date.setDate(date.getDate() + 1)
+    }
+
+    return rates
+  }
+
+  async saveRate(
+    rate: Omit<ExchangeRate, 'id' | 'createdAt' | 'updatedAt'>
+  ): Promise<ExchangeRate> {
     return {
-      date: new Date(date),
-      fromCurrency: from,
-      toCurrency: to,
-      rate: mockRate,
-      source: 'BOJ' as ExchangeRateSource,
+      id: `rate-${Date.now()}`,
+      ...rate,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    }
+  }
+
+  private async fetchBOJRate(date: Date, from: Currency, to: Currency): Promise<ExchangeRate> {
+    const mockRate = this.getMockRate(date)
+    return this.createExchangeRate(new Date(date), from, to, mockRate, 'BOJ')
+  }
+
+  private createExchangeRate(
+    date: Date,
+    fromCurrency: string,
+    toCurrency: string,
+    rate: number,
+    source: ExchangeRateSource
+  ): ExchangeRate {
+    return {
+      id: `rate-${date.toISOString()}-${fromCurrency}-${toCurrency}`,
+      rateDate: new Date(date),
+      fromCurrency,
+      toCurrency,
+      rate,
+      source,
+      sourceUrl: null,
+      confidence: source === 'BOJ' ? 1.0 : 0.9,
+      isOfficial: source === 'BOJ',
+      createdAt: new Date(),
+      updatedAt: new Date(),
     }
   }
 
@@ -91,8 +139,10 @@ export function createExchangeRateService(source: ExchangeRateSource = 'BOJ'): E
     case 'BOJ':
       return new BOJExchangeRateService()
     case 'ECB':
-      // Placeholder for ECB implementation
-      throw new Error('ECB exchange rate service not implemented')
+    case 'MURC':
+    case 'OPEN_EXCHANGE':
+    case 'MANUAL':
+      throw new Error(`${source} exchange rate service not implemented`)
     default:
       return new BOJExchangeRateService()
   }

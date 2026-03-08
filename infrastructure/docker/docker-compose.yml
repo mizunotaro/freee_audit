@@ -14,15 +14,25 @@ services:
       - NEXTAUTH_URL=${NEXTAUTH_URL:-http://localhost:3000}
       - JWT_SECRET=${JWT_SECRET:-change-me-in-production}
       - ENCRYPTION_KEY=${ENCRYPTION_KEY:-0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef}
+      - PYTHON_SERVICE_URL=http://python-service:8000
+      - R_SERVICE_URL=http://r-service:8001
     volumes:
       - app-data:/app/data
     restart: unless-stopped
     healthcheck:
-      test: ['CMD', 'wget', '--no-verbose', '--tries=1', '--spider', 'http://localhost:3000/api/health']
+      test:
+        ['CMD', 'wget', '--no-verbose', '--tries=1', '--spider', 'http://localhost:3000/api/health']
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 40s
+    depends_on:
+      python-service:
+        condition: service_healthy
+      r-service:
+        condition: service_healthy
+    networks:
+      - calculation-network
 
   app-dev:
     build:
@@ -38,6 +48,8 @@ services:
       - JWT_SECRET=dev-jwt-secret
       - ENCRYPTION_KEY=0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
       - FREEE_MOCK_MODE=true
+      - PYTHON_SERVICE_URL=http://python-service:8000
+      - R_SERVICE_URL=http://r-service:8001
     volumes:
       - ../..:/app
       - /app/node_modules
@@ -45,6 +57,45 @@ services:
     command: pnpm dev
     profiles:
       - dev
+    depends_on:
+      - python-service
+      - r-service
+    networks:
+      - calculation-network
+
+  python-service:
+    build:
+      context: ../../python-service
+      dockerfile: Dockerfile
+    ports:
+      - '8000:8000'
+    networks:
+      - calculation-network
+    healthcheck:
+      test: ['CMD', 'curl', '-f', 'http://localhost:8000/health']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+
+  r-service:
+    build:
+      context: ../../r-service
+      dockerfile: Dockerfile
+    ports:
+      - '8001:8001'
+    networks:
+      - calculation-network
+    healthcheck:
+      test: ['CMD', 'curl', '-f', 'http://localhost:8001/health']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
 
 volumes:
   app-data:
+
+networks:
+  calculation-network:
+    driver: bridge

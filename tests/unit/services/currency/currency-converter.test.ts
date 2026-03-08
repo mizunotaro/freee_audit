@@ -13,11 +13,17 @@ describe('DefaultCurrencyConverter', () => {
   let mockRateService: ExchangeRateService
 
   const mockRate: ExchangeRate = {
-    date: new Date('2024-01-15'),
+    id: 'rate-1',
+    rateDate: new Date('2024-01-15'),
     fromCurrency: 'JPY',
     toCurrency: 'USD',
     rate: 149.5,
     source: 'BOJ',
+    sourceUrl: null,
+    confidence: 1.0,
+    isOfficial: true,
+    createdAt: new Date(),
+    updatedAt: new Date(),
   }
 
   beforeEach(() => {
@@ -25,6 +31,8 @@ describe('DefaultCurrencyConverter', () => {
       getRate: vi.fn().mockResolvedValue(mockRate),
       getLatestRate: vi.fn().mockResolvedValue(mockRate),
       getMonthlyRates: vi.fn().mockResolvedValue([mockRate]),
+      getRatesInRange: vi.fn().mockResolvedValue([mockRate]),
+      saveRate: vi.fn().mockResolvedValue(mockRate),
     }
     converter = new DefaultCurrencyConverter(mockRateService)
     vi.clearAllMocks()
@@ -51,11 +59,17 @@ describe('DefaultCurrencyConverter', () => {
 
     it('should convert USD to JPY correctly', () => {
       const usdToJpyRate: ExchangeRate = {
-        date: new Date('2024-01-15'),
+        id: 'rate-2',
+        rateDate: new Date('2024-01-15'),
         fromCurrency: 'JPY',
         toCurrency: 'USD',
         rate: 149.5,
         source: 'BOJ',
+        sourceUrl: null,
+        confidence: 1.0,
+        isOfficial: true,
+        createdAt: new Date(),
+        updatedAt: new Date(),
       }
 
       const result = converter.convert(100, 'USD', 'JPY', usdToJpyRate)
@@ -68,11 +82,17 @@ describe('DefaultCurrencyConverter', () => {
 
     it('should throw error for incompatible currency pair', () => {
       const incompatibleRate: ExchangeRate = {
-        date: new Date('2024-01-15'),
+        id: 'rate-3',
+        rateDate: new Date('2024-01-15'),
         fromCurrency: 'EUR' as Currency,
         toCurrency: 'GBP' as Currency,
         rate: 1.2,
         source: 'BOJ',
+        sourceUrl: null,
+        confidence: 1.0,
+        isOfficial: true,
+        createdAt: new Date(),
+        updatedAt: new Date(),
       }
 
       expect(() => converter.convert(100, 'JPY', 'USD', incompatibleRate)).toThrow()
@@ -115,6 +135,8 @@ describe('createCurrencyConverter', () => {
       getRate: vi.fn(),
       getLatestRate: vi.fn(),
       getMonthlyRates: vi.fn(),
+      getRatesInRange: vi.fn(),
+      saveRate: vi.fn(),
     }
 
     const converter = createCurrencyConverter(mockService)

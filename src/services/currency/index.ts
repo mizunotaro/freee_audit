@@ -19,3 +19,9 @@ export {
   formatDualCurrency,
   formatCurrency,
 } from './currency-converter'
+
+export { BOJRateProvider, createBOJRateProvider } from './providers/boj-rate-provider'
+
+export { ExchangeRateAggregator, exchangeRateService } from './exchange-rate-aggregator'
+
+export type { ExchangeRateProvider } from './types'

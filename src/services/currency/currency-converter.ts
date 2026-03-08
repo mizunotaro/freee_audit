@@ -50,17 +50,24 @@ export class DefaultCurrencyConverter implements CurrencyConverter {
     to: Currency
   ): Promise<CurrencyConversion> {
     if (from === to) {
+      const now = new Date()
       return {
         originalAmount: amount,
         originalCurrency: from,
         convertedAmount: amount,
         convertedCurrency: to,
         exchangeRate: {
-          date: new Date(),
+          id: 'same-currency',
+          rateDate: now,
           fromCurrency: from,
           toCurrency: to,
           rate: 1,
           source: 'BOJ',
+          sourceUrl: null,
+          confidence: 1.0,
+          isOfficial: true,
+          createdAt: now,
+          updatedAt: now,
         },
       }
     }

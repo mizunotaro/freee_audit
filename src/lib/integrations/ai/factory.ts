@@ -5,10 +5,16 @@ import { ClaudeProvider, createClaudeProvider } from './claude'
 import { OpenRouterProvider, createOpenRouterProvider } from './openrouter'
 import { MockAIProvider, createMockAIProvider } from './mock'
 import { FallbackAIProvider, FallbackConfig, createFallbackProvider } from './fallback-provider'
+import {
+  OpenAICompatibleProvider,
+  createOpenAICompatibleProvider,
+  OpenAICompatibleProviderConfig,
+} from './openai-compatible'
 import { providerRegistry } from '@/lib/ai/providers/registry'
 import { getModelConfigService } from '@/lib/ai/config/model-config'
 import { apiKeyService } from '@/services/secrets/api-key-service'
-import type { ResolvedConfig } from '@/lib/ai/config/types'
+import { OPENAI_COMPATIBLE_CONFIGS } from '@/lib/ai/config/defaults'
+import type { ResolvedConfig, OpenAICompatibleProviderType } from '@/lib/ai/config/types'
 import './register-providers'
 
 export type { AIProvider, AIProviderType, AIConfig, FallbackConfig }
@@ -20,15 +26,53 @@ export {
   MockAIProvider,
   FallbackAIProvider,
 }
+export { OpenAICompatibleProvider }
 
 const PROVIDER_ENV_MAP: Record<AIProviderType, { keyEnv: string; modelEnv?: string }> = {
   openai: { keyEnv: 'OPENAI_API_KEY', modelEnv: 'OPENAI_MODEL' },
   gemini: { keyEnv: 'GEMINI_API_KEY', modelEnv: 'GEMINI_MODEL' },
   claude: { keyEnv: 'ANTHROPIC_API_KEY', modelEnv: 'CLAUDE_MODEL' },
   openrouter: { keyEnv: 'OPENROUTER_API_KEY', modelEnv: 'OPENROUTER_MODEL' },
+  deepseek: { keyEnv: 'DEEPSEEK_API_KEY', modelEnv: 'DEEPSEEK_MODEL' },
+  kimi: { keyEnv: 'KIMI_API_KEY', modelEnv: 'KIMI_MODEL' },
+  qwen: { keyEnv: 'QWEN_API_KEY', modelEnv: 'QWEN_MODEL' },
+  groq: { keyEnv: 'GROQ_API_KEY', modelEnv: 'GROQ_MODEL' },
+  azure: { keyEnv: 'AZURE_OPENAI_API_KEY', modelEnv: 'AZURE_OPENAI_MODEL' },
+  aws: { keyEnv: 'AWS_ACCESS_KEY_ID', modelEnv: 'AWS_MODEL' },
+  gcp: { keyEnv: 'GOOGLE_CLOUD_API_KEY', modelEnv: 'GCP_MODEL' },
+  freee: { keyEnv: 'FREEE_API_KEY', modelEnv: 'FREEE_MODEL' },
+  custom: { keyEnv: 'CUSTOM_LLM_API_KEY', modelEnv: 'CUSTOM_LLM_MODEL' },
+}
+
+const OPENAI_COMPATIBLE_PROVIDERS: OpenAICompatibleProviderType[] = [
+  'deepseek',
+  'kimi',
+  'qwen',
+  'groq',
+  'custom',
+]
+
+function isOpenAICompatibleProvider(
+  provider: AIProviderType
+): provider is OpenAICompatibleProviderType {
+  return OPENAI_COMPATIBLE_PROVIDERS.includes(provider as OpenAICompatibleProviderType)
 }
 
 export function createAIProvider(config: AIConfig): AIProvider {
+  if (isOpenAICompatibleProvider(config.provider)) {
+    const compatibleConfig = OPENAI_COMPATIBLE_CONFIGS[config.provider]
+    const providerConfig: OpenAICompatibleProviderConfig = {
+      apiKey: config.apiKey,
+      provider: config.provider,
+      baseUrl: compatibleConfig.baseUrl,
+      defaultModel: compatibleConfig.defaultModel,
+      model: config.model,
+      temperature: config.temperature,
+      maxTokens: config.maxTokens,
+    }
+    return createOpenAICompatibleProvider(providerConfig)
+  }
+
   switch (config.provider) {
     case 'openai':
       return createOpenAIProvider(config)
@@ -80,10 +124,22 @@ export function createAIProviderFromEnv(provider?: AIProviderType): AIProvider |
 }
 
 export function createFallbackProviderFromEnv(providersEnv: string): FallbackAIProvider | null {
+  const validProviders: AIProviderType[] = [
+    'openai',
+    'gemini',
+    'claude',
+    'openrouter',
+    'deepseek',
+    'kimi',
+    'qwen',
+    'groq',
+    'custom',
+  ]
+
   const providerNames = providersEnv
     .split(',')
     .map((p) => p.trim().toLowerCase() as AIProviderType)
-    .filter((p) => ['openai', 'gemini', 'claude', 'openrouter'].includes(p))
+    .filter((p) => validProviders.includes(p))
 
   if (providerNames.length === 0) {
     console.warn('[AI] No valid providers specified in AI_PROVIDERS')

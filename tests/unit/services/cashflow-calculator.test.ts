@@ -299,4 +299,96 @@ describe('calculateCashFlow', () => {
       expect(result1.netChangeInCash).toBe(result2.netChangeInCash)
     })
   })
+
+  describe('Accounting Standard Support', () => {
+    it('should apply JGAAP interest classification (separate)', () => {
+      const currentBS = createMockBalanceSheet()
+      const previousBS = createMockBalanceSheet(4000000)
+      const pl = createMockProfitLoss()
+      pl.nonOperatingExpenses = [{ code: 'NE01', name: '支払利息', amount: 100000 }]
+
+      const result = calculateCashFlow(pl, currentBS, previousBS, { standard: 'JGAAP' })
+
+      expect(result.operatingActivities!.netCashFromOperating).toBeDefined()
+      expect(result.operatingActivities!.amortization).toBe(0)
+      expect(result.operatingActivities!.deferredTaxChange).toBe(0)
+    })
+
+    it('should apply IFRS interest classification (financing)', () => {
+      const currentBS = createMockBalanceSheet()
+      const previousBS = createMockBalanceSheet(4000000)
+      const pl = createMockProfitLoss()
+      pl.nonOperatingExpenses = [{ code: 'NE01', name: '支払利息', amount: 100000 }]
+
+      const result = calculateCashFlow(pl, currentBS, previousBS, { standard: 'IFRS' })
+
+      expect(result.operatingActivities).toBeDefined()
+      expect(result.financingActivities).toBeDefined()
+      expect(result.financingActivities!.interestPaid).toBe(100000)
+    })
+
+    it('should apply USGAAP interest classification (operating)', () => {
+      const currentBS = createMockBalanceSheet()
+      const previousBS = createMockBalanceSheet(4000000)
+      const pl = createMockProfitLoss()
+      pl.nonOperatingExpenses = [{ code: 'NE01', name: '支払利息', amount: 100000 }]
+
+      const result = calculateCashFlow(pl, currentBS, previousBS, { standard: 'USGAAP' })
+
+      expect(result.operatingActivities).toBeDefined()
+      expect(result.financingActivities!.interestPaid).toBe(0)
+    })
+
+    it('should handle deferred tax changes', () => {
+      const currentBS = createMockBalanceSheet(5000000, 3000000, 2000000, 2000000)
+      currentBS.assets.current.push({ code: '1500', name: '繰延税金資産', amount: 500000 })
+
+      const previousBS = createMockBalanceSheet(4000000, 3500000, 1800000, 2200000)
+      previousBS.assets.current.push({ code: '1500', name: '繰延税金資産', amount: 300000 })
+
+      const pl = createMockProfitLoss()
+
+      const result = calculateCashFlow(pl, currentBS, previousBS)
+
+      expect(result.operatingActivities!.deferredTaxChange).toBe(-200000)
+    })
+
+    it('should handle deferred tax liability changes', () => {
+      const currentBS = createMockBalanceSheet(5000000, 3000000, 2000000, 2000000)
+      currentBS.liabilities.fixed.push({ code: '4500', name: '繰延税金負債', amount: 400000 })
+
+      const previousBS = createMockBalanceSheet(4000000, 3500000, 1800000, 2200000)
+      previousBS.liabilities.fixed.push({ code: '4500', name: '繰延税金負債', amount: 200000 })
+
+      const pl = createMockProfitLoss()
+
+      const result = calculateCashFlow(pl, currentBS, previousBS)
+
+      expect(result.operatingActivities!.deferredTaxChange).toBe(200000)
+    })
+
+    it('should default to JGAAP when no standard specified', () => {
+      const currentBS = createMockBalanceSheet()
+      const pl = createMockProfitLoss()
+
+      const result = calculateCashFlow(pl, currentBS, null)
+
+      expect(result.operatingActivities!.amortization).toBeDefined()
+      expect(result.operatingActivities!.deferredTaxChange).toBeDefined()
+    })
+
+    it('should allow override of interest classification via options', () => {
+      const currentBS = createMockBalanceSheet()
+      const previousBS = createMockBalanceSheet(4000000)
+      const pl = createMockProfitLoss()
+      pl.nonOperatingExpenses = [{ code: 'NE01', name: '支払利息', amount: 100000 }]
+
+      const result = calculateCashFlow(pl, currentBS, previousBS, {
+        standard: 'JGAAP',
+        interestPaidAsOperating: true,
+      })
+
+      expect(result.financingActivities!.interestPaid).toBe(0)
+    })
+  })
 })

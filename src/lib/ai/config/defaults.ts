@@ -1,10 +1,60 @@
-import type { AIProviderType, ModelConfig } from './types'
+import type { AIProviderType, ModelConfig, OpenAICompatibleProviderType } from './types'
+
+export const OPENAI_COMPATIBLE_CONFIGS: Record<
+  OpenAICompatibleProviderType,
+  {
+    baseUrl: string
+    defaultModel: string
+    apiKeyEnvVar: string
+    modelEnvVar: string
+  }
+> = {
+  deepseek: {
+    baseUrl: 'https://api.deepseek.com/v1',
+    defaultModel: 'deepseek-chat',
+    apiKeyEnvVar: 'DEEPSEEK_API_KEY',
+    modelEnvVar: 'DEEPSEEK_MODEL',
+  },
+  kimi: {
+    baseUrl: 'https://api.moonshot.cn/v1',
+    defaultModel: 'moonshot-v1-8k',
+    apiKeyEnvVar: 'KIMI_API_KEY',
+    modelEnvVar: 'KIMI_MODEL',
+  },
+  qwen: {
+    baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
+    defaultModel: 'qwen-turbo',
+    apiKeyEnvVar: 'QWEN_API_KEY',
+    modelEnvVar: 'QWEN_MODEL',
+  },
+  groq: {
+    baseUrl: 'https://api.groq.com/openai/v1',
+    defaultModel: 'llama-3.3-70b-versatile',
+    apiKeyEnvVar: 'GROQ_API_KEY',
+    modelEnvVar: 'GROQ_MODEL',
+  },
+  custom: {
+    baseUrl: process.env.CUSTOM_LLM_BASE_URL || 'http://localhost:11434/v1',
+    defaultModel: 'custom-model',
+    apiKeyEnvVar: 'CUSTOM_LLM_API_KEY',
+    modelEnvVar: 'CUSTOM_LLM_MODEL',
+  },
+}
 
 export const DEFAULT_MODELS: Record<AIProviderType, string> = {
   openai: 'gpt-5-nano',
   claude: 'claude-sonnet-4-20250514',
   gemini: 'gemini-2.0-flash',
   openrouter: 'openai/gpt-5-nano',
+  deepseek: 'deepseek-chat',
+  kimi: 'moonshot-v1-8k',
+  qwen: 'qwen-turbo',
+  groq: 'llama-3.3-70b-versatile',
+  azure: 'gpt-4o',
+  aws: 'anthropic.claude-3-sonnet-20240229-v1:0',
+  gcp: 'gemini-1.5-pro',
+  freee: 'freee-ai',
+  custom: 'custom-model',
 }
 
 export const DEFAULT_TEMPERATURE = 0.1
@@ -130,6 +180,96 @@ export const MODEL_REGISTRY: ModelConfig[] = [
     pricing: { inputToken: 0.1, outputToken: 0.4 },
     capabilities: { vision: true, tools: true, json: true, streaming: true },
   },
+  {
+    provider: 'deepseek',
+    modelId: 'deepseek-chat',
+    displayName: 'DeepSeek Chat',
+    contextLength: 64000,
+    maxOutputTokens: 4096,
+    pricing: { inputToken: 0.14, outputToken: 0.28 },
+    capabilities: { vision: false, tools: true, json: true, streaming: true },
+  },
+  {
+    provider: 'deepseek',
+    modelId: 'deepseek-reasoner',
+    displayName: 'DeepSeek Reasoner',
+    contextLength: 64000,
+    maxOutputTokens: 8192,
+    pricing: { inputToken: 0.55, outputToken: 2.19 },
+    capabilities: { vision: false, tools: false, json: true, streaming: true },
+  },
+  {
+    provider: 'kimi',
+    modelId: 'moonshot-v1-8k',
+    displayName: 'Kimi (Moonshot) 8K',
+    contextLength: 8192,
+    maxOutputTokens: 4096,
+    pricing: { inputToken: 0.5, outputToken: 0.5 },
+    capabilities: { vision: false, tools: true, json: true, streaming: true },
+  },
+  {
+    provider: 'kimi',
+    modelId: 'moonshot-v1-32k',
+    displayName: 'Kimi (Moonshot) 32K',
+    contextLength: 32768,
+    maxOutputTokens: 4096,
+    pricing: { inputToken: 0.8, outputToken: 0.8 },
+    capabilities: { vision: false, tools: true, json: true, streaming: true },
+  },
+  {
+    provider: 'kimi',
+    modelId: 'moonshot-v1-128k',
+    displayName: 'Kimi (Moonshot) 128K',
+    contextLength: 131072,
+    maxOutputTokens: 4096,
+    pricing: { inputToken: 1.0, outputToken: 1.0 },
+    capabilities: { vision: false, tools: true, json: true, streaming: true },
+  },
+  {
+    provider: 'qwen',
+    modelId: 'qwen-turbo',
+    displayName: 'Qwen Turbo',
+    contextLength: 128000,
+    maxOutputTokens: 6144,
+    pricing: { inputToken: 0.3, outputToken: 0.6 },
+    capabilities: { vision: true, tools: true, json: true, streaming: true },
+  },
+  {
+    provider: 'qwen',
+    modelId: 'qwen-plus',
+    displayName: 'Qwen Plus',
+    contextLength: 128000,
+    maxOutputTokens: 6144,
+    pricing: { inputToken: 0.8, outputToken: 2.0 },
+    capabilities: { vision: true, tools: true, json: true, streaming: true },
+  },
+  {
+    provider: 'qwen',
+    modelId: 'qwen-max',
+    displayName: 'Qwen Max',
+    contextLength: 32768,
+    maxOutputTokens: 8192,
+    pricing: { inputToken: 2.0, outputToken: 6.0 },
+    capabilities: { vision: true, tools: true, json: true, streaming: true },
+  },
+  {
+    provider: 'groq',
+    modelId: 'llama-3.3-70b-versatile',
+    displayName: 'Llama 3.3 70B (Groq)',
+    contextLength: 128000,
+    maxOutputTokens: 8192,
+    pricing: { inputToken: 0.59, outputToken: 0.79 },
+    capabilities: { vision: false, tools: true, json: true, streaming: true },
+  },
+  {
+    provider: 'groq',
+    modelId: 'llama-3.1-8b-instant',
+    displayName: 'Llama 3.1 8B Instant (Groq)',
+    contextLength: 128000,
+    maxOutputTokens: 8192,
+    pricing: { inputToken: 0.05, outputToken: 0.08 },
+    capabilities: { vision: false, tools: true, json: true, streaming: true },
+  },
 ]
 
 export const ENV_KEY_MAP: Record<AIProviderType, { apiKey: string; modelKey: string }> = {
@@ -137,6 +277,15 @@ export const ENV_KEY_MAP: Record<AIProviderType, { apiKey: string; modelKey: str
   claude: { apiKey: 'ANTHROPIC_API_KEY', modelKey: 'CLAUDE_MODEL' },
   gemini: { apiKey: 'GEMINI_API_KEY', modelKey: 'GEMINI_MODEL' },
   openrouter: { apiKey: 'OPENROUTER_API_KEY', modelKey: 'OPENROUTER_MODEL' },
+  deepseek: { apiKey: 'DEEPSEEK_API_KEY', modelKey: 'DEEPSEEK_MODEL' },
+  kimi: { apiKey: 'KIMI_API_KEY', modelKey: 'KIMI_MODEL' },
+  qwen: { apiKey: 'QWEN_API_KEY', modelKey: 'QWEN_MODEL' },
+  groq: { apiKey: 'GROQ_API_KEY', modelKey: 'GROQ_MODEL' },
+  azure: { apiKey: 'AZURE_OPENAI_API_KEY', modelKey: 'AZURE_OPENAI_MODEL' },
+  aws: { apiKey: 'AWS_ACCESS_KEY_ID', modelKey: 'AWS_MODEL' },
+  gcp: { apiKey: 'GOOGLE_CLOUD_API_KEY', modelKey: 'GCP_MODEL' },
+  freee: { apiKey: 'FREEE_API_KEY', modelKey: 'FREEE_MODEL' },
+  custom: { apiKey: 'CUSTOM_LLM_API_KEY', modelKey: 'CUSTOM_LLM_MODEL' },
 }
 
 export function getDefaultModel(provider: AIProviderType): string {
@@ -163,7 +312,22 @@ export function getModelsByProvider(provider: AIProviderType): ModelConfig[] {
 }
 
 export function isValidProvider(provider: string): provider is AIProviderType {
-  return ['openai', 'claude', 'gemini', 'openrouter'].includes(provider)
+  const validProviders: AIProviderType[] = [
+    'openai',
+    'claude',
+    'gemini',
+    'openrouter',
+    'deepseek',
+    'kimi',
+    'qwen',
+    'groq',
+    'azure',
+    'aws',
+    'gcp',
+    'freee',
+    'custom',
+  ]
+  return validProviders.includes(provider as AIProviderType)
 }
 
 export function sanitizeModelId(modelId: string): string {

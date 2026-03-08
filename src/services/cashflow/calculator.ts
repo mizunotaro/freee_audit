@@ -1,13 +1,77 @@
 import type { BalanceSheet, ProfitLoss, CashFlowStatement } from '@/types'
+import type { AccountingStandard } from '@/types/accounting-standard'
+import { getAccountingStandardConfig } from '@/types/accounting-standard'
 
+export interface CashFlowCalculationOptions {
+  standard?: AccountingStandard
+  includeDeferredTax?: boolean
+  interestPaidAsOperating?: boolean
+}
+
+interface OperatingActivities {
+  netIncome: number
+  depreciation: number
+  amortization: number
+  deferredTaxChange: number
+  increaseInReceivables: number
+  decreaseInInventory: number
+  increaseInPayables: number
+  otherNonCash: number
+  netCashFromOperating: number
+}
+
+interface InvestingActivities {
+  purchaseOfFixedAssets: number
+  saleOfFixedAssets: number
+  netCashFromInvesting: number
+}
+
+interface FinancingActivities {
+  proceedsFromBorrowing: number
+  repaymentOfBorrowing: number
+  dividendPaid: number
+  interestPaid: number
+  netCashFromFinancing: number
+}
+
+/**
+ * キャッシュフロー計算書を間接法で作成する
+ *
+ * @param pl - 損益計算書
+ * @param currentBS - 当期末貸借対照表
+ * @param previousBS - 前期末貸借対照表（nullの場合は期首0として計算）
+ * @param options - 計算オプション（会計基準等）
+ * @returns キャッシュフロー計算書
+ *
+ * @example
+ * ```typescript
+ * const cf = calculateCashFlow(pl, currentBS, previousBS, { standard: 'JGAAP' })
+ * ```
+ *
+ * @remarks
+ * - JGAAP: 利息は営業外（財務CFに含まない）
+ * - USGAAP: 利息は営業活動
+ * - IFRS: 利息は財務活動
+ */
 export function calculateCashFlow(
   pl: ProfitLoss,
   currentBS: BalanceSheet,
-  previousBS: BalanceSheet | null
+  previousBS: BalanceSheet | null,
+  options: CashFlowCalculationOptions = {}
 ): CashFlowStatement {
-  const operatingActivities = calculateOperatingCF(pl, currentBS, previousBS)
+  const standard = options.standard ?? 'JGAAP'
+  const config = getAccountingStandardConfig(standard)
+
+  const interestAsOperating =
+    options.interestPaidAsOperating ?? config.cashFlow.interestClassification === 'operating'
+
+  const operatingActivities = calculateOperatingCF(pl, currentBS, previousBS, standard, {
+    interestAsOperating,
+  })
   const investingActivities = calculateInvestingCF(currentBS, previousBS)
-  const financingActivities = calculateFinancingCF(currentBS, previousBS)
+  const financingActivities = calculateFinancingCF(currentBS, previousBS, pl, {
+    interestAsOperating,
+  })
 
   const netChangeInCash =
     operatingActivities.netCashFromOperating +
@@ -29,36 +93,16 @@ export function calculateCashFlow(
   }
 }
 
-interface OperatingActivities {
-  netIncome: number
-  depreciation: number
-  increaseInReceivables: number
-  decreaseInInventory: number
-  increaseInPayables: number
-  otherNonCash: number
-  netCashFromOperating: number
-}
-
-interface InvestingActivities {
-  purchaseOfFixedAssets: number
-  saleOfFixedAssets: number
-  netCashFromInvesting: number
-}
-
-interface FinancingActivities {
-  proceedsFromBorrowing: number
-  repaymentOfBorrowing: number
-  dividendPaid: number
-  netCashFromFinancing: number
-}
-
 function calculateOperatingCF(
   pl: ProfitLoss,
   currentBS: BalanceSheet,
-  previousBS: BalanceSheet | null
+  previousBS: BalanceSheet | null,
+  _standard: AccountingStandard,
+  options: { interestAsOperating: boolean }
 ): OperatingActivities {
   const netIncome = pl.netIncome
   const depreciation = pl.depreciation || 0
+  const amortization = 0
 
   const currentReceivables = getTotalReceivables(currentBS)
   const previousReceivables = previousBS ? getTotalReceivables(previousBS) : 0
@@ -72,25 +116,66 @@ function calculateOperatingCF(
   const previousPayables = previousBS ? getTotalPayables(previousBS) : 0
   const increaseInPayables = currentPayables - previousPayables
 
+  const deferredTaxChange = calculateDeferredTaxChange(currentBS, previousBS)
+
   const otherNonCash = calculateOtherNonCashItems(pl, currentBS, previousBS)
+
+  let interestAdjustment = 0
+  if (!options.interestAsOperating) {
+    const interestExpense = getInterestExpense(pl)
+    interestAdjustment = interestExpense
+  }
 
   const netCashFromOperating =
     netIncome +
     depreciation +
+    amortization +
+    deferredTaxChange +
     increaseInReceivables +
     decreaseInInventory +
     increaseInPayables +
-    otherNonCash
+    otherNonCash +
+    interestAdjustment
 
   return {
     netIncome,
     depreciation,
+    amortization,
+    deferredTaxChange,
     increaseInReceivables,
     decreaseInInventory,
     increaseInPayables,
     otherNonCash,
     netCashFromOperating,
   }
+}
+
+function calculateDeferredTaxChange(
+  currentBS: BalanceSheet,
+  previousBS: BalanceSheet | null
+): number {
+  const currentDeferred = getDeferredTax(currentBS)
+  const previousDeferred = previousBS ? getDeferredTax(previousBS) : 0
+  return previousDeferred - currentDeferred
+}
+
+function getDeferredTax(bs: BalanceSheet): number {
+  const deferredTaxAsset = bs.assets.current
+    .filter((item) => item.name.includes('繰延税金資産'))
+    .reduce((sum, item) => sum + item.amount, 0)
+
+  const deferredTaxLiability = bs.liabilities.current
+    .concat(bs.liabilities.fixed)
+    .filter((item) => item.name.includes('繰延税金負債'))
+    .reduce((sum, item) => sum + item.amount, 0)
+
+  return deferredTaxAsset - deferredTaxLiability
+}
+
+function getInterestExpense(pl: ProfitLoss): number {
+  return pl.nonOperatingExpenses
+    .filter((e) => e.name.includes('支払利息') || e.name.includes('利息'))
+    .reduce((sum, e) => sum + e.amount, 0)
 }
 
 function calculateInvestingCF(
@@ -114,7 +199,9 @@ function calculateInvestingCF(
 
 function calculateFinancingCF(
   currentBS: BalanceSheet,
-  previousBS: BalanceSheet | null
+  previousBS: BalanceSheet | null,
+  pl: ProfitLoss,
+  options: { interestAsOperating: boolean }
 ): FinancingActivities {
   const currentBorrowing = getTotalBorrowing(currentBS)
   const previousBorrowing = previousBS ? getTotalBorrowing(previousBS) : 0
@@ -125,12 +212,19 @@ function calculateFinancingCF(
 
   const dividendPaid = 0
 
-  const netCashFromFinancing = proceedsFromBorrowing - repaymentOfBorrowing - dividendPaid
+  let interestPaid = 0
+  if (!options.interestAsOperating) {
+    interestPaid = getInterestExpense(pl)
+  }
+
+  const netCashFromFinancing =
+    proceedsFromBorrowing - repaymentOfBorrowing - dividendPaid - interestPaid
 
   return {
     proceedsFromBorrowing,
     repaymentOfBorrowing,
     dividendPaid,
+    interestPaid,
     netCashFromFinancing,
   }
 }

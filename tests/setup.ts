@@ -1,4 +1,5 @@
 import { beforeAll, afterAll, vi } from 'vitest'
+import '@testing-library/jest-dom/vitest'
 
 process.env.DATABASE_URL = process.env.TEST_DATABASE_URL || 'file:./test.db'
 process.env.NEXTAUTH_SECRET = 'test-secret-key-for-testing'
@@ -9,6 +10,20 @@ process.env.CSRF_SECRET = 'test-csrf-secret-for-testing-320'
 
 beforeAll(() => {
   ;(process.env as Record<string, string | undefined>).NODE_ENV = 'test'
+
+  Element.prototype.scrollIntoView = vi.fn()
+
+  class MockIntersectionObserver {
+    observe = vi.fn()
+    unobserve = vi.fn()
+    disconnect = vi.fn()
+  }
+
+  Object.defineProperty(globalThis, 'IntersectionObserver', {
+    writable: true,
+    configurable: true,
+    value: MockIntersectionObserver,
+  })
 })
 
 vi.mock('next/navigation', () => ({

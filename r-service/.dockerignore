@@ -1,0 +1,32 @@
+# Docker
+Dockerfile
+.dockerignore
+
+# Git
+.git
+.gitignore
+
+# R
+.Rhistory
+.RData
+.Ruserdata
+.Rprofile
+
+# renv
+renv/
+renv.lock
+
+# IDE
+.vscode/
+.idea/
+
+# Logs
+logs/
+*.log
+
+# Documentation
+README.md
+LICENSE
+
+# Tests (for package build)
+tests/testthat/_snaps/
