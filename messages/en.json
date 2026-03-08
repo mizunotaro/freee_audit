@@ -26,7 +26,21 @@
     "budgets": "Budgets",
     "settings": "Settings",
     "audit": "Audit",
-    "journals": "Journals"
+    "journals": "Journals",
+    "journalProposal": "Journal Proposal AI",
+    "tax": "Tax Management",
+    "socialInsurance": "Social Insurance",
+    "deferredAccrual": "Deferred & Accrual",
+    "kpiSettings": "KPI Settings",
+    "fixedAssets": "Fixed Assets",
+    "closingEntries": "Closing Entries",
+    "expenseAudit": "Expense Audit",
+    "accountingBasis": "Accrual vs Cash Basis",
+    "inventory": "Inventory Management",
+    "periodicReports": "Periodic Reports",
+    "kpi": "KPI",
+    "board": "Board",
+    "businessReport": "Business Report"
   },
   "report": {
     "balanceSheet": "Balance Sheet",
@@ -290,5 +304,116 @@
   "language": {
     "ja": "日本語",
     "en": "English"
+  },
+  "journalProposal": {
+    "title": "Journal Proposal",
+    "description": "Auto-generate journal entries from receipts",
+    "upload": {
+      "title": "Receipt Upload",
+      "dragDrop": "Drag & drop files here",
+      "orClick": "or click to select",
+      "supportedFormats": "Supported: PDF, PNG, JPG (max 10MB)",
+      "uploading": "Uploading...",
+      "processing": "Processing...",
+      "success": "Upload complete",
+      "error": "Upload error"
+    },
+    "ocr": {
+      "title": "OCR Result",
+      "confidence": "Confidence",
+      "rawText": "Extracted Text",
+      "extractedInfo": "Extracted Information",
+      "date": "Date",
+      "vendor": "Vendor",
+      "amount": "Amount",
+      "taxAmount": "Tax Amount",
+      "taxRate": "Tax Rate",
+      "items": "Items",
+      "paymentMethod": "Payment Method",
+      "warnings": "Warnings"
+    },
+    "proposal": {
+      "title": "Journal Proposals",
+      "noProposals": "No proposals available",
+      "selectProposal": "Select a proposal",
+      "rank": "Rank",
+      "confidence": "Confidence",
+      "debit": "Debit",
+      "credit": "Credit",
+      "account": "Account",
+      "amount": "Amount",
+      "taxType": "Tax Type",
+      "taxAmount": "Tax Amount",
+      "description": "Description",
+      "reasoning": {
+        "title": "Reasoning",
+        "accountSelection": "Account Selection",
+        "taxClassification": "Tax Classification",
+        "standardCompliance": "Standard Compliance",
+        "keyAssumptions": "Key Assumptions",
+        "references": "Legal References"
+      },
+      "risk": {
+        "title": "Risk Assessment",
+        "overallRisk": "Overall Risk",
+        "auditRisk": "Audit Risk",
+        "taxRisk": "Tax Risk",
+        "recommendations": "Recommendations",
+        "low": "Low",
+        "medium": "Medium",
+        "high": "High"
+      }
+    },
+    "actions": {
+      "approve": "Approve",
+      "reject": "Reject",
+      "edit": "Edit",
+      "save": "Save",
+      "cancel": "Cancel",
+      "regenerate": "Regenerate",
+      "exportToFreee": "Export to freee",
+      "confirmApprove": "Approve this journal entry?",
+      "confirmReject": "Reject this journal entry?"
+    },
+    "list": {
+      "title": "Journal Proposal List",
+      "filter": "Filter",
+      "status": "Status",
+      "dateRange": "Date Range",
+      "sortBy": "Sort By",
+      "sortDate": "Date",
+      "sortAmount": "Amount",
+      "sortConfidence": "Confidence",
+      "noResults": "No results found",
+      "pagination": {
+        "previous": "Previous",
+        "next": "Next",
+        "showing": "Showing",
+        "of": "of"
+      }
+    },
+    "status": {
+      "draft": "Draft",
+      "pending": "Pending Review",
+      "approved": "Approved",
+      "rejected": "Rejected",
+      "exported": "Exported"
+    },
+    "taxType": {
+      "taxable_10": "Taxable 10%",
+      "taxable_8": "Taxable 8%",
+      "taxable_reduced_8": "Reduced 8%",
+      "tax_exempt": "Tax Exempt",
+      "non_taxable": "Non-Taxable",
+      "zero_tax": "Zero Tax"
+    },
+    "errors": {
+      "uploadFailed": "Failed to upload file",
+      "ocrFailed": "OCR processing failed",
+      "analysisFailed": "Analysis failed",
+      "invalidFileType": "Unsupported file type",
+      "fileTooLarge": "File size too large",
+      "noProposals": "Could not generate journal proposals"
+    }
   }
 }

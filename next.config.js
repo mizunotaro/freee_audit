@@ -14,6 +14,32 @@ const nextConfig = {
     },
   },
 
+  serverExternalPackages: ['tiktoken'],
+
+  webpack: (config, { isServer }) => {
+    if (isServer) {
+      config.externals = config.externals || []
+      if (Array.isArray(config.externals)) {
+        config.externals.push('tiktoken')
+      }
+    }
+
+    config.experiments = {
+      ...config.experiments,
+      asyncWebAssembly: true,
+      layers: true,
+    }
+
+    config.resolve.fallback = {
+      ...config.resolve.fallback,
+      fs: false,
+      path: false,
+      crypto: false,
+    }
+
+    return config
+  },
+
   async headers() {
     return [
       {

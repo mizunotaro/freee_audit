@@ -1,0 +1,59 @@
+{
+  "$schema": "./schemas/models.schema.json",
+  "version": "1.0.0",
+  "primary": {
+    "provider": "zai-coding-plan",
+    "model": "glm-5",
+    "modelId": "zai-coding-plan/glm-5",
+    "displayName": "Z.AI GLM5 (Coding Plan Pro)",
+    "contextLength": 128000,
+    "maxOutputTokens": 4096,
+    "temperature": 0.0,
+    "pricing": {
+      "inputTokens": 0.0,
+      "outputTokens": 0.0,
+      "currency": "JPY"
+    },
+    "capabilities": [
+      "code_generation",
+      "code_review",
+      "refactoring",
+      "debugging",
+      "documentation",
+      "test_generation",
+      "security_audit",
+      "architecture_design"
+    ]
+  },
+  "fallback": {
+    "provider": "zai-coding-plan",
+    "model": "glm-4.6",
+    "modelId": "zai-coding-plan/glm-4.6",
+    "displayName": "Z.AI GLM4.6",
+    "contextLength": 128000,
+    "maxOutputTokens": 4096,
+    "temperature": 0.0,
+    "pricing": {
+      "inputTokens": 0.0,
+      "outputTokens": 0.0,
+      "currency": "JPY"
+    },
+    "capabilities": ["code_generation", "code_review", "debugging"]
+  },
+  "rateLimits": {
+    "maxConcurrent": 2,
+    "requestsPerMinute": 30,
+    "timeWindowHours": 5,
+    "backoffStrategy": {
+      "initialDelaySeconds": 60,
+      "maxDelaySeconds": 300,
+      "multiplier": 2
+    }
+  },
+  "timeouts": {
+    "stepTimeoutMinutes": 20,
+    "apiTimeoutSeconds": 60,
+    "jobTimeoutMinutes": 30,
+    "maxRetries": 3
+  }
+}

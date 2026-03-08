@@ -108,3 +108,32 @@ export interface PersonaError {
 }
 
 export type PersonaResult<T> = { success: true; data: T } | { success: false; error: PersonaError }
+
+export interface PromptVariables {
+  ocrText: string
+  companyContext?: string
+  chartOfAccounts?: string
+  fiscalYearEnd?: number
+  additionalContext?: string
+}
+
+export interface JournalEntry {
+  entryDate: string
+  description: string
+  debitAccount: string
+  debitAccountName: string
+  creditAccount: string
+  creditAccountName: string
+  amount: number
+  taxAmount: number
+  taxType: string
+}
+
+export interface JournalProposalResponse {
+  entries: readonly JournalEntry[]
+  rationale: string
+  confidence: number
+  warnings: readonly string[]
+}
+
+export type PersonaRole = 'cpa' | 'tax_accountant' | 'cfo' | 'financial_analyst'

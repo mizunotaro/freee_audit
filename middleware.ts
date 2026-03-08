@@ -1,7 +1,7 @@
 import createMiddleware from 'next-intl/middleware'
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
-import { validateSession } from '@/lib/auth'
+import { validateSessionEdge } from '@/lib/auth-edge'
 
 const locales = ['ja', 'en'] as const
 const defaultLocale = 'ja'
@@ -33,7 +33,7 @@ export async function middleware(request: NextRequest) {
       return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
     }
 
-    const user = await validateSession(token)
+    const user = await validateSessionEdge(token)
     if (!user) {
       const response = NextResponse.json(
         { success: false, error: 'Invalid or expired session' },
@@ -68,6 +68,14 @@ export async function middleware(request: NextRequest) {
     if (!token) {
       const loginUrl = new URL(`/${localeMatch}/login`, request.url)
       return NextResponse.redirect(loginUrl)
+    }
+
+    const user = await validateSessionEdge(token)
+    if (!user) {
+      const loginUrl = new URL(`/${localeMatch}/login`, request.url)
+      const response = NextResponse.redirect(loginUrl)
+      response.cookies.delete('session')
+      return response
     }
   }
 

@@ -27,6 +27,7 @@
     "settings": "設定",
     "audit": "監査",
     "journals": "仕訳",
+    "journalProposal": "仕訳提案AI",
     "tax": "税金管理",
     "socialInsurance": "社会保険",
     "deferredAccrual": "前払・未払",
@@ -301,5 +302,116 @@
   "language": {
     "ja": "日本語",
     "en": "English"
+  },
+  "journalProposal": {
+    "title": "仕訳提案",
+    "description": "領収書から仕訳を自動生成",
+    "upload": {
+      "title": "領収書アップロード",
+      "dragDrop": "ファイルをドラッグ&ドロップ",
+      "orClick": "またはクリックして選択",
+      "supportedFormats": "対応形式: PDF, PNG, JPG (最大10MB)",
+      "uploading": "アップロード中...",
+      "processing": "処理中...",
+      "success": "アップロード完了",
+      "error": "アップロードエラー"
+    },
+    "ocr": {
+      "title": "OCR結果",
+      "confidence": "信頼度",
+      "rawText": "抽出テキスト",
+      "extractedInfo": "抽出情報",
+      "date": "日付",
+      "vendor": "取引先",
+      "amount": "金額",
+      "taxAmount": "消費税",
+      "taxRate": "税率",
+      "items": "明細",
+      "paymentMethod": "支払方法",
+      "warnings": "警告"
+    },
+    "proposal": {
+      "title": "仕訳提案",
+      "noProposals": "提案がありません",
+      "selectProposal": "提案を選択",
+      "rank": "ランク",
+      "confidence": "確信度",
+      "debit": "借方",
+      "credit": "貸方",
+      "account": "勘定科目",
+      "amount": "金額",
+      "taxType": "税区分",
+      "taxAmount": "税額",
+      "description": "摘要",
+      "reasoning": {
+        "title": "判断根拠",
+        "accountSelection": "勘定科目選択理由",
+        "taxClassification": "税分類",
+        "standardCompliance": "会計基準準拠",
+        "keyAssumptions": "主な前提",
+        "references": "法的根拠"
+      },
+      "risk": {
+        "title": "リスク評価",
+        "overallRisk": "総合リスク",
+        "auditRisk": "監査リスク",
+        "taxRisk": "税務リスク",
+        "recommendations": "推奨事項",
+        "low": "低",
+        "medium": "中",
+        "high": "高"
+      }
+    },
+    "actions": {
+      "approve": "承認",
+      "reject": "却下",
+      "edit": "編集",
+      "save": "保存",
+      "cancel": "キャンセル",
+      "regenerate": "再生成",
+      "exportToFreee": "freeeへ転送",
+      "confirmApprove": "この仕訳を承認しますか？",
+      "confirmReject": "この仕訳を却下しますか？"
+    },
+    "list": {
+      "title": "仕訳提案一覧",
+      "filter": "フィルター",
+      "status": "ステータス",
+      "dateRange": "日付範囲",
+      "sortBy": "並び替え",
+      "sortDate": "日付順",
+      "sortAmount": "金額順",
+      "sortConfidence": "確信度順",
+      "noResults": "結果がありません",
+      "pagination": {
+        "previous": "前へ",
+        "next": "次へ",
+        "showing": "表示中",
+        "of": "/"
+      }
+    },
+    "status": {
+      "draft": "下書き",
+      "pending": "確認待ち",
+      "approved": "承認済み",
+      "rejected": "却下済み",
+      "exported": "転送済み"
+    },
+    "taxType": {
+      "taxable_10": "課税10%",
+      "taxable_8": "課税8%",
+      "taxable_reduced_8": "軽減税率8%",
+      "tax_exempt": "非課税",
+      "non_taxable": "不課税",
+      "zero_tax": "免税"
+    },
+    "errors": {
+      "uploadFailed": "ファイルのアップロードに失敗しました",
+      "ocrFailed": "OCR処理に失敗しました",
+      "analysisFailed": "分析に失敗しました",
+      "invalidFileType": "対応していないファイル形式です",
+      "fileTooLarge": "ファイルサイズが大きすぎます",
+      "noProposals": "仕訳提案を生成できませんでした"
+    }
   }
 }

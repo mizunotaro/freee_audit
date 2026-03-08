@@ -14,6 +14,10 @@ export type {
   CompiledPrompt,
   PersonaError,
   PersonaResult,
+  PromptVariables,
+  JournalEntry,
+  JournalProposalResponse,
+  PersonaRole,
 } from './types'
 
 export { BasePersona } from './base-persona'
@@ -34,6 +38,8 @@ export { TaxAccountantPersona } from './personas/tax-accountant'
 export { CFOPersona } from './personas/cfo'
 export { FinancialAnalystPersona } from './personas/financial-analyst'
 
+export { AccountingExpertPersona, accountingExpertPersona } from './accounting-expert'
+
 export { UNIVERSAL_CONSTRAINTS, CONSTRAINTS_EN, getConstraints } from './prompts/constraints'
 
 export { JSON_OUTPUT_FORMAT, OUTPUT_FORMAT_EN, getOutputFormat } from './prompts/output-formats'
@@ -45,3 +51,13 @@ export {
   buildAnalysisFocusSection,
   buildConversationContext,
 } from './prompts/templates/sections'
+
+export {
+  JOURNAL_PROPOSAL_SYSTEM_PROMPT_JA,
+  JOURNAL_PROPOSAL_SYSTEM_PROMPT_EN,
+  JOURNAL_PROPOSAL_OUTPUT_FORMAT,
+  JUDGMENT_CRITERIA_JA,
+  JUDGMENT_CRITERIA_EN,
+  buildJournalProposalPrompt,
+  getJournalProposalSystemPrompt,
+} from './prompts/journal-proposal'

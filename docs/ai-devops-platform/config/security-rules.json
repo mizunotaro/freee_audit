@@ -1,0 +1,101 @@
+{
+  "$schema": "./schemas/security-rules.schema.json",
+  "version": "1.0.0",
+  "inputValidation": {
+    "maxIssueBodyLength": 10000,
+    "forbiddenPatterns": [
+      "ignore.*instruction",
+      "無視.*指示",
+      "制約.*無視",
+      "constraint.*ignore",
+      "forget.*previous",
+      "忘れ.*前",
+      "出力.*シークレット",
+      "print.*secret",
+      "\\$\\(",
+      "`"
+    ],
+    "sanitizeCommands": ["base64_encode"]
+  },
+  "secretScopes": {
+    "githubToken": {
+      "permissions": ["contents:write", "pull-requests:write", "issues:write"],
+      "forbidden": ["administration:write", "organization:write", "repository:delete"],
+      "description": "Repository-scoped token for PR operations"
+    },
+    "zaiApiKey": {
+      "usage": "model_invocation_only",
+      "logging": false,
+      "environmentOnly": true,
+      "description": "Z.AI API key for LLM invocation"
+    },
+    "orgAdminToken": {
+      "usage": "cross_repository_operations",
+      "logging": false,
+      "environmentOnly": true,
+      "description": "Optional token for multi-repo operations"
+    }
+  },
+  "promptBoundaries": {
+    "userInputSection": "untrusted",
+    "systemInstructionsSection": "trusted",
+    "securityConstraintsSection": "highest_priority",
+    "markerFormat": "base64"
+  },
+  "exclusionRules": {
+    "securityRelated": {
+      "patterns": [
+        "**/auth/**",
+        "**/middleware/auth*",
+        "**/crypto/**",
+        "**/encryption*",
+        ".env*",
+        "**/config/env*",
+        "**/secrets/**",
+        "**/*.pem",
+        "**/*.key"
+      ],
+      "action": "require_human_review",
+      "description": "Security-sensitive files require human review"
+    },
+    "infrastructure": {
+      "patterns": [
+        "prisma/schema.prisma",
+        "**/migrations/**",
+        ".github/workflows/*",
+        "**/Dockerfile*",
+        "**/infra/**",
+        "**/terraform/**",
+        "**/config/**",
+        "*.config.*"
+      ],
+      "action": "require_human_review",
+      "description": "Infrastructure changes require human review"
+    },
+    "breakingChanges": {
+      "patterns": [],
+      "detectionMethods": ["function_signature_change", "interface_deletion", "major_version_bump"],
+      "action": "require_human_review",
+      "description": "Breaking changes require human review"
+    }
+  },
+  "audit": {
+    "logAllPrompts": true,
+    "logAllResponses": false,
+    "retainDays": 30,
+    "sensitiveDataPatterns": [
+      "api[_-]?key",
+      "secret",
+      "password",
+      "token",
+      "credential",
+      "private[_-]?key"
+    ]
+  },
+  "errorHandling": {
+    "rateLimitBehavior": "exponential_backoff",
+    "maxRetryAttempts": 3,
+    "timeoutBehavior": "graceful_shutdown",
+    "unauthorizedBehavior": "immediate_block"
+  }
+}

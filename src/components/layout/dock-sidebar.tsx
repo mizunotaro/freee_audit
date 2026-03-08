@@ -18,6 +18,7 @@ import {
   TrendingUp,
   Users,
   FileText,
+  Sparkles,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
@@ -31,6 +32,13 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { cn } from '@/lib/utils'
 
+interface NavItem {
+  key: string
+  href: string
+  icon: React.ComponentType<{ className?: string }>
+  requiredRole?: string
+}
+
 interface DockSidebarProps {
   user: {
     name: string
@@ -40,9 +48,10 @@ interface DockSidebarProps {
   locale: string
 }
 
-const navItems = [
+const navItems: NavItem[] = [
   { key: 'dashboard', href: '/dashboard', icon: LayoutDashboard },
   { key: 'audit', href: '/audit/journals', icon: FileCheck },
+  { key: 'journalProposal', href: '/journal-proposal', icon: Sparkles, requiredRole: 'ACCOUNTANT' },
   { key: 'reports', href: '/reports', icon: BarChart3 },
   { key: 'periodicReports', href: '/reports/periodic', icon: TrendingUp },
   { key: 'budgets', href: '/budgets', icon: Wallet },
@@ -56,10 +65,18 @@ const navItems = [
   { key: 'settings', href: '/settings', icon: Settings },
 ]
 
+const ROLE_HIERARCHY: Record<string, number> = {
+  VIEWER: 0,
+  ACCOUNTANT: 1,
+  ADMIN: 2,
+  SUPER_ADMIN: 3,
+}
+
 export function DockSidebar({ user, locale }: DockSidebarProps) {
   const t = useTranslations('navigation')
   const pathname = usePathname()
   const [isExpanded, setIsExpanded] = useState(false)
+  const isPinned = false
   const hideTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
   const handleMouseEnter = () => {
@@ -89,6 +106,14 @@ export function DockSidebar({ user, locale }: DockSidebarProps) {
     window.location.href = `/${locale}/login`
   }
 
+  const userRoleLevel = ROLE_HIERARCHY[user.role] ?? 0
+
+  const filteredNavItems = navItems.filter((item) => {
+    if (!item.requiredRole) return true
+    const requiredRoleLevel = ROLE_HIERARCHY[item.requiredRole] ?? 0
+    return userRoleLevel >= requiredRoleLevel
+  })
+
   return (
     <TooltipProvider delayDuration={0}>
       <aside
@@ -112,7 +137,7 @@ export function DockSidebar({ user, locale }: DockSidebarProps) {
         </div>
 
         <nav className="flex-1 overflow-y-auto py-2">
-          {navItems.map((item) => {
+          {filteredNavItems.map((item) => {
             const Icon = item.icon
             const href = `/${locale}${item.href}`
             const isActive = pathname.startsWith(href)

@@ -1,7 +1,22 @@
-import { get_encoding, Tiktoken, TiktokenEncoding } from 'tiktoken'
+import type { Tiktoken, TiktokenEncoding } from 'tiktoken'
 import type { EncodingName } from './encodings'
 import { getEncodingForModel, getTiktokenEncodingName } from './encodings'
 import { calculateCost, getModelContextLength, type CostEstimate } from './cost-calculator'
+
+let get_encoding: ((encoding: TiktokenEncoding) => Tiktoken) | null = null
+
+async function loadTiktoken(): Promise<void> {
+  if (get_encoding) return
+
+  try {
+    const tiktoken = await import('tiktoken')
+    get_encoding = tiktoken.get_encoding
+  } catch (error) {
+    console.warn('[Tokenizer] Failed to load tiktoken, using fallback estimation:', error)
+  }
+}
+
+loadTiktoken().catch(() => {})
 
 export interface TokenCountResult {
   tokens: number
@@ -28,6 +43,10 @@ class TokenizerService {
   private fallbackRatio: number = 4
 
   private getEncoder(encoding: EncodingName): Tiktoken | null {
+    if (!get_encoding) {
+      return null
+    }
+
     const cached = this.encoderCache.get(encoding)
     if (cached) {
       cached.refCount++

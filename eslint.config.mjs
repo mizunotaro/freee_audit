@@ -54,6 +54,13 @@ export default [
   },
   prettier,
   {
-    ignores: ['node_modules/**', '.next/**', 'dist/**', 'coverage/**', 'next.config.js'],
+    ignores: [
+      'node_modules/**',
+      '.next/**',
+      'dist/**',
+      'coverage/**',
+      'next.config.js',
+      'docs/ai-devops-platform/**',
+    ],
   },
 ]

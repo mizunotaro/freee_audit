@@ -19,6 +19,7 @@ import {
   Users,
   FileText,
   ChevronDown,
+  Sparkles,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
@@ -32,6 +33,13 @@ import {
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet'
 import { cn } from '@/lib/utils'
 
+interface NavItem {
+  key: string
+  href: string
+  icon: React.ComponentType<{ className?: string }>
+  requiredRole?: string
+}
+
 interface SidebarProps {
   user: {
     name: string
@@ -41,9 +49,10 @@ interface SidebarProps {
   locale: string
 }
 
-const navItems = [
+const navItems: NavItem[] = [
   { key: 'dashboard', href: '/dashboard', icon: LayoutDashboard },
   { key: 'audit', href: '/audit/journals', icon: FileCheck },
+  { key: 'journalProposal', href: '/journal-proposal', icon: Sparkles, requiredRole: 'ACCOUNTANT' },
   { key: 'reports', href: '/reports', icon: BarChart3 },
   { key: 'periodicReports', href: '/reports/periodic', icon: TrendingUp },
   { key: 'budgets', href: '/budgets', icon: Wallet },
@@ -57,6 +66,13 @@ const navItems = [
   { key: 'settings', href: '/settings', icon: Settings },
 ]
 
+const ROLE_HIERARCHY: Record<string, number> = {
+  VIEWER: 0,
+  ACCOUNTANT: 1,
+  ADMIN: 2,
+  SUPER_ADMIN: 3,
+}
+
 export function Sidebar({ user, locale }: SidebarProps) {
   const t = useTranslations('navigation')
   const pathname = usePathname()
@@ -65,31 +81,41 @@ export function Sidebar({ user, locale }: SidebarProps) {
     window.location.href = `/${locale}/login`
   }
 
-  const NavLinks = () => (
-    <nav className="flex flex-col gap-1">
-      {navItems.map((item) => {
-        const Icon = item.icon
-        const href = `/${locale}${item.href}`
-        const isActive = pathname.startsWith(href)
+  const NavLinks = () => {
+    const userRoleLevel = ROLE_HIERARCHY[user.role] ?? 0
 
-        return (
-          <Link
-            key={item.key}
-            href={href}
-            className={cn(
-              'flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors',
-              isActive
-                ? 'bg-primary text-primary-foreground'
-                : 'text-muted-foreground hover:bg-muted hover:text-foreground'
-            )}
-          >
-            <Icon className="h-4 w-4" />
-            {t(item.key)}
-          </Link>
-        )
-      })}
-    </nav>
-  )
+    return (
+      <nav className="flex flex-col gap-1">
+        {navItems
+          .filter((item) => {
+            if (!item.requiredRole) return true
+            const requiredRoleLevel = ROLE_HIERARCHY[item.requiredRole] ?? 0
+            return userRoleLevel >= requiredRoleLevel
+          })
+          .map((item) => {
+            const Icon = item.icon
+            const href = `/${locale}${item.href}`
+            const isActive = pathname.startsWith(href)
+
+            return (
+              <Link
+                key={item.key}
+                href={href}
+                className={cn(
+                  'flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors',
+                  isActive
+                    ? 'bg-primary text-primary-foreground'
+                    : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                )}
+              >
+                <Icon className="h-4 w-4" />
+                {t(item.key)}
+              </Link>
+            )
+          })}
+      </nav>
+    )
+  }
 
   const UserMenu = () => (
     <DropdownMenu>
