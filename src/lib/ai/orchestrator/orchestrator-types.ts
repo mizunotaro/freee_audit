@@ -59,6 +59,9 @@ export interface OrchestratorRequest {
     readonly maxCost?: number
     readonly maxLatencyMs?: number
     readonly preferredPersonas?: readonly PersonaType[]
+    readonly enableReproducibility?: boolean
+    readonly seed?: number
+    readonly temperature?: number
   }
 }
 

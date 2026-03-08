@@ -2,6 +2,8 @@ import { prisma } from '@/lib/db'
 import OpenAI from 'openai'
 import { getModelConfigService } from '@/lib/ai/config/model-config'
 import { apiKeyService } from '@/services/secrets/api-key-service'
+import { MemoryCache } from '@/lib/cache'
+import crypto from 'crypto'
 import type {
   Result,
   JournalProposalInput,
@@ -12,10 +14,14 @@ import type {
   ProposalStatus,
   AIProposalResponse,
   ChartOfAccountItem,
+  AIGenerationOptions,
 } from './types'
 import { JOURNAL_PROPOSAL_PROMPT as PROMPT } from './prompts/journal-proposal'
 
 const TIMEOUT_MS = 30000
+const CHART_OF_ACCOUNTS_CACHE_TTL_MS = 30 * 60 * 1000
+
+const chartOfAccountsCache = new MemoryCache<ChartOfAccountItem[]>(CHART_OF_ACCOUNTS_CACHE_TTL_MS)
 
 type PrismaWithJournalProposal = typeof prisma & {
   journalProposal: {
@@ -57,7 +63,10 @@ const db = prisma as PrismaWithJournalProposal
 export class JournalProposalService {
   constructor() {}
 
-  async propose(input: JournalProposalInput): Promise<Result<JournalProposalOutput>> {
+  async propose(
+    input: JournalProposalInput,
+    options?: AIGenerationOptions
+  ): Promise<Result<JournalProposalOutput>> {
     try {
       const validationError = this.validateInput(input)
       if (validationError) {
@@ -71,8 +80,14 @@ export class JournalProposalService {
         }
       }
 
-      const chartOfAccounts =
-        input.chartOfAccounts || (await this.getChartOfAccounts(input.companyId))
+      const coaCacheKey = `coa:${input.companyId}`
+      let chartOfAccounts = chartOfAccountsCache.get(coaCacheKey)
+      if (!chartOfAccounts) {
+        chartOfAccounts = input.chartOfAccounts || (await this.getChartOfAccounts(input.companyId))
+        if (chartOfAccounts.length > 0) {
+          chartOfAccountsCache.set(coaCacheKey, chartOfAccounts)
+        }
+      }
 
       if (chartOfAccounts.length === 0) {
         return {
@@ -95,7 +110,11 @@ export class JournalProposalService {
         aiConfig.client,
         aiConfig.model,
         PROMPT.system,
-        userPrompt
+        userPrompt,
+        {
+          seed: options?.enableReproducibility ? this.generateSeed(input) : options?.seed,
+          temperature: options?.temperature,
+        }
       )
 
       const parsedResponse = this.parseAIResponse(aiResponse)
@@ -400,24 +419,38 @@ export class JournalProposalService {
     client: OpenAI,
     model: string,
     systemPrompt: string,
-    userPrompt: string
+    userPrompt: string,
+    options?: { seed?: number; temperature?: number }
   ): Promise<string> {
     const timeoutPromise = new Promise<never>((_, reject) => {
       setTimeout(() => reject(new Error('AI request timeout')), TIMEOUT_MS)
     })
 
-    const aiPromise = client.chat.completions.create({
+    const requestOptions: OpenAI.Chat.ChatCompletionCreateParams = {
       model,
       messages: [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userPrompt },
       ],
       response_format: { type: 'json_object' },
-    })
+      temperature: options?.temperature ?? 0.1,
+    }
+
+    if (options?.seed !== undefined) {
+      requestOptions.seed = options.seed
+    }
+
+    const aiPromise = client.chat.completions.create(requestOptions)
 
     const response = await Promise.race([aiPromise, timeoutPromise])
 
     return response.choices[0]?.message?.content || '{}'
+  }
+
+  private generateSeed(input: JournalProposalInput): number {
+    const rawText = input.ocrResult.success ? input.ocrResult.data?.rawText || '' : ''
+    const hash = crypto.createHash('sha256').update(`${input.receiptId}:${rawText}`).digest()
+    return hash.readInt32BE(0)
   }
 
   private parseAIResponse(responseText: string): AIProposalResponse {

@@ -2,6 +2,12 @@ import type { OCRStructuredData, OCRResult } from '@/types/ocr'
 
 export type Result<T, E = Error> = { success: true; data: T } | { success: false; error: E }
 
+export interface AIGenerationOptions {
+  seed?: number
+  temperature?: number
+  enableReproducibility?: boolean
+}
+
 export interface ChartOfAccountItem {
   id: string
   code: string

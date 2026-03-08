@@ -34,6 +34,23 @@ export interface ProposalListOptions {
   sortDirection?: 'asc' | 'desc'
 }
 
+export interface ManualInputData {
+  date: string
+  vendor: string
+  totalAmount: number
+  taxAmount: number
+  taxRate: number
+  description: string
+  items: Array<{ name: string; amount: number }>
+}
+
+export interface AnalyzeWithManualInputOptions {
+  companyId: string
+  manualData: ManualInputData
+  userId?: string
+  fiscalYear?: number
+}
+
 class JournalProposalApiService {
   private readonly endpoint: string
   private readonly timeout: number
@@ -212,6 +229,99 @@ class JournalProposalApiService {
           'NETWORK_ERROR',
           error instanceof Error ? error.message : 'Network error',
           undefined,
+          error instanceof Error ? error : undefined
+        ),
+      }
+    }
+  }
+
+  async analyzeWithManualInput(
+    options: AnalyzeWithManualInputOptions
+  ): Promise<Result<AnalyzeDocumentResult, AppError>> {
+    const { companyId, manualData, userId, fiscalYear } = options
+
+    if (!companyId) {
+      return {
+        success: false,
+        error: createAppError('AUTHORIZATION_ERROR', 'Company ID is required'),
+      }
+    }
+
+    if (!manualData.date || !manualData.vendor || manualData.totalAmount === undefined) {
+      return {
+        success: false,
+        error: createAppError('VALIDATION_ERROR', 'Date, vendor, and total amount are required'),
+      }
+    }
+
+    try {
+      const response = await fetchWithTimeout(`${this.endpoint}/manual`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          companyId,
+          userId,
+          fiscalYear,
+          manualData,
+        }),
+        timeout: this.timeout,
+      })
+
+      if (!response.ok) {
+        const errorData = await this.safeParseJson(response)
+        return {
+          success: false,
+          error: createAppError(
+            'SERVER_ERROR',
+            this.extractMessage(errorData) || `Server error: ${response.status}`,
+            { statusCode: response.status }
+          ),
+        }
+      }
+
+      const result = await this.safeParseJson(response)
+
+      if (!result || result.success !== true) {
+        return {
+          success: false,
+          error: createAppError(
+            'PARSE_ERROR',
+            this.extractMessage(result) || 'Failed to parse response',
+            { rawResponse: result }
+          ),
+        }
+      }
+
+      const data = result.data as AnalyzeDocumentResult
+      return {
+        success: true,
+        data: {
+          documentId: data.documentId,
+          ocrResult: data.ocrResult,
+          proposals: data.proposals,
+          generatedAt: new Date(data.generatedAt),
+          aiProvider: data.aiProvider,
+          aiModel: data.aiModel,
+        },
+      }
+    } catch (error) {
+      const sanitizedError = sanitizeForLog({
+        error: error instanceof Error ? error.message : String(error),
+        companyId,
+        manualData: {
+          date: manualData.date,
+          vendor: manualData.vendor,
+          totalAmount: manualData.totalAmount,
+        },
+      })
+      console.error('[JournalProposalApi] analyzeWithManualInput error:', sanitizedError)
+
+      return {
+        success: false,
+        error: createAppError(
+          'NETWORK_ERROR',
+          error instanceof Error ? error.message : 'Unknown error occurred',
+          sanitizedError,
           error instanceof Error ? error : undefined
         ),
       }

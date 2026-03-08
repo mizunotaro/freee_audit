@@ -8,11 +8,12 @@ import { ProposalList } from './components/ProposalList'
 import { ProposalCard } from './components/ProposalCard'
 import { ProposalEditor } from './components/ProposalEditor'
 import { ProposalActions } from './components/ProposalActions'
+import { FallbackInput } from './components/FallbackInput'
 import { StatusBadge } from '@/components/journal-proposal'
 import type { ProposalStatus } from '@/components/journal-proposal'
 import type { JournalProposalOutput, JournalProposal } from '@/types/journal-proposal'
 import type { AppError } from '@/lib/journal-proposal'
-import { journalProposalApi } from '@/services/journal-proposal'
+import { journalProposalApi, type ManualInputData } from '@/services/journal-proposal'
 import { JOURNAL_PROPOSAL_CONFIG } from '@/config/journal-proposal'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 
@@ -26,6 +27,8 @@ interface PageState {
   editingProposal: JournalProposal | null
   proposalStatus: ProposalStatus
   error: AppError | null
+  showFallback: boolean
+  ocrError: string | null
 }
 
 const initialState: PageState = {
@@ -36,6 +39,8 @@ const initialState: PageState = {
   editingProposal: null,
   proposalStatus: 'draft',
   error: null,
+  showFallback: false,
+  ocrError: null,
 }
 
 export default function JournalProposalPage() {
@@ -48,7 +53,13 @@ export default function JournalProposalPage() {
   }, [])
 
   const handleUpload = useCallback(async (file: File) => {
-    setState((prev) => ({ ...prev, isProcessing: true, error: null }))
+    setState((prev) => ({
+      ...prev,
+      isProcessing: true,
+      error: null,
+      showFallback: false,
+      ocrError: null,
+    }))
 
     const result = await journalProposalApi.analyzeDocument({
       file,
@@ -58,6 +69,16 @@ export default function JournalProposalPage() {
     })
 
     if (!result.success) {
+      if (result.error.code === 'OCR_FAILED' || result.error.code === 'PARSE_ERROR') {
+        setState((prev) => ({
+          ...prev,
+          isProcessing: false,
+          showFallback: true,
+          ocrError: result.error.message,
+        }))
+        return
+      }
+
       setState((prev) => ({
         ...prev,
         isProcessing: false,
@@ -179,6 +200,35 @@ export default function JournalProposalPage() {
       currentProposal: null,
       editingProposal: null,
       error: null,
+      showFallback: false,
+      ocrError: null,
+    }))
+  }, [])
+
+  const handleFallbackSubmit = useCallback(async (data: ManualInputData) => {
+    setState((prev) => ({ ...prev, isProcessing: true }))
+
+    const result = await journalProposalApi.analyzeWithManualInput({
+      companyId: JOURNAL_PROPOSAL_CONFIG.defaults.companyId,
+      manualData: data,
+    })
+
+    if (!result.success) {
+      setState((prev) => ({
+        ...prev,
+        isProcessing: false,
+        error: result.error,
+      }))
+      return
+    }
+
+    setState((prev) => ({
+      ...prev,
+      isProcessing: false,
+      currentProposal: result.data,
+      showFallback: false,
+      viewMode: 'detail',
+      proposalStatus: 'pending',
     }))
   }, [])
 
@@ -220,6 +270,11 @@ export default function JournalProposalPage() {
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
           <div className="lg:col-span-1">
             <ReceiptUploader onUpload={handleUpload} isProcessing={state.isProcessing} />
+            {state.showFallback && (
+              <div className="mt-4">
+                <FallbackInput onSubmit={handleFallbackSubmit} isProcessing={state.isProcessing} />
+              </div>
+            )}
           </div>
           <div className="lg:col-span-2">
             <ProposalList proposals={mockProposals} onSelectProposal={handleSelectProposal} />

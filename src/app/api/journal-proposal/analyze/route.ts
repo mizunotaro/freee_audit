@@ -217,6 +217,7 @@ async function postHandler(req: AuthenticatedRequest): Promise<NextResponse> {
       constraints: {
         preferredPersonas: ['cpa'],
         maxLatencyMs: ANALYSIS_TIMEOUT_MS,
+        enableReproducibility: process.env.AI_ENABLE_REPRODUCIBILITY === 'true',
       },
     })
 

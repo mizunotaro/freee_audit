@@ -412,6 +412,24 @@
       "invalidFileType": "対応していないファイル形式です",
       "fileTooLarge": "ファイルサイズが大きすぎます",
       "noProposals": "仕訳提案を生成できませんでした"
+    },
+    "fallback": {
+      "title": "手動入力",
+      "description": "OCR処理が失敗しました。以下のフォームに情報を手動入力してください。",
+      "fields": {
+        "date": "日付",
+        "vendor": "取引先",
+        "totalAmount": "金額（税抜）",
+        "taxRate": "税率",
+        "taxAmount": "消費税",
+        "description": "摘要"
+      },
+      "placeholders": {
+        "vendor": "例：株式会社〇〇",
+        "description": "取引内容の詳細を入力"
+      },
+      "submit": "仕訳提案を生成",
+      "submitting": "処理中..."
     }
   }
 }
