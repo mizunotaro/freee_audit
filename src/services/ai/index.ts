@@ -10,6 +10,6 @@ export type {
   ChartOfAccountItem,
 } from './types'
 
-export { JOURNAL_PROPOSAL_PROMPT } from './types'
+export { JOURNAL_PROPOSAL_PROMPT, PROMPT_VERSION } from './prompts/journal-proposal'
 
 export { JournalProposalService, journalProposalService } from './journal-proposal-service'
