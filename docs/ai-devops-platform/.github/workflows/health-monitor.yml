@@ -10,15 +10,14 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
+      contents: read
       issues: write
       actions: write
     env:
       GH_TOKEN: ${{ github.token }}
     steps:
       - name: Checkout
-        uses: actions/checkout@628eae0335e8e7a1ee4935f2a3c9ab5e9c41fe6c
-        with:
-          sparse-checkout: true
+        uses: actions/checkout@v6
 
       - name: Detect Stale Sessions
         id: stale

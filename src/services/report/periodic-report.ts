@@ -332,7 +332,7 @@ function calculatePeriodCF(pl: PeriodPL, bs: PeriodBS, previousBS: PeriodBS | nu
   }
 }
 
-function calculatePeriodKPIs(bs: PeriodBS, pl: PeriodPL, cf: PeriodCF): PeriodKPIs {
+function calculatePeriodKPIs(bs: PeriodBS, pl: PeriodPL, _cf: PeriodCF): PeriodKPIs {
   const roe = bs.equity > 0 ? (pl.netIncome / bs.equity) * 100 : 0
   const roa = bs.totalAssets > 0 ? (pl.netIncome / bs.totalAssets) * 100 : 0
   const grossMargin = pl.revenue > 0 ? (pl.grossProfit / pl.revenue) * 100 : 0

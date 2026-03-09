@@ -36,7 +36,7 @@ jobs:
       enabled_repos: ${{ steps.repos.outputs.enabled_repos }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Check automation
         id: check
@@ -81,7 +81,7 @@ jobs:
       count: ${{ steps.scan.outputs.count }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Scan for tasks
         id: scan
@@ -139,14 +139,14 @@ jobs:
         task: ${{ fromJson(needs.scan.outputs.tasks) }}
     steps:
       - name: Checkout target
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           repository: ${{ matrix.task.repo }}
           token: ${{ secrets.HUB_PAT }}
           fetch-depth: 0
 
       - name: Setup
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: '20'
 

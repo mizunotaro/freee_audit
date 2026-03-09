@@ -144,7 +144,6 @@ class APIKeyService {
     userId?: string
   ): Promise<APIKeyConfig | null> {
     try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const settings = await (prisma as any).settings.findFirst({
         where: {
           userId: userId || undefined,

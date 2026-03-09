@@ -155,7 +155,7 @@ export function useAnalysis(period: FiscalPeriod) {
         error: err instanceof Error ? err.message : 'Unknown error',
       }))
     }
-  }, [period])
+  }, [period, cacheTtlMs])
 
   useEffect(() => {
     fetchData()

@@ -56,7 +56,7 @@ jobs:
       next_action: ${{ steps.output.outputs.next_action }}
     steps:
       - name: Checkout target
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           repository: ${{ inputs.repository }}
           token: ${{ secrets.HUB_PAT }}

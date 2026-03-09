@@ -1,4 +1,3 @@
-import { Journal } from '@prisma/client'
 import { prisma } from '@/lib/db'
 import { InsuranceType } from './schedule-manager'
 

@@ -39,9 +39,7 @@ jobs:
       priority: ${{ steps.select.outputs.priority }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          sparse-checkout: true
+        uses: actions/checkout@v6
 
       - name: Select next task
         id: select

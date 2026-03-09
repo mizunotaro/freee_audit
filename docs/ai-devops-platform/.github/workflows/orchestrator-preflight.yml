@@ -44,9 +44,7 @@ jobs:
       max_concurrency: ${{ steps.schedule.outputs.max_concurrency }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          sparse-checkout: true
+        uses: actions/checkout@v6
 
       - name: Resolve target repository
         id: resolve

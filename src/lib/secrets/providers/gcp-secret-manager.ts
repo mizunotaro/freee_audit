@@ -30,7 +30,6 @@ export class GCPSecretManagerProvider extends BaseSecretProvider {
     try {
       const { SecretManagerServiceClient } = await import('@google-cloud/secret-manager')
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const clientOptions: any = {
         projectId: this.gcpConfig.projectId,
       }
@@ -100,7 +99,6 @@ export class GCPSecretManagerProvider extends BaseSecretProvider {
 
       const [secrets] = await client.listSecrets({ parent, pageSize: 100 })
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       let names = (secrets as any[]).map((s: any) => s.name?.split('/').pop() || '').filter(Boolean)
 
       if (prefix) {

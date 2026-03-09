@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import {
   CONFIG_VERSION,
   DEFAULT_ANALYZER_CONFIG,
@@ -85,6 +85,36 @@ describe('Config', () => {
     it('should use defaults when no env vars set', () => {
       const config = getAnalyzerConfig()
       expect(config.timeout).toBe(DEFAULT_ANALYZER_CONFIG.timeout)
+    })
+
+    describe('with environment variables', () => {
+      let originalEnv: NodeJS.ProcessEnv
+
+      beforeEach(() => {
+        originalEnv = { ...process.env }
+      })
+
+      afterEach(() => {
+        process.env = originalEnv
+      })
+
+      it('should parse valid env var number', () => {
+        process.env.ANALYZER_TIMEOUT = '60000'
+        const config = getAnalyzerConfig()
+        expect(config.timeout).toBe(60000)
+      })
+
+      it('should fallback for invalid env var number', () => {
+        process.env.ANALYZER_TIMEOUT = 'invalid'
+        const config = getAnalyzerConfig()
+        expect(config.timeout).toBe(DEFAULT_ANALYZER_CONFIG.timeout)
+      })
+
+      it('should handle empty string env var', () => {
+        process.env.ANALYZER_TIMEOUT = ''
+        const config = getAnalyzerConfig()
+        expect(config.timeout).toBe(DEFAULT_ANALYZER_CONFIG.timeout)
+      })
     })
   })
 

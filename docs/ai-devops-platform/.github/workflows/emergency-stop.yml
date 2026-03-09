@@ -49,15 +49,14 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@628eae0335e8e7a1ee4935f2a3c9ab5e9c41fe6c
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
       - name: Setup Python
-        uses: actions/setup-python@0a5c61591373683505ea898e09a3ea4f39ef2b9c
+        uses: actions/setup-python@v6
         with:
           python-version: '3.11'
-          cache: 'pip'
 
       - name: Install Dependencies
         run: |
@@ -346,7 +345,7 @@ jobs:
           rm -f "$REPORT_FILE"
 
       - name: Upload Evidence
-        uses: actions/upload-artifact@65c4c4a1ddee5b72f698fdd19549f0f0fb45cf08
+        uses: actions/upload-artifact@v7
         with:
           name: incident-evidence-${{ steps.report.outputs.incident_id }}
           path: |

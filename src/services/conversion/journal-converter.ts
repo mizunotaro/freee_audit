@@ -1,9 +1,7 @@
 import { prisma } from '@/lib/db'
 import { MappingRuleEngine } from './mapping-rule-engine'
-import { conversionCache } from '@/lib/cache/conversion-cache'
 import type {
   AccountMapping,
-  ConversionRule,
   ConversionSettings,
   JournalConversion,
   ConvertedJournalLine,
@@ -52,13 +50,6 @@ interface JournalRecord {
   amount: number
   taxAmount: number
   taxType: string | null
-}
-
-interface MappingWithTarget extends AccountMapping {
-  conversionRule?: ConversionRule
-  targetAccountId: string
-  targetAccountCode: string
-  targetAccountName: string
 }
 
 export class JournalConverter {

@@ -41,9 +41,8 @@ export default function InvestorPortalPage() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ action: 'view_portal' }),
         })
-      } catch (_err) {
+      } catch {
         setError('Failed to authenticate')
-      } finally {
         setIsLoading(false)
       }
     }

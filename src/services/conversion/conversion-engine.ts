@@ -48,7 +48,6 @@ interface AbortControllerEntry {
 }
 
 const CONVERSION_TIMEOUT_MS = 30 * 60 * 1000
-const DEFAULT_BATCH_SIZE = 1000
 
 export class ConversionEngine {
   private journalConverter: JournalConverter

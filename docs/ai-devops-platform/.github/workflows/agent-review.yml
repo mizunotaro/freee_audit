@@ -43,7 +43,7 @@ jobs:
       issues: ${{ steps.evaluate.outputs.issues }}
     steps:
       - name: Checkout target
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           repository: ${{ inputs.repository }}
           token: ${{ secrets.HUB_PAT }}

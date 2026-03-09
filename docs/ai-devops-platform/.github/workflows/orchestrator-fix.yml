@@ -54,7 +54,7 @@ jobs:
 
       - name: Checkout
         if: steps.check.outputs.can_fix == 'true'
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           repository: ${{ inputs.target_repo }}
           token: ${{ github.token }}

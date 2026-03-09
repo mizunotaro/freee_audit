@@ -1,4 +1,4 @@
-import { SocialInsuranceSchedule, SocialInsurancePayment } from '@prisma/client'
+import { SocialInsuranceSchedule } from '@prisma/client'
 import { prisma } from '@/lib/db'
 
 export type InsuranceType = 'health' | 'pension' | 'employment' | 'work_accident' | 'care'
