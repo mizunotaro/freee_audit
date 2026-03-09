@@ -26,15 +26,24 @@ jobs:
 
           THIRTY_MIN_AGO=$(date -u -d '30 minutes ago' +%Y-%m-%dT%H:%M:%SZ)
 
+          # Also check ai:blocked issues - they might be ready for retry after human review
           STALE_ISSUES=$(gh issue list --repo "${{ github.repository }}" \
             --label "ai:in-progress" \
             --state open \
             --json number,updatedAt \
             --jq ".[] | select(.updatedAt < \"$THIRTY_MIN_AGO\") | .number")
 
-          if [ -n "$STALE_ISSUES" ]; then
-            echo "stale_issues=$STALE_ISSUES" >> $GITHUB_OUTPUT
-            for ISSUE in $STALE_ISSUES; do
+          BLOCKED_ISSUES=$(gh issue list --repo "${{ github.repository }}" \
+            --label "ai:blocked" \
+            --state open \
+            --json number,updatedAt \
+            --jq ".[] | select(.updatedAt < \"$THIRTY_MIN_AGO\") | .number")
+
+          ALL_ISSUES="$STALE_ISSUES $BLOCKED_ISSUES"
+
+          if [ -n "$ALL_ISSUES" ]; then
+            echo "stale_issues=$ALL_ISSUES" >> $GITHUB_OUTPUT
+            for ISSUE in $ALL_ISSUES; do
               gh issue comment --repo "${{ github.repository }}" "$ISSUE" \
                 --body "⏰ **Session Timeout Detected** - No activity for 30 minutes. Returning to ai:ready."
               gh issue edit --repo "${{ github.repository }}" "$ISSUE" \
