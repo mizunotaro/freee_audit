@@ -2,7 +2,11 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import type { ApiResponse } from '@/app/api/analysis/types/response'
-import type { FinancialAnalysisOutput } from '@/app/api/analysis/types/output'
+import type {
+  FinancialAnalysisOutput,
+  RatioAnalysisOutput,
+  BenchmarkOutput,
+} from '@/app/api/analysis/types/output'
 
 export interface FiscalPeriod {
   fiscalYear: number
@@ -11,8 +15,8 @@ export interface FiscalPeriod {
 
 export interface AnalysisState {
   financialData: ApiResponse<FinancialAnalysisOutput> | null
-  ratioData: ApiResponse<unknown> | null
-  benchmarkData: ApiResponse<unknown> | null
+  ratioData: ApiResponse<RatioAnalysisOutput> | null
+  benchmarkData: ApiResponse<BenchmarkOutput> | null
   isLoading: boolean
   error: string | null
 }
@@ -28,7 +32,7 @@ export function useAnalysis(period: FiscalPeriod) {
 
   const abortControllerRef = useRef<AbortController | null>(null)
   const cacheRef = useRef<Map<string, { data: unknown; timestamp: number }>>(new Map())
-  const CACHE_TTL_MS = 5 * 60 * 1000
+  const cacheTtlMs = 5 * 60 * 1000
 
   const fetchData = useCallback(async () => {
     if (abortControllerRef.current) {
@@ -41,7 +45,7 @@ export function useAnalysis(period: FiscalPeriod) {
     const cacheKey = `analysis_${period.fiscalYear}_${period.month}`
     const cached = cacheRef.current.get(cacheKey)
 
-    if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
+    if (cached && Date.now() - cached.timestamp < cacheTtlMs) {
       setState({
         financialData: cached.data as ApiResponse<FinancialAnalysisOutput>,
         ratioData: null,

@@ -1,0 +1,294 @@
+name: Agent - PM
+
+on:
+  workflow_call:
+    inputs:
+      repository:
+        description: 'Target repository'
+        required: true
+        type: string
+      issue_number:
+        description: 'Issue number'
+        required: true
+        type: number
+      issue_title:
+        description: 'Issue title'
+        required: true
+        type: string
+      issue_body:
+        description: 'Issue body'
+        required: true
+        type: string
+      action:
+        description: 'PM action: decompose, integrate, or coordinate'
+        required: true
+        type: string
+      session_id:
+        description: 'Session ID'
+        required: true
+        type: string
+      context:
+        description: 'Additional context (JSON)'
+        required: false
+        type: string
+        default: '{}'
+    outputs:
+      subtasks:
+        description: 'Decomposed subtasks (JSON)'
+        value: ${{ jobs.pm.outputs.subtasks }}
+      decision:
+        description: 'PM decision'
+        value: ${{ jobs.pm.outputs.decision }}
+      next_action:
+        description: 'Next recommended action'
+        value: ${{ jobs.pm.outputs.next_action }}
+
+env:
+  ZAI_API_KEY: ${{ secrets.ZAI_API_KEY }}
+
+jobs:
+  pm:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    outputs:
+      subtasks: ${{ steps.output.outputs.subtasks }}
+      decision: ${{ steps.output.outputs.decision }}
+      next_action: ${{ steps.output.outputs.next_action }}
+    steps:
+      - name: Checkout target
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ inputs.repository }}
+          token: ${{ secrets.HUB_PAT }}
+          fetch-depth: 1
+
+      - name: Analyze codebase structure
+        id: analyze
+        run: |
+          echo "### Codebase Analysis" >> $GITHUB_STEP_SUMMARY
+
+          STRUCTURE="{}"
+
+          if [ -f "package.json" ]; then
+            DEPS=$(jq -c '.dependencies // {} | keys' package.json)
+            STRUCTURE=$(echo "$STRUCTURE" | jq --argjson deps "$DEPS" '. + {dependencies: $deps}')
+          fi
+
+          DIRS=$(find . -type d -name "src" -o -name "lib" -o -name "components" -o -name "services" 2>/dev/null | head -20 | jq -R -s -c 'split("\n") | map(select(length > 0))')
+          STRUCTURE=$(echo "$STRUCTURE" | jq --argjson dirs "$DIRS" '. + {directories: $dirs}')
+
+          FILE_COUNT=$(find . -name "*.ts" -o -name "*.tsx" 2>/dev/null | wc -l)
+          STRUCTURE=$(echo "$STRUCTURE" | jq --arg count "$FILE_COUNT" '. + {fileCount: ($count | tonumber)}')
+
+          echo "structure=$STRUCTURE" >> $GITHUB_OUTPUT
+          echo "- Files: $FILE_COUNT" >> $GITHUB_STEP_SUMMARY
+
+      - name: Run PM Agent
+        id: pm
+        uses: anomalyco/opencode/github@v1.1.44
+        env:
+          ZAI_API_KEY: ${{ secrets.ZAI_API_KEY }}
+        with:
+          model: zai-coding-plan/glm-5
+          agent: pm
+          prompt: |
+            ## PM Task: ${{ inputs.action }}
+
+            ### Issue Information:
+            - **Number:** #${{ inputs.issue_number }}
+            - **Title:** ${{ inputs.issue_title }}
+            - **Body:** 
+            ```
+            ${{ inputs.issue_body }}
+            ```
+
+            ### Codebase Structure:
+            ```json
+            ${{ steps.analyze.outputs.structure }}
+            ```
+
+            ### Context:
+            ```json
+            ${{ inputs.context }}
+            ```
+
+            ### Your Role:
+            You are the PM Agent responsible for task decomposition, quality control, and coordination.
+
+            ---
+
+            ${{ inputs.action == 'decompose' && '
+            ### Task Decomposition Instructions:
+
+            Analyze the issue and decompose it into smaller, manageable subtasks.
+
+            **Rules:**
+            - Maximum 5 subtasks
+            - Each subtask should be completable in a single session
+            - Identify dependencies between subtasks
+            - Mark which subtasks can be parallelized
+            - Ensure each subtask has clear acceptance criteria
+
+            **Output Format:**
+            ```json
+            {
+              "analysis": "Brief analysis of the original task",
+              "complexity": "low|medium|high",
+              "subtasks": [
+                {
+                  "id": "subtask-1",
+                  "title": "Subtask title",
+                  "description": "Detailed description",
+                  "dependencies": [],
+                  "parallelizable": true,
+                  "estimatedComplexity": "low|medium|high",
+                  "acceptanceCriteria": ["criteria 1", "criteria 2"]
+                }
+              ],
+              "executionPlan": "Recommended execution order",
+              "estimatedSessions": 2
+            }
+            ```
+            ' || '' }}
+
+            ${{ inputs.action == 'integrate' && '
+            ### Integration Instructions:
+
+            Review the completed subtasks and determine if they can be integrated.
+
+            **Output Format:**
+            ```json
+            {
+              "canIntegrate": true|false,
+              "integrationSteps": ["step 1", "step 2"],
+              "risks": ["risk 1", "risk 2"],
+              "recommendation": "proceed|needs_fix|human_review"
+            }
+            ```
+            ' || '' }}
+
+            ${{ inputs.action == 'coordinate' && '
+            ### Coordination Instructions:
+
+            Assess the current state and make coordination decisions.
+
+            **Output Format:**
+            ```json
+            {
+              "currentStatus": "on_track|at_risk|blocked",
+              "blockers": ["blocker 1"],
+              "decisions": [
+                {
+                  "decision": "Decision text",
+                  "rationale": "Why this decision",
+                  "impact": "Impact description"
+                }
+              ],
+              "nextActions": [
+                {
+                  "action": "Action description",
+                  "assignee": "builder|reviewer|recovery|human",
+                  "priority": "high|medium|low"
+                }
+              ]
+            }
+            ```
+            ' || '' }}
+
+            **Important:**
+            - Be objective and data-driven
+            - Consider session limits (max 3 concurrent)
+            - Prioritize tasks that unblock others
+            - Recommend human review when uncertainty is high
+          token: ${{ secrets.HUB_PAT }}
+
+      - name: Parse PM output
+        id: output
+        run: |
+          PM_OUTPUT="${{ steps.pm.outputs.response }}"
+
+          SUBTASKS="[]"
+          DECISION=""
+          NEXT_ACTION=""
+
+          if [ "${{ inputs.action }}" == "decompose" ]; then
+            SUBTASKS=$(echo "$PM_OUTPUT" | jq -c '.subtasks // []')
+            DECISION=$(echo "$PM_OUTPUT" | jq -c '{complexity: .complexity, estimatedSessions: .estimatedSessions}')
+            NEXT_ACTION="execute_subtasks"
+          elif [ "${{ inputs.action }}" == "integrate" ]; then
+            SUBTASKS="[]"
+            DECISION=$(echo "$PM_OUTPUT" | jq -c '{canIntegrate: .canIntegrate, recommendation: .recommendation}')
+            NEXT_ACTION=$(echo "$PM_OUTPUT" | jq -r '.recommendation')
+          elif [ "${{ inputs.action }}" == "coordinate" ]; then
+            SUBTASKS="[]"
+            DECISION=$(echo "$PM_OUTPUT" | jq -c '.decisions // []')
+            NEXT_ACTION=$(echo "$PM_OUTPUT" | jq -r '.nextActions[0].action // "continue"')
+          fi
+
+          echo "subtasks=$SUBTASKS" >> $GITHUB_OUTPUT
+          echo "decision=$DECISION" >> $GITHUB_OUTPUT
+          echo "next_action=$NEXT_ACTION" >> $GITHUB_OUTPUT
+
+          echo "### PM Agent Output" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Action:** ${{ inputs.action }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Next Action:** $NEXT_ACTION" >> $GITHUB_STEP_SUMMARY
+
+      - name: Create subtask issues
+        if: inputs.action == 'decompose' && steps.output.outputs.subtasks != '[]'
+        env:
+          GH_TOKEN: ${{ secrets.HUB_PAT }}
+        run: |
+          SUBTASKS='${{ steps.output.outputs.subtasks }}'
+
+          echo "$SUBTASKS" | jq -c '.[]' | while read subtask; do
+            TITLE=$(echo "$subtask" | jq -r '.title')
+            DESC=$(echo "$subtask" | jq -r '.description')
+            DEPS=$(echo "$subtask" | jq -c '.dependencies')
+            CRITERIA=$(echo "$subtask" | jq -r '.acceptanceCriteria | join("\n- ")')
+            
+            BODY="## Parent Issue
+            #${{ inputs.issue_number }}
+            
+            ## Description
+            $DESC
+            
+            ## Dependencies
+            \`\`\`json
+            $DEPS
+            \`\`\`
+            
+            ## Acceptance Criteria
+            - $CRITERIA
+            
+            ## Session ID
+            ${{ inputs.session_id }}"
+            
+            gh issue create --repo ${{ inputs.repository }} \
+              --title "[Subtask] $TITLE" \
+              --body "$BODY" \
+              --label "ai:ready,ai:subtask" || true
+          done
+
+      - name: Post PM comment
+        env:
+          GH_TOKEN: ${{ secrets.HUB_PAT }}
+        run: |
+          PM_OUTPUT="${{ steps.pm.outputs.response }}"
+
+          cat > pm_comment.md << 'COMMENT_EOF'
+          ## 📋 PM Agent Report
+
+          **Session ID:** ${{ inputs.session_id }}
+          **Action:** ${{ inputs.action }}
+
+          COMMENT_EOF
+
+          if [ "${{ inputs.action }}" == "decompose" ]; then
+            echo "$PM_OUTPUT" | jq -r '.analysis // ""' >> pm_comment.md
+            echo "" >> pm_comment.md
+            echo "### Subtasks Created" >> pm_comment.md
+            echo "$PM_OUTPUT" | jq -r '.subtasks[] | "- **\(.title)** (Complexity: \(.estimatedComplexity))"' >> pm_comment.md
+          fi
+
+          gh issue comment ${{ inputs.issue_number }} --repo ${{ inputs.repository }} --body-file pm_comment.md || true

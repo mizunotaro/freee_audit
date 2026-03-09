@@ -531,8 +531,83 @@ export class ConsoleLogger implements Logger {
  * ログ出力を無効化（本番環境での無駄なログ回避やテスト用）
  */
 export class NoOpLogger implements Logger {
-  debug(): void {}
-  info(): void {}
-  warn(): void {}
-  error(): void {}
+  debug(_message: string, _context?: Partial<LogContext>): void {}
+  info(_message: string, _context?: Partial<LogContext>): void {}
+  warn(_message: string, _context?: Partial<LogContext>): void {}
+  error(_message: string, _context?: Partial<LogContext>): void {}
+}
+
+export interface CacheEntry<T> {
+  data: T
+  timestamp: number
+  ttl: number
+}
+
+export class AnalysisCache<T> {
+  private cache: Map<string, CacheEntry<T>> = new Map()
+
+  constructor(
+    private maxSize: number = 100,
+    private defaultTtl: number = 60000
+  ) {}
+
+  get(key: string): T | undefined {
+    const entry = this.cache.get(key)
+    if (!entry) return undefined
+
+    if (Date.now() - entry.timestamp > entry.ttl) {
+      this.cache.delete(key)
+      return undefined
+    }
+
+    return entry.data
+  }
+
+  set(key: string, data: T, ttl?: number): void {
+    if (this.cache.size >= this.maxSize) {
+      const oldestKey = this.cache.keys().next().value
+      if (oldestKey) {
+        this.cache.delete(oldestKey)
+      }
+    }
+
+    this.cache.set(key, {
+      data,
+      timestamp: Date.now(),
+      ttl: ttl ?? this.defaultTtl,
+    })
+  }
+
+  invalidate(pattern?: RegExp): void {
+    if (!pattern) {
+      this.cache.clear()
+      return
+    }
+
+    for (const key of this.cache.keys()) {
+      if (pattern.test(key)) {
+        this.cache.delete(key)
+      }
+    }
+  }
+
+  size(): number {
+    return this.cache.size
+  }
+}
+
+export async function processParallel<T, R>(
+  items: T[],
+  processor: (item: T) => Promise<R>,
+  concurrency: number = 5
+): Promise<R[]> {
+  const results: R[] = []
+
+  for (let i = 0; i < items.length; i += concurrency) {
+    const batch = items.slice(i, i + concurrency)
+    const batchResults = await Promise.all(batch.map(processor))
+    results.push(...batchResults)
+  }
+
+  return results
 }

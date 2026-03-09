@@ -1,0 +1,363 @@
+name: Agent - Recovery
+
+on:
+  workflow_call:
+    inputs:
+      repository:
+        description: 'Target repository'
+        required: true
+        type: string
+      issue_number:
+        description: 'Issue number'
+        required: true
+        type: number
+      branch:
+        description: 'Branch name'
+        required: true
+        type: string
+      session_id:
+        description: 'Original session ID'
+        required: true
+        type: string
+      failure_context:
+        description: 'Failure context (JSON)'
+        required: true
+        type: string
+      attempt:
+        description: 'Recovery attempt number'
+        required: true
+        type: number
+    outputs:
+      success:
+        description: 'Recovery successful'
+        value: ${{ jobs.recovery.outputs.success }}
+      strategy:
+        description: 'Recovery strategy used'
+        value: ${{ jobs.recovery.outputs.strategy }}
+
+env:
+  ZAI_API_KEY: ${{ secrets.ZAI_API_KEY }}
+
+jobs:
+  recovery:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    outputs:
+      success: ${{ steps.result.outputs.success }}
+      strategy: ${{ steps.result.outputs.strategy }}
+    steps:
+      - name: Checkout target
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ inputs.repository }}
+          token: ${{ secrets.HUB_PAT }}
+          ref: ${{ inputs.branch }}
+          fetch-depth: 0
+
+      - name: Gather failure context
+        id: context
+        run: |
+          echo "### Gathering Failure Context" >> $GITHUB_STEP_SUMMARY
+
+          CONTEXT='${{ inputs.failure_context }}'
+
+          LAST_COMMIT_MSG=$(git log -1 --pretty=%B)
+          CHANGED_FILES=$(git diff --name-only HEAD~1 HEAD 2>/dev/null || echo "")
+          ERROR_LOGS=$(find . -name "*.log" -exec cat {} \; 2>/dev/null | head -100 || echo "")
+
+          echo "last_commit<<EOF" >> $GITHUB_OUTPUT
+          echo "$LAST_COMMIT_MSG" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+          echo "changed_files<<EOF" >> $GITHUB_OUTPUT
+          echo "$CHANGED_FILES" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Analyze failure pattern
+        id: analyze
+        run: |
+          CONTEXT='${{ inputs.failure_context }}'
+
+          FAILURE_TYPE="unknown"
+          ROOT_CAUSE="Unable to determine"
+          SUGGESTED_STRATEGY="retry_with_different_approach"
+
+          TSC_FAIL=$(echo "$CONTEXT" | jq -r '.qualityGates.tsc // "unknown"')
+          ESLINT_FAIL=$(echo "$CONTEXT" | jq -r '.qualityGates.eslint // "unknown"')
+          JEST_FAIL=$(echo "$CONTEXT" | jq -r '.qualityGates.jest // "unknown"')
+          BUILD_FAIL=$(echo "$CONTEXT" | jq -r '.qualityGates.build // "unknown"')
+          ATTEMPTS=$(echo "$CONTEXT" | jq -r '.attempts // 0')
+          ERRORS=$(echo "$CONTEXT" | jq -c '.errors // []')
+
+          if [ "$TSC_FAIL" == "fail" ]; then
+            FAILURE_TYPE="type_error"
+            ROOT_CAUSE="TypeScript compilation errors"
+            SUGGESTED_STRATEGY="fix_type_errors"
+          elif [ "$JEST_FAIL" == "fail" ]; then
+            FAILURE_TYPE="test_failure"
+            ROOT_CAUSE="Unit tests failing"
+            SUGGESTED_STRATEGY="fix_tests"
+          elif [ "$BUILD_FAIL" == "fail" ]; then
+            FAILURE_TYPE="build_failure"
+            ROOT_CAUSE="Build process failed"
+            SUGGESTED_STRATEGY="fix_build"
+          elif [ "$ESLINT_FAIL" == "fail" ]; then
+            FAILURE_TYPE="lint_error"
+            ROOT_CAUSE="ESLint errors"
+            SUGGESTED_STRATEGY="fix_lint"
+          fi
+
+          if [ "$ATTEMPTS" -ge 3 ]; then
+            SUGGESTED_STRATEGY="simplify_task"
+          fi
+
+          echo "failure_type=$FAILURE_TYPE" >> $GITHUB_OUTPUT
+          echo "root_cause=$ROOT_CAUSE" >> $GITHUB_OUTPUT
+          echo "strategy=$SUGGESTED_STRATEGY" >> $GITHUB_OUTPUT
+          echo "errors=$ERRORS" >> $GITHUB_OUTPUT
+
+          echo "- **Failure Type:** $FAILURE_TYPE" >> $GITHUB_STEP_SUMMARY
+          echo "- **Root Cause:** $ROOT_CAUSE" >> $GITHUB_STEP_SUMMARY
+          echo "- **Suggested Strategy:** $SUGGESTED_STRATEGY" >> $GITHUB_STEP_SUMMARY
+
+      - name: Run Recovery Agent
+        id: recovery
+        uses: anomalyco/opencode/github@v1.1.44
+        env:
+          ZAI_API_KEY: ${{ secrets.ZAI_API_KEY }}
+        with:
+          model: zai-coding-plan/glm-5
+          agent: recovery
+          prompt: |
+            ## Recovery Task
+
+            You are the Recovery Agent. Your job is to take over a failed implementation and complete it.
+
+            ### Original Context:
+            - **Issue:** #${{ inputs.issue_number }}
+            - **Branch:** ${{ inputs.branch }}
+            - **Recovery Attempt:** ${{ inputs.attempt }} / 2
+
+            ### Failure Analysis:
+            - **Type:** ${{ steps.analyze.outputs.failure_type }}
+            - **Root Cause:** ${{ steps.analyze.outputs.root_cause }}
+            - **Suggested Strategy:** ${{ steps.analyze.outputs.strategy }}
+
+            ### Previous Errors:
+            ```json
+            ${{ steps.analyze.outputs.errors }}
+            ```
+
+            ### Last Commit:
+            ```
+            ${{ steps.context.outputs.last_commit }}
+            ```
+
+            ### Changed Files:
+            ```
+            ${{ steps.context.outputs.changed_files }}
+            ```
+
+            ### Recovery Strategies:
+
+            1. **fix_type_errors** - Fix TypeScript compilation errors
+               - Analyze type errors
+               - Add proper type definitions
+               - Fix type mismatches
+
+            2. **fix_tests** - Fix failing tests
+               - Analyze test failures
+               - Fix implementation or tests
+               - Ensure test coverage
+
+            3. **fix_build** - Fix build failures
+               - Analyze build errors
+               - Fix configuration issues
+               - Resolve dependencies
+
+            4. **fix_lint** - Fix linting errors
+               - Fix ESLint errors
+               - Apply auto-fixes where possible
+               - Update code style
+
+            5. **simplify_task** - Simplify the implementation
+               - Reduce complexity
+               - Break into smaller pieces
+               - Focus on core functionality
+
+            6. **retry_with_different_approach** - Try alternative implementation
+               - Review original approach
+               - Identify issues
+               - Implement alternative solution
+
+            ### Your Task:
+
+            1. Analyze the failure context
+            2. Choose the best recovery strategy
+            3. Implement the fix
+            4. Ensure all quality gates pass
+
+            **Important:**
+            - Do NOT repeat the same mistakes
+            - If previous approach failed, try a different one
+            - Focus on minimal, working solution
+            - Add comments explaining the fix
+
+            ### Output Format:
+
+            After implementing the fix, provide:
+            ```json
+            {
+              "strategy": "strategy_used",
+              "changes_made": ["change 1", "change 2"],
+              "lessons_learned": ["lesson 1"],
+              "confidence": "high|medium|low"
+            }
+            ```
+          token: ${{ secrets.HUB_PAT }}
+
+      - name: Run quality gates
+        id: quality
+        continue-on-error: true
+        run: |
+          echo "### Quality Gates (Recovery)" >> $GITHUB_STEP_SUMMARY
+
+          if [ -f pnpm-lock.yaml ]; then
+            npm install -g pnpm && pnpm install --frozen-lockfile
+          fi
+
+          TSC="fail"
+          ESLINT="fail"
+          JEST="fail"
+          BUILD="fail"
+
+          if pnpm tsc --noEmit 2>&1; then
+            TSC="pass"
+            echo "✅ tsc: pass" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ tsc: fail" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          if pnpm eslint src/ --max-warnings=0 2>&1; then
+            ESLINT="pass"
+            echo "✅ eslint: pass" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ eslint: fail" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          if pnpm jest --passWithNoTests 2>&1; then
+            JEST="pass"
+            echo "✅ jest: pass" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ jest: fail" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          if pnpm build 2>&1; then
+            BUILD="pass"
+            echo "✅ build: pass" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ build: fail" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          if [ "$TSC" == "pass" ] && [ "$ESLINT" == "pass" ] && [ "$JEST" == "pass" ] && [ "$BUILD" == "pass" ]; then
+            echo "all_passed=true" >> $GITHUB_OUTPUT
+          else
+            echo "all_passed=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Determine result
+        id: result
+        run: |
+          RECOVERY_OUTPUT="${{ steps.recovery.outputs.response }}"
+
+          STRATEGY=$(echo "$RECOVERY_OUTPUT" | jq -r '.strategy // "unknown"')
+          CONFIDENCE=$(echo "$RECOVERY_OUTPUT" | jq -r '.confidence // "low"')
+          ALL_PASSED="${{ steps.quality.outputs.all_passed }}"
+
+          if [ "$ALL_PASSED" == "true" ]; then
+            echo "success=true" >> $GITHUB_OUTPUT
+            echo "strategy=$STRATEGY" >> $GITHUB_OUTPUT
+          elif [ "${{ inputs.attempt }}" -lt 2 ] && [ "$CONFIDENCE" != "low" ]; then
+            echo "success=false" >> $GITHUB_OUTPUT
+            echo "strategy=retry" >> $GITHUB_OUTPUT
+          else
+            echo "success=false" >> $GITHUB_OUTPUT
+            echo "strategy=human_review" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Commit recovery changes
+        if: steps.quality.outputs.all_passed == 'true'
+        run: |
+          git config user.name "Recovery Agent"
+          git config user.email "recovery-agent@ai-devops.local"
+          git add -A
+          git commit -m "fix(recovery): ${{ steps.analyze.outputs.failure_type }} - attempt ${{ inputs.attempt }}" || true
+          git push origin ${{ inputs.branch }}
+
+      - name: Post recovery report
+        env:
+          GH_TOKEN: ${{ secrets.HUB_PAT }}
+        run: |
+          RECOVERY_OUTPUT="${{ steps.recovery.outputs.response }}"
+          SUCCESS="${{ steps.result.outputs.success }}"
+
+          if [ "$SUCCESS" == "true" ]; then
+            ICON="✅"
+            STATUS="SUCCESS"
+          else
+            ICON="❌"
+            STATUS="FAILED"
+          fi
+
+          cat > recovery_report.md << COMMENT_EOF
+          ## $ICON Recovery Agent Report
+
+          **Original Session:** ${{ inputs.session_id }}
+          **Recovery Attempt:** ${{ inputs.attempt }} / 2
+          **Status:** $STATUS
+
+          ### Failure Analysis
+          - **Type:** ${{ steps.analyze.outputs.failure_type }}
+          - **Root Cause:** ${{ steps.analyze.outputs.root_cause }}
+
+          ### Recovery Strategy
+          **Strategy:** ${{ steps.result.outputs.strategy }}
+
+          ### Changes Made
+          $(echo "$RECOVERY_OUTPUT" | jq -r '.changes_made[]? // "N/A"')
+
+          ### Lessons Learned
+          $(echo "$RECOVERY_OUTPUT" | jq -r '.lessons_learned[]? // "None"')
+          COMMENT_EOF
+
+          gh issue comment ${{ inputs.issue_number }} --repo ${{ inputs.repository }} --body-file recovery_report.md
+
+      - name: Update labels on success
+        if: steps.result.outputs.success == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.HUB_PAT }}
+        run: |
+          gh issue edit ${{ inputs.issue_number }} --repo ${{ inputs.repository }} \
+            --add-label "ai:done" \
+            --remove-label "ai:blocked,ai:in-progress" || true
+
+      - name: Escalate if max attempts reached
+        if: steps.result.outputs.success == 'false' && inputs.attempt >= 2
+        env:
+          GH_TOKEN: ${{ secrets.HUB_PAT }}
+        run: |
+          gh issue edit ${{ inputs.issue_number }} --repo ${{ inputs.repository }} \
+            --add-label "ai:blocked,needs-human-review" \
+            --remove-label "ai:in-progress" || true
+
+          gh issue comment ${{ inputs.issue_number }} --repo ${{ inputs.repository }} --body "⚠️ **Recovery Failed After ${{ inputs.attempt }} Attempts**
+
+          This task requires human intervention. Please review:
+          - Original failure: ${{ steps.analyze.outputs.failure_type }}
+          - Root cause: ${{ steps.analyze.outputs.root_cause }}
+          - Recovery strategies attempted: ${{ inputs.attempt }}
+
+          Consider:
+          1. Simplifying the task requirements
+          2. Providing more specific guidance
+          3. Breaking into smaller subtasks" || true

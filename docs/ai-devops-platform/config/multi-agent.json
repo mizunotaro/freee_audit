@@ -1,0 +1,285 @@
+{
+  "$schema": "./multi-agent.schema.json",
+  "version": "1.0.0",
+  "agents": {
+    "builder": {
+      "name": "Builder Agent",
+      "description": "Implements code based on task specifications",
+      "model": "zai-coding-plan/glm-5",
+      "temperature": 0.0,
+      "maxTokens": 8192,
+      "timeout": 20,
+      "role": "implementation",
+      "responsibilities": [
+        "Analyze task requirements",
+        "Implement features/fixes",
+        "Write tests",
+        "Follow existing patterns"
+      ],
+      "qualityStandards": ["TypeScript strict mode", "ESLint rules", "Test coverage >= 80%"]
+    },
+    "reviewer": {
+      "name": "Reviewer Agent",
+      "description": "Reviews code against 10 quality criteria",
+      "model": "zai-coding-plan/glm-5",
+      "temperature": 0.1,
+      "maxTokens": 4096,
+      "timeout": 10,
+      "role": "review",
+      "responsibilities": [
+        "Evaluate 10 quality criteria",
+        "Identify potential issues",
+        "Suggest improvements",
+        "Provide objective assessment"
+      ],
+      "qualityCriteria": [
+        {
+          "id": "stability",
+          "name": "Stability",
+          "weight": 1.0,
+          "checklist": [
+            "External API calls have timeout settings",
+            "Retry logic implemented (max 3 retries)",
+            "Graceful degradation implemented",
+            "Error handling complete",
+            "Resource cleanup implemented",
+            "Connection timeout configured"
+          ]
+        },
+        {
+          "id": "robustness",
+          "name": "Robustness",
+          "weight": 1.0,
+          "checklist": [
+            "Input validation implemented",
+            "Exception handling comprehensive",
+            "Boundary value tests created",
+            "Null safety ensured",
+            "Type safety (TypeScript strict mode)",
+            "Edge cases handled"
+          ]
+        },
+        {
+          "id": "reproducibility",
+          "name": "Reproducibility",
+          "weight": 0.8,
+          "checklist": [
+            "Configuration versioned",
+            "Deterministic processing (temperature=0)",
+            "Random seed fixed if needed",
+            "Environment separation",
+            "Dependency versions pinned",
+            "State management explicit"
+          ]
+        },
+        {
+          "id": "extensibility",
+          "name": "Extensibility",
+          "weight": 0.7,
+          "checklist": [
+            "Plugin pattern adopted",
+            "Interface segregation",
+            "Dependency injection",
+            "Open-closed principle followed",
+            "Configuration externalized",
+            "Modular design"
+          ]
+        },
+        {
+          "id": "maintainability",
+          "name": "Maintainability",
+          "weight": 0.8,
+          "checklist": [
+            "Single responsibility principle",
+            "Documentation created",
+            "Naming conventions unified",
+            "Code structure organized",
+            "Appropriate comments",
+            "Complexity managed"
+          ]
+        },
+        {
+          "id": "security",
+          "name": "Security",
+          "weight": 1.2,
+          "checklist": [
+            "Input sanitization",
+            "Sensitive data protection",
+            "Authentication/authorization verified",
+            "Encryption used where needed",
+            "Audit logging",
+            "Security headers",
+            "Safe default values"
+          ]
+        },
+        {
+          "id": "performance",
+          "name": "Performance",
+          "weight": 0.7,
+          "checklist": [
+            "Caching strategy",
+            "Parallel processing utilized",
+            "Memory management",
+            "Lazy loading",
+            "Query optimization",
+            "Resource pooling"
+          ]
+        },
+        {
+          "id": "syntax",
+          "name": "Syntax Error Prevention",
+          "weight": 1.0,
+          "checklist": [
+            "Strict mode enabled",
+            "Type definitions complete",
+            "Null checks",
+            "Exhaustive switch statements",
+            "Error boundaries",
+            "Lint rules followed"
+          ]
+        },
+        {
+          "id": "functionDesign",
+          "name": "Function Design",
+          "weight": 0.9,
+          "checklist": [
+            "Object argument pattern",
+            "Result type used",
+            "Side effects separated",
+            "Pure functions utilized",
+            "Immutability ensured",
+            "Explicit return values"
+          ]
+        },
+        {
+          "id": "consistency",
+          "name": "Overall Consistency",
+          "weight": 0.8,
+          "checklist": [
+            "Consistency with existing code",
+            "Patterns unified",
+            "Architecture followed",
+            "Style guide adhered",
+            "API consistency",
+            "Error format unified"
+          ]
+        }
+      ],
+      "passingThreshold": 80,
+      "criticalCriteria": ["security", "stability", "robustness", "syntax"]
+    },
+    "pm": {
+      "name": "PM Agent",
+      "description": "Project manager agent for task decomposition and quality control",
+      "model": "zai-coding-plan/glm-5",
+      "temperature": 0.2,
+      "maxTokens": 4096,
+      "timeout": 10,
+      "role": "management",
+      "responsibilities": [
+        "Decompose large tasks into subtasks",
+        "Prioritize tasks based on dependencies",
+        "Track progress across sessions",
+        "Coordinate between agents",
+        "Make go/no-go decisions"
+      ],
+      "taskDecomposition": {
+        "maxSubtasks": 5,
+        "minSubtaskSize": "small",
+        "dependencyAnalysis": true,
+        "parallelizable": true
+      },
+      "qualityControl": {
+        "reviewRequired": true,
+        "autoMergeThreshold": 90,
+        "humanReviewThreshold": 70,
+        "blockThreshold": 50
+      }
+    },
+    "recovery": {
+      "name": "Recovery Agent",
+      "description": "Takes over failed sessions and completes them",
+      "model": "zai-coding-plan/glm-5",
+      "temperature": 0.1,
+      "maxTokens": 8192,
+      "timeout": 15,
+      "role": "recovery",
+      "responsibilities": [
+        "Analyze failure context",
+        "Identify root cause",
+        "Propose alternative approach",
+        "Complete partial implementations",
+        "Learn from failures"
+      ],
+      "maxAttempts": 2,
+      "strategies": [
+        "retry_with_different_approach",
+        "simplify_task",
+        "request_clarification",
+        "partial_implementation"
+      ]
+    }
+  },
+  "workflows": {
+    "standard": {
+      "description": "Standard workflow for regular tasks",
+      "steps": [
+        { "agent": "builder", "action": "implement" },
+        { "agent": "reviewer", "action": "review" },
+        { "condition": "review_passed", "then": "complete", "else": "fix" }
+      ]
+    },
+    "complex": {
+      "description": "Complex workflow for large tasks",
+      "steps": [
+        { "agent": "pm", "action": "decompose" },
+        { "agent": "builder", "action": "implement_subtasks", "parallel": true },
+        { "agent": "reviewer", "action": "review_all" },
+        { "agent": "pm", "action": "integrate" },
+        { "condition": "integration_passed", "then": "complete", "else": "recover" }
+      ]
+    },
+    "recovery": {
+      "description": "Recovery workflow for failed tasks",
+      "steps": [
+        { "agent": "recovery", "action": "analyze_failure" },
+        { "agent": "recovery", "action": "implement_fix" },
+        { "agent": "reviewer", "action": "review" },
+        { "condition": "review_passed", "then": "complete", "else": "human_review" }
+      ]
+    }
+  },
+  "handoff": {
+    "protocols": {
+      "builder_to_reviewer": {
+        "required": ["implementation_summary", "files_changed", "tests_written"],
+        "format": "structured_comment"
+      },
+      "reviewer_to_builder": {
+        "required": ["issues_found", "severity", "suggestions"],
+        "format": "structured_comment"
+      },
+      "builder_to_recovery": {
+        "required": ["failure_context", "attempted_fixes", "remaining_issues"],
+        "format": "handoff_document"
+      }
+    },
+    "contextPreservation": {
+      "maxTokens": 2048,
+      "includeHistory": true,
+      "includeErrors": true,
+      "includeAttempts": true
+    }
+  },
+  "sessionLimits": {
+    "weekday_day": {
+      "hours": [9, 18],
+      "days": [1, 2, 3, 4, 5],
+      "maxConcurrent": 2,
+      "timezone": "Asia/Tokyo"
+    },
+    "other": {
+      "maxConcurrent": 3
+    }
+  }
+}
