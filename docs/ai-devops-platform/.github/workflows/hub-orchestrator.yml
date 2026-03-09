@@ -94,14 +94,14 @@ jobs:
           for repo in $(echo "$REPOS" | jq -r '.[].name'); do
             echo "Scanning $repo..."
             
-            ISSUES=$(gh issue list --repo "$repo" --label "ai-task" --state open --json number,title,body,labels,createdAt --limit 20 2>/dev/null || echo '[]')
+            ISSUES=$(gh issue list --repo "$repo" --label "ai:ready" --state open --json number,title,body,labels,createdAt --limit 20 2>/dev/null || echo '[]')
             
             for row in $(echo "$ISSUES" | jq -r '.[] | @base64'); do
               issue=$(echo "$row" | base64 -d)
               num=$(echo "$issue" | jq -r '.number')
               labels=$(echo "$issue" | jq -r '[.labels[].name]')
               
-              if echo "$labels" | jq -e 'index("ai-in-progress") or index("ai-blocked")' > /dev/null 2>&1; then
+              if echo "$labels" | jq -e 'index("ai:in-progress") or index("ai:blocked")' > /dev/null 2>&1; then
                 continue
               fi
               
@@ -163,7 +163,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.HUB_PAT }}
         run: |
-          gh issue edit ${{ matrix.task.num }} --repo ${{ matrix.task.repo }} --add-label "ai-in-progress" --remove-label "ai-task" 2>/dev/null || true
+          gh issue edit ${{ matrix.task.num }} --repo ${{ matrix.task.repo }} --add-label "ai:in-progress" --remove-label "ai:ready" 2>/dev/null || true
           gh issue comment ${{ matrix.task.num }} --repo ${{ matrix.task.repo }} --body "🤖 AI processing started - Model: GLM5 - Repo: ${{ matrix.task.repo }} - Issue: #${{ matrix.task.num }}" 2>/dev/null || true
 
       - name: Create branch
@@ -274,7 +274,7 @@ jobs:
           GH_TOKEN: ${{ secrets.HUB_PAT }}
         run: |
           gh issue edit ${{ matrix.task.num }} --repo ${{ matrix.task.repo }} \
-            --add-label "ai-blocked" --remove-label "ai-in-progress" 2>/dev/null || true
+            --add-label "ai:blocked" --remove-label "ai:in-progress" 2>/dev/null || true
 
           gh issue comment ${{ matrix.task.num }} --repo ${{ matrix.task.repo }} --body "❌ AI processing failed - Quality gates: tsc=${{ steps.quality.outputs.tsc }}, eslint=${{ steps.quality.outputs.eslint }}, jest=${{ steps.quality.outputs.jest }}, build=${{ steps.quality.outputs.build }} - Human review required." 2>/dev/null || true
 

@@ -1,0 +1,233 @@
+name: 'Security Alert Notification'
+description: 'Send security alerts via multiple channels (GitHub, Email, Slack)'
+author: 'AI-DevOps Platform'
+
+inputs:
+  threat-level:
+    description: 'Threat severity level (critical, high, medium, low)'
+    required: true
+  threat-details:
+    description: 'JSON threat details'
+    required: true
+  repository:
+    description: 'Target repository (owner/repo)'
+    required: true
+  issue-number:
+    description: 'Related issue or PR number'
+    required: false
+    default: ''
+  branch-name:
+    description: 'Branch name that was terminated'
+    required: false
+    default: ''
+  session-id:
+    description: 'Session identifier for tracking'
+    required: false
+    default: ''
+  github-token:
+    description: 'GitHub token for API access'
+    required: false
+    default: ${{ github.token }}
+
+outputs:
+  notification-sent:
+    description: 'Whether notification was sent successfully'
+    value: ${{ steps.check-status.outputs.sent }}
+  channels-notified:
+    description: 'List of channels that received notification'
+    value: ${{ steps.check-status.outputs.channels }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Validate inputs
+      id: validate
+      shell: bash
+      env:
+        THREAT_LEVEL: ${{ inputs.threat-level }}
+        THREAT_DETAILS: ${{ inputs.threat-details }}
+      run: |
+        set -euo pipefail
+        VALID_LEVELS=("critical" "high" "medium" "low")
+        LEVEL="${THREAT_LEVEL,,}"
+        if [[ ! " ${VALID_LEVELS[*]} " =~ " ${LEVEL} " ]]; then
+          echo "::error::Invalid threat level: ${THREAT_LEVEL}"
+          exit 1
+        fi
+        if ! echo "${THREAT_DETAILS}" | jq -e . > /dev/null 2>&1; then
+          echo "::error::threat-details must be valid JSON"
+          exit 1
+        fi
+        echo "validated=true" >> $GITHUB_OUTPUT
+        echo "level=${LEVEL}" >> $GITHUB_OUTPUT
+
+    - name: Load notification templates
+      id: templates
+      shell: bash
+      env:
+        THREAT_LEVEL: ${{ inputs.threat-level }}
+      run: |
+        set -euo pipefail
+        LEVEL="${THREAT_LEVEL,,}"
+        case "${LEVEL}" in
+          critical)
+            EMOJI=":rotating_light:"
+            COLOR="danger"
+            LABEL="CRITICAL"
+            ;;
+          high)
+            EMOJI=":warning:"
+            COLOR="warning"
+            LABEL="HIGH"
+            ;;
+          medium)
+            EMOJI=":information_source:"
+            COLOR="good"
+            LABEL="MEDIUM"
+            ;;
+          low)
+            EMOJI=":memo:"
+            COLOR="#808080"
+            LABEL="LOW"
+            ;;
+        esac
+        echo "emoji=${EMOJI}" >> $GITHUB_OUTPUT
+        echo "color=${COLOR}" >> $GITHUB_OUTPUT
+        echo "label=${LABEL}" >> $GITHUB_OUTPUT
+
+    - name: GitHub Comment
+      id: github-comment
+      if: ${{ inputs.issue-number != '' }}
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.github-token }}
+        REPOSITORY: ${{ inputs.repository }}
+        ISSUE_NUMBER: ${{ inputs.issue-number }}
+        THREAT_LEVEL: ${{ inputs.threat-level }}
+        THREAT_DETAILS: ${{ inputs.threat-details }}
+        BRANCH_NAME: ${{ inputs.branch-name }}
+        SESSION_ID: ${{ inputs.session-id }}
+        LABEL: ${{ steps.templates.outputs.label }}
+        EMOJI: ${{ steps.templates.outputs.emoji }}
+      run: |
+        set -euo pipefail
+        LEVEL="${THREAT_LEVEL,,}"
+        DETAIL_SECTION=""
+        if [[ -n "${THREAT_DETAILS}" ]]; then
+          DETAIL_SECTION=$(echo "${THREAT_DETAILS}" | jq -r '"**Pattern:** \(.pattern // \"N/A\")\n**Source:** \(.source // \"N/A\")"')
+        fi
+        BRANCH_SECTION=""
+        if [[ -n "${BRANCH_NAME}" ]]; then
+          BRANCH_SECTION="\n**Branch Terminated:** \`${BRANCH_NAME}\`"
+        fi
+        SESSION_SECTION=""
+        if [[ -n "${SESSION_ID}" ]]; then
+          SESSION_SECTION="\n**Session ID:** \`${SESSION_ID}\`"
+        fi
+        BODY="${EMOJI} **${LABEL} Security Alert Detected**\n\n---\n\n**Severity:** ${LABEL}\n${DETAIL_SECTION}${BRANCH_SECTION}${SESSION_SECTION}\n\n---\n\n**Action Taken:** Session terminated\n**Next Steps:** Manual review required\n\n_This is an automated security notification_"
+        gh issue comment "${ISSUE_NUMBER}" --repo "${REPOSITORY}" --body "$(echo -e "${BODY}")"
+        echo "github_comment=sent" >> $GITHUB_OUTPUT
+        echo "::notice::GitHub comment posted"
+
+    - name: Email Notification
+      id: email-notification
+      if: ${{ env.SECURITY_EMAIL_ENABLED == 'true' }}
+      shell: bash
+      env:
+        SECURITY_EMAIL_ENABLED: ${{ secrets.SECURITY_EMAIL_ENABLED }}
+        SECURITY_EMAIL_RECIPIENTS: ${{ secrets.SECURITY_EMAIL_RECIPIENTS }}
+        REPOSITORY: ${{ inputs.repository }}
+        THREAT_LEVEL: ${{ inputs.threat-level }}
+        THREAT_DETAILS: ${{ inputs.threat-details }}
+        LABEL: ${{ steps.templates.outputs.label }}
+      run: |
+        set -euo pipefail
+        SUBJECT="[AI-DevOps Security] ${LABEL} Alert - ${REPOSITORY}"
+        TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+        DETAILS=$(echo "${THREAT_DETAILS}" | jq -r 'to_entries | .[] | "  \(.key): \(.value)"')
+        BODY="Security Alert Notification\nRepository: ${REPOSITORY}\nSeverity: ${LABEL}\nTimestamp: ${TIMESTAMP}\n\nThreat Details:\n${DETAILS}\n\n---\nThis is an automated notification."
+        if command -v mail &> /dev/null; then
+          echo -e "${BODY}" | mail -s "${SUBJECT}" "${SECURITY_EMAIL_RECIPIENTS}"
+          echo "email=sent" >> $GITHUB_OUTPUT
+          echo "::notice::Email notification sent"
+        else
+          echo "email=skipped" >> $GITHUB_OUTPUT
+          echo "::warning::mail command not available"
+        fi
+
+    - name: Slack Notification
+      id: slack-notification
+      if: ${{ env.SLACK_WEBHOOK_URL != '' }}
+      shell: bash
+      env:
+        SLACK_WEBHOOK_URL: ${{ secrets.SLACK_SECURITY_WEBHOOK }}
+        REPOSITORY: ${{ inputs.repository }}
+        THREAT_LEVEL: ${{ inputs.threat-level }}
+        THREAT_DETAILS: ${{ inputs.threat-details }}
+        BRANCH_NAME: ${{ inputs.branch-name }}
+        SESSION_ID: ${{ inputs.session-id }}
+        LABEL: ${{ steps.templates.outputs.label }}
+        COLOR: ${{ steps.templates.outputs.color }}
+        EMOJI: ${{ steps.templates.outputs.emoji }}
+        GITHUB_SERVER_URL: ${{ github.server_url }}
+        GITHUB_RUN_ID: ${{ github.run_id }}
+      run: |
+        set -euo pipefail
+        TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+        RUN_URL="${GITHUB_SERVER_URL}/${REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+        DETAILS=$(echo "${THREAT_DETAILS}" | jq -r '"Pattern: \(.pattern // \"N/A\")\nSource: \(.source // \"N/A\")"')
+        PAYLOAD=$(jq -n \
+          --arg emoji "${EMOJI}" \
+          --arg label "${LABEL}" \
+          --arg color "${COLOR}" \
+          --arg repo "${REPOSITORY}" \
+          --arg details "${DETAILS}" \
+          --arg run_url "${RUN_URL}" \
+          --arg timestamp "${TIMESTAMP}" \
+          '{
+            "text": ($emoji + " Security Alert - " + $label),
+            "attachments": [{
+              "color": $color,
+              "blocks": [
+                {"type": "header", "text": {"type": "plain_text", "text": ($emoji + " " + $label + " Security Alert"), "emoji": true}},
+                {"type": "section", "fields": [{"type": "mrkdwn", "text": ("*Repository:*\n" + $repo)}, {"type": "mrkdwn", "text": ("*Severity:*\n" + $label)}]},
+                {"type": "section", "text": {"type": "mrkdwn", "text": $details}},
+                {"type": "context", "elements": [{"type": "mrkdwn", "text": ("<" + $run_url + "|View Run> | " + $timestamp)}]}
+              ]
+            }]
+          }')
+        HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" -X POST "${SLACK_WEBHOOK_URL}" -H "Content-type: application/json" -d "${PAYLOAD}")
+        if [[ "${HTTP_CODE}" == "200" ]]; then
+          echo "slack=sent" >> $GITHUB_OUTPUT
+          echo "::notice::Slack notification sent"
+        else
+          echo "slack=failed" >> $GITHUB_OUTPUT
+          echo "::warning::Slack notification failed with HTTP ${HTTP_CODE}"
+        fi
+
+    - name: Check notification status
+      id: check-status
+      shell: bash
+      env:
+        GITHUB_COMMENT: ${{ steps.github-comment.outputs.github_comment }}
+        EMAIL_STATUS: ${{ steps.email-notification.outputs.email }}
+        SLACK_STATUS: ${{ steps.slack-notification.outputs.slack }}
+      run: |
+        set -euo pipefail
+        CHANNELS=""
+        [[ "${GITHUB_COMMENT}" == "sent" ]] && CHANNELS="${CHANNELS}github,"
+        [[ "${EMAIL_STATUS}" == "sent" ]] && CHANNELS="${CHANNELS}email,"
+        [[ "${SLACK_STATUS}" == "sent" ]] && CHANNELS="${CHANNELS}slack,"
+        CHANNELS="${CHANNELS%,}"
+        if [[ -n "${CHANNELS}" ]]; then
+          echo "sent=true" >> $GITHUB_OUTPUT
+          echo "channels=${CHANNELS}" >> $GITHUB_OUTPUT
+          echo "::notice::Notifications sent to: ${CHANNELS}"
+        else
+          echo "sent=false" >> $GITHUB_OUTPUT
+          echo "channels=none" >> $GITHUB_OUTPUT
+        fi
+
+branding:
+  icon: 'alert-triangle'
+  color: 'red'

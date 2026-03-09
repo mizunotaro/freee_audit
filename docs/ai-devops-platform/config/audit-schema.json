@@ -1,0 +1,177 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://example.com/schemas/audit-event.json",
+  "title": "AuditEvent",
+  "description": "Schema for security audit log events",
+  "type": "object",
+  "required": ["event_id", "timestamp", "event_type", "severity", "actor"],
+  "additionalProperties": false,
+  "properties": {
+    "event_id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Unique identifier for the event"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp of when the event occurred"
+    },
+    "event_type": {
+      "type": "string",
+      "enum": [
+        "SESSION_START",
+        "SESSION_END",
+        "FILE_CHANGE",
+        "THREAT_DETECTED",
+        "SESSION_TERMINATED",
+        "MANUAL_REVIEW"
+      ],
+      "description": "Type of audit event"
+    },
+    "severity": {
+      "type": "string",
+      "enum": ["debug", "info", "warning", "error", "critical"],
+      "description": "Severity level of the event"
+    },
+    "session_id": {
+      "type": ["string", "null"],
+      "pattern": "^sess_[a-zA-Z0-9_-]+$",
+      "description": "Identifier of the AI session, if applicable"
+    },
+    "repository": {
+      "type": ["string", "null"],
+      "pattern": "^[a-zA-Z0-9_-]+/[a-zA-Z0-9_.-]+$",
+      "description": "GitHub repository in owner/repo format"
+    },
+    "issue_number": {
+      "type": ["integer", "null"],
+      "minimum": 1,
+      "description": "GitHub issue number, if applicable"
+    },
+    "branch": {
+      "type": ["string", "null"],
+      "description": "Git branch name"
+    },
+    "details": {
+      "type": "object",
+      "description": "Additional event-specific details",
+      "additionalProperties": true,
+      "properties": {
+        "threat_type": {
+          "type": "string",
+          "enum": [
+            "eval_injection",
+            "command_injection",
+            "sql_injection",
+            "xss",
+            "path_traversal",
+            "ssrf",
+            "secrets_exposure",
+            "malicious_code",
+            "unauthorized_access",
+            "data_exfiltration",
+            "other"
+          ],
+          "description": "Type of threat detected"
+        },
+        "file": {
+          "type": "string",
+          "description": "File path where the event occurred"
+        },
+        "line": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Line number in the file"
+        },
+        "pattern": {
+          "type": "string",
+          "description": "Pattern that matched for threat detection"
+        },
+        "context": {
+          "type": "string",
+          "description": "Surrounding code context"
+        },
+        "old_value": {
+          "type": "string",
+          "description": "Previous value for FILE_CHANGE events"
+        },
+        "new_value": {
+          "type": "string",
+          "description": "New value for FILE_CHANGE events"
+        },
+        "reviewer": {
+          "type": "string",
+          "description": "Reviewer username for MANUAL_REVIEW events"
+        },
+        "review_outcome": {
+          "type": "string",
+          "enum": ["approved", "rejected", "pending"],
+          "description": "Outcome of manual review"
+        },
+        "review_notes": {
+          "type": "string",
+          "description": "Notes from the reviewer"
+        },
+        "termination_reason": {
+          "type": "string",
+          "description": "Reason for session termination"
+        },
+        "duration_seconds": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Session duration in seconds"
+        },
+        "files_modified": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "List of files modified during session"
+        },
+        "commands_executed": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "List of commands executed during session"
+        }
+      }
+    },
+    "action_taken": {
+      "type": ["string", "null"],
+      "enum": [
+        "SESSION_TERMINATED",
+        "PR_BLOCKED",
+        "ALERT_SENT",
+        "MANUAL_REVIEW_REQUIRED",
+        "AUTO_REMEDIATED",
+        "LOGGED_ONLY",
+        null
+      ],
+      "description": "Action taken in response to the event"
+    },
+    "actor": {
+      "type": "string",
+      "description": "Entity that triggered or recorded the event",
+      "examples": ["security-watcher", "orchestrator", "manual-review", "system"]
+    }
+  },
+  "definitions": {
+    "EventType": {
+      "type": "string",
+      "enum": [
+        "SESSION_START",
+        "SESSION_END",
+        "FILE_CHANGE",
+        "THREAT_DETECTED",
+        "SESSION_TERMINATED",
+        "MANUAL_REVIEW"
+      ]
+    },
+    "Severity": {
+      "type": "string",
+      "enum": ["debug", "info", "warning", "error", "critical"]
+    }
+  }
+}

@@ -8,7 +8,7 @@
       "priority": 1,
       "description": "Financial audit system with AI-powered analysis",
       "labels": {
-        "task": "ai-task",
+        "task": "ai:ready",
         "ready": "ai:ready",
         "inProgress": "ai:in-progress",
         "completed": "ai:done",

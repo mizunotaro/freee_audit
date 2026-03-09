@@ -1,0 +1,374 @@
+import type { BalanceSheet, ProfitLoss } from '@/types'
+import type {
+  FinancialStatementSet,
+  AnalysisOptions,
+  FinancialAnalysisResult,
+  CategoryAnalysis,
+  AlertItem,
+  RecommendationItem,
+  KeyMetric,
+  AnalysisCategory,
+} from './types'
+import { ANALYSIS_THRESHOLDS, getStatusFromScore } from './types'
+import { getAnalyzerConfig, type AnalyzerConfig } from './config'
+import {
+  GROWTH_THRESHOLDS,
+  CATEGORY_WEIGHTS
+  STATUS_SCORES
+  STATUS_DESCRIPTIONS_JA
+  CATEGORY_NAMES_JA
+  SEVERITY_ORDER
+  PRIORITY_ORDER
+} from './constants'
+import {
+  safeDivide,
+  extractTotalAssets,
+  extractTotalEquity,
+  extractTotalLiabilities,
+  extractCurrentAssets,
+  extractCurrentLiabilities,
+  extractInventory,
+  extractCashAndEquivalents,
+  extractRevenue,
+  extractGrossProfit,
+  extractOperatingIncome,
+  extractNetIncome,
+  calculateAverageTotalAssets,
+  calculateAverageEquity,
+  generateAlertId,
+  generateRecommendationId,
+  determineTrend,
+  classifyFinancialHealth,
+  checkTimeout,
+  calculateSafeGrowthRate,
+  approximatelyEqual,
+} from './utils'
+import { validateFinancialStatementSet, normalizeStatements } from './validators'
+
+type Status = 'excellent' | 'good' | 'fair' | 'poor' | 'critical'
+
+/**
+ * 財務諸表分析メインクラス
+ *
+ * @remarks
+ * 貸借対照表（BS）と損益計算書（PL）を分析し、財務健全性のスコア、アラート、推奨事項を生成します。
+ * タイムアウト、部分的失敗許容、決定論的モードをサポートします。
+ *
+ * @example
+ * ```typescript
+ * const analyzer = new FinancialAnalyzer()
+ * const result = analyzer.analyze({ balanceSheet, profitLoss })
+ *
+ * if (result.success) {
+ *   console.log(`Overall Score: ${result.data.overallScore}`)
+ * }
+ * ```
+ */
+export class FinancialAnalyzer {
+  private readonly config: AnalyzerConfig
+
+  constructor(config?: Partial<AnalyzerConfig>) {
+    this.config = { ...getAnalyzerConfig(), ...config }
+  }
+
+  /**
+   * 財務諸表を分析
+   *
+   * @param statements - 財務諸表データセット
+   * @param options - 分析オプション
+   * @returns 分析結果（Result型）
+   *
+   * @remarks
+   * ### タイムアウト
+   * - デフォルト: 30秒
+   * - 設定可能: `new FinancialAnalyzer({ timeout: 60000 })`
+   *
+   * ### 部分的失敗
+   * - デフォルト: 許容
+   * - 1つのカテゴリでエラーが発生しても他は継続
+   *
+   * @example
+   * ```typescript
+   * // 基本的な使用
+   * const result = analyzer.analyze({ balanceSheet, profitLoss })
+   *
+   * // 特定カテゴリのみ分析
+   * const result = analyzer.analyze(
+   *   { balanceSheet, profitLoss },
+   *   { category: 'liquidity' }
+   * )
+   *
+   * // 決定論的モード（テスト用）
+   * const result = analyzer.analyze(
+   *   { balanceSheet, profitLoss },
+   *   { deterministic: true }
+   * )
+   * ```
+   */
+  analyze(
+    statements: FinancialStatementSet,
+    options: AnalysisOptions = {}
+  ): FinancialAnalysisResult {
+    const startTime = options.deterministic ? 0 : Date.now()
+    const errors: Array<{ category: string; error: Error }> = []
+
+    try {
+      // バリデーション
+      const validationResult = validateFinancialStatementSet(statements)
+      if (!validationResult.success) {
+        return { success: false, error: validationResult.error }
+      }
+
+      // タイムアウトチェック
+      checkTimeout(startTime, this.config.timeout)
+
+      const normalized = normalizeStatements(statements)
+      const { balanceSheet, profitLoss, previousBalanceSheet, previousProfitLoss } = normalized
+
+      // オプションを使用
+      const categories = this.getTargetCategories(options)
+
+      // カテゴリ分析（部分的失敗許容）
+      const categoryAnalyses = this.analyzeAllCategoriesWithFallback(
+        balanceSheet,
+        profitLoss,
+        previousBalanceSheet,
+        previousProfitLoss,
+        options,
+        startTime,
+        errors
+      )
+
+      // 全カテゴリ失敗チェック
+      if (categoryAnalyses.length === 0) {
+        return {
+          success: false,
+          error: {
+            code: 'all_categories_failed',
+            message: 'All category analyses failed',
+            details: { errors: errors.map(e => ({ category: e.category, message: e.error.message })) },
+          },
+        }
+      }
+
+      // タイムアウト再チェック
+      checkTimeout(startTime, this.config.timeout)
+
+      // スコア計算
+      const overallScore = this.calculateOverallScore(categoryAnalyses)
+      const overallStatus = getStatusFromScore(overallScore)
+
+      // アラート収集（上限付き）
+      const allAlerts = this.collectAlertsWithLimit(categoryAnalyses, this.config.maxAlerts)
+
+      // 推奨事項（上限付き）
+      const topRecommendations = this.collectRecommendationsWithLimit(
+        categoryAnalyses,
+        this.config.maxRecommendations
+      )
+
+      // 主要指標（重複計算なし）
+      const keyMetrics = this.extractKeyMetricsFromCategories(categoryAnalyses)
+
+      // エグゼクティブサマリー
+      const executiveSummary = this.generateExecutiveSummary(
+        overallScore,
+        overallStatus,
+        categoryAnalyses,
+        classifyFinancialHealth(balanceSheet, profitLoss)
+      )
+
+      return {
+        success: true,
+        data: {
+          overallScore,
+          overallStatus,
+          executiveSummary,
+          categoryAnalyses,
+          allAlerts,
+          topRecommendations,
+          keyMetrics,
+          processingTimeMs: options.deterministic ? 0 : Date.now() - startTime,
+          analyzedAt: options.deterministic
+            ? (options.fixedTimestamp ?? new Date('2024-01-01T00:00:00Z'))
+            : new Date(),
+          ...(errors.length > 0 && {
+            warnings: errors.map(e => `Partial failure in ${e.category}: ${e.error.message}`),
+          }),
+        },
+      }
+    } catch (error) {
+      const isTimeout = error instanceof Error && error.message.includes('timed out')
+
+      return {
+        success: false,
+        error: {
+          code: isTimeout ? 'analysis_timeout' : 'analysis_failed',
+          message: error instanceof Error ? error.message : 'Unknown error during analysis',
+          details: {
+            processingTimeMs: Date.now() - startTime,
+            partialErrors: errors,
+          },
+        },
+      }
+    }
+  }
+
+  /**
+   * 対象カテゴリを取得
+   *
+   * @param options - 分析オプション
+   * @returns 対象カテゴリのリスト
+   */
+  private getTargetCategories(options: AnalysisOptions): AnalysisCategory[] {
+    if (options.category && options.category !== 'comprehensive') {
+      return [options.category]
+    }
+    return ['liquidity', 'safety', 'profitability', 'efficiency', 'growth']
+  }
+
+  /**
+   * カテゴリ分析（部分的失敗許容）
+   */
+  private analyzeAllCategoriesWithFallback(
+    bs: BalanceSheet,
+    pl: ProfitLoss,
+    prevBS: BalanceSheet | undefined,
+    prevPL: ProfitLoss | undefined,
+    options: AnalysisOptions,
+    startTime: number,
+    errors: Array<{ category: string; error: Error }>
+  ): CategoryAnalysis[] {
+    const categories = this.getTargetCategories(options)
+    const results: CategoryAnalysis[] = []
+
+    for (const category of categories) {
+      try {
+        checkTimeout(startTime, this.config.timeout)
+
+        const analysis = this.analyzeCategory(category, bs, pl, prevBS, prevPL)
+        results.push(analysis)
+      } catch (error) {
+        if (this.config.allowPartialFailure) {
+          errors.push({
+            category,
+            error: error instanceof Error ? error : new Error(String(error)),
+          })
+
+          results.push(this.createFallbackCategory(category, error))
+        } else {
+          throw error
+        }
+      }
+    }
+
+    return results
+  }
+
+  /**
+   * フォールバック用カテゴリ作成
+   */
+  private createFallbackCategory(category: AnalysisCategory, error: unknown): CategoryAnalysis {
+    return {
+      category,
+      score: 50,
+      status: 'fair',
+      summary: `${CATEGORY_NAMES_JA[category]}分析でエラーが発生しました`,
+      trends: [],
+      alerts: [{
+        id: generateAlertId(),
+        category,
+        severity: 'info',
+        title: '分析エラー',
+        description: error instanceof Error ? error.message : 'Unknown error',
+        metric: 'none',
+        currentValue: 0,
+        recommendation: 'データを確認してください',
+      }],
+      recommendations: [],
+    }
+  }
+
+  /**
+   * アラート収集（上限付き）
+   */
+  private collectAlertsWithLimit(
+    categories: CategoryAnalysis[],
+    maxAlerts: number
+  ): AlertItem[] {
+    const allAlerts = categories.flatMap(c => c.alerts)
+
+    const sorted = allAlerts.sort((a, b) =>
+      SEVERITY_ORDER[a.severity] - SEVERITY_ORDER[b.severity]
+    )
+
+    return sorted.slice(0, maxAlerts)
+  }
+
+  /**
+   * 推奨事項収集（上限付き）
+   */
+  private collectRecommendationsWithLimit(
+    categories: CategoryAnalysis[],
+    maxRecommendations: number
+  ): RecommendationItem[] {
+    const allRecommendations = this.prioritizeRecommendations(
+      categories.flatMap(c => c.recommendations)
+    )
+
+    return allRecommendations.slice(0, maxRecommendations)
+  }
+
+  /**
+   * 主要指標抽出（重複計算なし）
+   */
+  private extractKeyMetricsFromCategories(categories: CategoryAnalysis[]): KeyMetric[] {
+    const liquidity = categories.find(c => c.category === 'liquidity')
+    const safety = categories.find(c => c.category === 'safety')
+    const profitability = categories.find(c => c.category === 'profitability')
+
+    return [
+      liquidity?.metrics[0],
+      safety?.metrics[0],
+      profitability?.metrics[4],
+      profitability?.metrics[1],
+    ].filter((m): m is KeyMetric => m !== undefined)
+  }
+
+  private analyzeCategory(
+    category: AnalysisCategory,
+    bs: BalanceSheet,
+    pl: ProfitLoss,
+    prevBS?: BalanceSheet,
+    prevPL?: ProfitLoss
+  ): CategoryAnalysis {
+    const analyzers: Record<
+      AnalysisCategory,
+      () => { score: number; metrics: KeyMetric[]; alerts: AlertItem[] }
+    > = {
+      liquidity: () => this.analyzeLiquidity(bs, pl, prevBS),
+      safety: () => this.analyzeSafety(bs, pl, prevBS),
+      profitability: () => this.analyzeProfitability(bs, pl, prevBS, prevPL),
+      efficiency: () => this.analyzeEfficiency(bs, pl, prevBS),
+      growth: () => this.analyzeGrowth(bs, pl, prevBS, prevPL),
+    }
+
+    const analyzer = analyzers[category]
+    if (!analyzer) {
+      return this.createFallbackCategory(category, new Error(`Unknown category: ${category}`))
+    }
+
+    const { score, metrics, alerts } = analyzer()
+
+    const recommendations = this.generateRecommendations(category, alerts, metrics)
+
+    return {
+      category,
+      score,
+      status: getStatusFromScore(score),
+      summary: this.generateCategorySummary(category, score, metrics),
+      trends: [],
+      alerts,
+      recommendations,
+    }
+  }

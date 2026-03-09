@@ -1,0 +1,20 @@
+repos:
+  - repo: local
+    hooks:
+      - id: security-scan
+        name: Security Pattern Scan
+        entry: scripts/pre-commit-security.sh
+        language: script
+        types: [file]
+        pass_filenames: true
+
+      - id: check-large-files
+        name: Check for large files
+        entry: check-large-files
+        language: system
+        args: ['--maxkb=500']
+
+      - id: check-forbidden-files
+        name: Check forbidden files
+        entry: scripts/check-forbidden-files.sh
+        language: script
