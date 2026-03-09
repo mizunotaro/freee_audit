@@ -22,7 +22,7 @@ jobs:
   preflight:
     uses: ./.github/workflows/orchestrator-preflight.yml
     with:
-      target_repo: ${{ inputs.target_repo || env.DEFAULT_REPO }}
+      target_repo: ${{ inputs.target_repo || 'mizunomi/freee_audit' }}
       force_run: ${{ inputs.force_run || false }}
 
   select:

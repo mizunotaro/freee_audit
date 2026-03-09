@@ -355,7 +355,7 @@ jobs:
           retention-days: 90
 
       - name: Send Webhook Notification
-        if: steps.inputs.outputs.notify_webhook == 'true' && secrets.SECURITY_WEBHOOK_URL != ''
+        if: steps.inputs.outputs.notify_webhook == 'true' && env.WEBHOOK_URL != ''
         env:
           WEBHOOK_URL: ${{ secrets.SECURITY_WEBHOOK_URL }}
         run: |
