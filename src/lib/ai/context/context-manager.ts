@@ -420,7 +420,11 @@ export class ContextManager {
 
   private async persistSession(session: Session): Promise<void> {
     if (this.storageAdapter) {
-      await this.storageAdapter.set(session.id, session)
+      try {
+        await this.storageAdapter.set(session.id, session)
+      } catch {
+        // Storage failure: session remains in memory, graceful degradation
+      }
     }
   }
 }
