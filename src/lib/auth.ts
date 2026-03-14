@@ -39,11 +39,18 @@ export async function verifyPassword(password: string, hash: string): Promise<bo
   return bcrypt.compare(password, hash)
 }
 
-export async function generateToken(userId: string, sessionId: string): Promise<string> {
+export async function generateToken(
+  userId: string,
+  sessionId: string,
+  role: string,
+  companyId: string | null
+): Promise<string> {
   return jwt.sign(
     {
       userId,
       sessionId,
+      role,
+      companyId,
       iat: Math.floor(Date.now() / 1000),
     },
     JWT_SECRET,
@@ -55,12 +62,14 @@ export async function generateToken(userId: string, sessionId: string): Promise<
   )
 }
 
-export function verifyToken(token: string): { userId: string; sessionId: string } | null {
+export function verifyToken(
+  token: string
+): { userId: string; sessionId: string; role: string; companyId: string | null } | null {
   try {
     const decoded = jwt.verify(token, JWT_SECRET, {
       issuer: 'freee_audit',
       audience: 'freee_audit_users',
-    }) as { userId: string; sessionId: string }
+    }) as { userId: string; sessionId: string; role: string; companyId: string | null }
     return decoded
   } catch {
     return null
@@ -74,9 +83,13 @@ export function constantTimeCompare(a: string, b: string): boolean {
   return crypto.timingSafeEqual(Buffer.from(a), Buffer.from(b))
 }
 
-export async function createSession(userId: string): Promise<Session> {
+export async function createSession(
+  userId: string,
+  role: string,
+  companyId: string | null
+): Promise<Session> {
   const sessionId = crypto.randomUUID()
-  const token = await generateToken(userId, sessionId)
+  const token = await generateToken(userId, sessionId, role, companyId)
   const expiresAt = new Date(Date.now() + SESSION_DURATION_HOURS * 60 * 60 * 1000)
 
   return prisma.session.create({
@@ -122,7 +135,7 @@ export async function login(email: string, password: string): Promise<LoginResul
     return { success: false, error: 'Invalid credentials' }
   }
 
-  const session = await createSession(user.id)
+  const session = await createSession(user.id, user.role, user.companyId)
 
   return {
     success: true,

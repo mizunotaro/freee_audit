@@ -14,8 +14,6 @@ import type {
   FreeeDealParams,
   JournalDocumentMapping,
   MappingSyncResult,
-  FreeeJournalDetail,
-  FreeeDealDetail,
 } from '@/lib/integrations/freee/types'
 
 /**
@@ -438,7 +436,7 @@ export class JournalReceiptMappingService {
     journal: FreeeJournal,
     dealsByDate: Map<string, FreeeDeal[]>,
     result: MappingSyncResult,
-    logCtx: LogContext
+    _logCtx: LogContext
   ): Promise<void> {
     try {
       const journalDate = journal.issue_date
@@ -585,6 +583,7 @@ export class JournalReceiptMappingService {
       },
     }
 
+    // eslint-disable-next-line no-console
     console[level === 'debug' ? 'log' : level](
       `[${logEntry.timestamp}] [${level.toUpperCase()}] ${message}`,
       context ? JSON.stringify(context) : ''

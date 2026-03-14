@@ -1,18 +1,13 @@
-import createMiddleware from 'next-intl/middleware'
+import createIntlMiddleware from 'next-intl/middleware'
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 import { validateSessionEdge } from '@/lib/auth-edge'
 
-const locales = ['ja', 'en'] as const
+const locales = ['ja', 'en']
 const defaultLocale = 'ja'
 
-const intlMiddleware = createMiddleware({
-  locales,
-  defaultLocale,
-  localePrefix: 'always',
-})
-
-const publicPaths = ['/login', '/api/auth/login', '/api/auth/logout', '/api/health']
+const publicPaths = ['/login']
+const publicApiPaths = ['/api/auth/login', '/api/auth/logout', '/api/health']
 
 const staticPaths = [
   '/favicon.ico',
@@ -50,10 +45,19 @@ function isStaticFile(pathname: string): boolean {
 }
 
 function isPublicPath(pathname: string): boolean {
-  return publicPaths.some(
-    (path) => pathname === path || pathname === `/ja${path}` || pathname === `/en${path}`
-  )
+  const pathWithoutLocale = pathname.replace(/^\/(ja|en)(\/|$)/, '/')
+  return publicPaths.some((path) => pathWithoutLocale === path || pathWithoutLocale === `${path}/`)
 }
+
+function isPublicApiPath(pathname: string): boolean {
+  return publicApiPaths.some((path) => pathname === path || pathname.startsWith(`${path}/`))
+}
+
+const intlMiddleware = createIntlMiddleware({
+  locales,
+  defaultLocale,
+  localePrefix: 'always',
+})
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
@@ -63,13 +67,15 @@ export async function middleware(request: NextRequest) {
   }
 
   if (pathname.startsWith('/api/')) {
-    if (isPublicPath(pathname)) {
+    if (isPublicApiPath(pathname)) {
       return NextResponse.next()
     }
 
     const token = request.cookies.get('session')?.value
     if (!token) {
-      return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
+      const response = NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
+      response.cookies.delete('session')
+      return response
     }
 
     const user = await validateSessionEdge(token)
@@ -94,39 +100,28 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next()
   }
 
-  const localeMatch = locales.find(
-    (locale) => pathname === `/${locale}` || pathname.startsWith(`/${locale}/`)
-  )
-
-  if (!localeMatch && pathname !== '/') {
-    return NextResponse.redirect(new URL(`/${defaultLocale}${pathname}`, request.url))
-  }
-
   if (pathname === '/') {
-    return NextResponse.redirect(new URL(`/${defaultLocale}/login`, request.url))
+    return NextResponse.redirect(new URL('/ja/login', request.url))
   }
+
+  const localeMatch = pathname.match(/^\/(ja|en)(\/|$)/)
+  const locale = localeMatch?.[1] || 'ja'
 
   if (localeMatch && !isPublicPath(pathname)) {
     const token = request.cookies.get('session')?.value
     if (!token) {
-      const loginUrl = new URL(`/${localeMatch}/login`, request.url)
-      return NextResponse.redirect(loginUrl)
+      return NextResponse.redirect(new URL(`/${locale}/login`, request.url))
     }
 
     const user = await validateSessionEdge(token)
     if (!user) {
-      const loginUrl = new URL(`/${localeMatch}/login`, request.url)
-      const response = NextResponse.redirect(loginUrl)
+      const response = NextResponse.redirect(new URL(`/${locale}/login`, request.url))
       response.cookies.delete('session')
       return response
     }
   }
 
-  if (localeMatch) {
-    return intlMiddleware(request)
-  }
-
-  return NextResponse.next()
+  return intlMiddleware(request)
 }
 
 export const config = {

@@ -14,7 +14,17 @@ function getRequiredEnvVar(name: string): string {
 
 const JWT_SECRET = getRequiredEnvVar('JWT_SECRET')
 
-async function verifyJwtEdge(token: string): Promise<{ userId: string; sessionId: string } | null> {
+interface JwtPayload {
+  userId: string
+  sessionId: string
+  role?: string
+  companyId?: string | null
+  exp?: number
+  iss?: string
+  aud?: string
+}
+
+async function verifyJwtEdge(token: string): Promise<JwtPayload | null> {
   try {
     const parts = token.split('.')
     if (parts.length !== 3) return null
@@ -41,7 +51,7 @@ async function verifyJwtEdge(token: string): Promise<{ userId: string; sessionId
     const isValid = await crypto.subtle.verify('HMAC', key, signature, data)
     if (!isValid) return null
 
-    const payload = JSON.parse(atob(payloadB64.replace(/-/g, '+').replace(/_/g, '/')))
+    const payload: JwtPayload = JSON.parse(atob(payloadB64.replace(/-/g, '+').replace(/_/g, '/')))
 
     if (payload.exp && payload.exp < Math.floor(Date.now() / 1000)) {
       return null
@@ -51,10 +61,7 @@ async function verifyJwtEdge(token: string): Promise<{ userId: string; sessionId
       return null
     }
 
-    return {
-      userId: payload.userId,
-      sessionId: payload.sessionId,
-    }
+    return payload
   } catch {
     return null
   }
@@ -66,8 +73,8 @@ export async function validateSessionEdge(token: string): Promise<EdgeAuthUser |
 
   return {
     id: decoded.userId,
-    role: 'USER',
-    companyId: null,
+    role: decoded.role || 'USER',
+    companyId: decoded.companyId || null,
   }
 }
 
