@@ -25,6 +25,19 @@ export {
 
 export { rateLimiters } from './rate-limiters'
 
+export {
+  fetchWithTimeout,
+  fetchWithRetry,
+  createCancellableFetch,
+  FetchTimeoutError,
+  type FetchWithTimeoutOptions,
+  type FetchWithRetryOptions,
+  type CancellableFetch,
+  DEFAULT_TIMEOUT_MS,
+  DEFAULT_RETRIES,
+  DEFAULT_RETRY_DELAY_MS,
+} from './fetch-with-timeout'
+
 import { NextRequest } from 'next/server'
 import type { AuthUser } from '@/lib/auth'
 import { getAuthenticatedUser } from './auth-helpers'

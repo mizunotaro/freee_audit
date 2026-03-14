@@ -2,6 +2,15 @@ import { prisma } from '@/lib/db'
 import { JournalConverter, getOptimalBatchSize } from './journal-converter'
 import { FinancialStatementConverter } from './financial-statement-converter'
 import { AccountMappingService } from './account-mapping-service'
+import {
+  type Result,
+  type AppError,
+  success,
+  failure,
+  isFailure,
+  createAppError,
+  ERROR_CODES,
+} from '@/types/result'
 import type {
   ConversionResult,
   ConversionSettings,
@@ -14,6 +23,32 @@ import type {
   ConvertedProfitLoss,
   ConvertedCashFlow,
 } from '@/types/conversion'
+
+const CONFIG_VERSION = '1.0.0'
+
+interface _VersionedConversionConfig {
+  version: string
+  createdAt: Date
+  settings: ConversionSettings
+}
+
+async function withRetry<T>(
+  fn: () => Promise<T>,
+  retries: number = 3,
+  delay: number = 1000
+): Promise<T> {
+  for (let i = 0; i < retries; i++) {
+    try {
+      return await fn()
+    } catch (error) {
+      if (i === retries - 1) throw error
+      const backoffDelay = delay * Math.pow(2, i)
+      console.warn(`[ConversionEngine] Retry ${i + 1}/${retries} after ${backoffDelay}ms`)
+      await new Promise((r) => setTimeout(r, backoffDelay))
+    }
+  }
+  throw new Error('Max retries exceeded')
+}
 
 export interface ExecutionOptions {
   dryRun?: boolean
@@ -62,13 +97,23 @@ export class ConversionEngine {
     this.abortControllers = new Map()
   }
 
-  async execute(projectId: string, options?: ExecutionOptions): Promise<ConversionResult> {
+  async execute(
+    projectId: string,
+    options?: ExecutionOptions
+  ): Promise<Result<ConversionResult, AppError>> {
     const startTime = Date.now()
-    const project = await this.getProject(projectId)
+    const projectResult = await this.getProject(projectId)
+    if (isFailure(projectResult)) {
+      return projectResult
+    }
+    const project = projectResult.data
 
     if (options?.dryRun) {
       const dryRunResult = await this.dryRun(projectId)
-      return this.createDryRunResult(projectId, dryRunResult, startTime)
+      if (isFailure(dryRunResult)) {
+        return dryRunResult
+      }
+      return success(this.createDryRunResult(projectId, dryRunResult.data, startTime))
     }
 
     const abortController = new AbortController()
@@ -89,7 +134,12 @@ export class ConversionEngine {
       if (!options?.skipValidation) {
         const validationResult = await this.validateMappings(mappings)
         if (!validationResult.isValid) {
-          throw new Error(`Validation failed: ${validationResult.errors.join(', ')}`)
+          return failure(
+            createAppError(
+              ERROR_CODES.VALIDATION_ERROR,
+              `Validation failed: ${validationResult.errors.join(', ')}`
+            )
+          )
         }
       }
 
@@ -110,7 +160,7 @@ export class ConversionEngine {
       )
 
       if (abortController.signal.aborted) {
-        throw new Error('Conversion aborted')
+        return failure(createAppError(ERROR_CODES.TIMEOUT, 'Conversion aborted'))
       }
 
       let balanceSheet: ConvertedBalanceSheet | undefined
@@ -158,18 +208,28 @@ export class ConversionEngine {
         errors: [],
       })
 
-      return result
+      return success(result)
     } catch (error) {
       await this.updateProjectStatus(projectId, 'error', 0)
-      throw error
+      return failure(
+        createAppError(
+          ERROR_CODES.DATABASE_ERROR,
+          error instanceof Error ? error.message : 'Unknown error',
+          { cause: error instanceof Error ? error : undefined }
+        )
+      )
     } finally {
       clearTimeout(timeoutId)
       this.abortControllers.delete(projectId)
     }
   }
 
-  async dryRun(projectId: string): Promise<DryRunResult> {
-    const project = await this.getProject(projectId)
+  async dryRun(projectId: string): Promise<Result<DryRunResult, AppError>> {
+    const projectResult = await this.getProject(projectId)
+    if (isFailure(projectResult)) {
+      return projectResult
+    }
+    const project = projectResult.data
 
     const mappings = await this.loadMappings(project.companyId, project.targetCoaId)
 
@@ -220,7 +280,7 @@ export class ConversionEngine {
 
     const estimatedDurationMs = Math.round(totalJournals * 5)
 
-    return {
+    return success({
       wouldCreate: {
         journalConversions: totalJournals,
         adjustingEntries: project.settings.generateAdjustingEntries ? 10 : 0,
@@ -228,11 +288,15 @@ export class ConversionEngine {
       },
       warnings,
       estimatedDurationMs,
-    }
+    })
   }
 
-  async getProgress(projectId: string): Promise<ConversionProgress> {
-    const project = await this.getProject(projectId)
+  async getProgress(projectId: string): Promise<Result<ConversionProgress, AppError>> {
+    const projectResult = await this.getProject(projectId)
+    if (isFailure(projectResult)) {
+      return projectResult
+    }
+    const project = projectResult.data
 
     const totalJournals = await this.countJournals(
       project.companyId,
@@ -254,7 +318,7 @@ export class ConversionEngine {
 
     const errors = await this.getConversionErrors(projectId)
 
-    return {
+    return success({
       status: project.status,
       progress: project.progress,
       processedJournals,
@@ -262,23 +326,33 @@ export class ConversionEngine {
       errors,
       startedAt,
       estimatedCompletion,
-    }
+    })
   }
 
-  async abort(projectId: string): Promise<void> {
+  async abort(projectId: string): Promise<Result<void, AppError>> {
     const abortEntry = this.abortControllers.get(projectId)
     if (abortEntry) {
       abortEntry.controller.abort()
     }
 
     await this.updateProjectStatus(projectId, 'error', 0)
+    return success(undefined)
   }
 
-  async resume(projectId: string): Promise<ConversionResult> {
-    const project = await this.getProject(projectId)
+  async resume(projectId: string): Promise<Result<ConversionResult, AppError>> {
+    const projectResult = await this.getProject(projectId)
+    if (isFailure(projectResult)) {
+      return projectResult
+    }
+    const project = projectResult.data
 
     if (project.status !== 'error') {
-      throw new Error(`Cannot resume project with status: ${project.status}`)
+      return failure(
+        createAppError(
+          ERROR_CODES.VALIDATION_ERROR,
+          `Cannot resume project with status: ${project.status}`
+        )
+      )
     }
 
     await this.updateProjectStatus(projectId, 'draft', 0)
@@ -286,26 +360,31 @@ export class ConversionEngine {
     return this.execute(projectId)
   }
 
-  private async getProject(projectId: string): Promise<{
-    id: string
-    companyId: string
-    targetCoaId: string
-    periodStart: Date
-    periodEnd: Date
-    status: ConversionStatus
-    progress: number
-    settings: ConversionSettings
-    createdAt: Date
-  }> {
+  private async getProject(projectId: string): Promise<
+    Result<
+      {
+        id: string
+        companyId: string
+        targetCoaId: string
+        periodStart: Date
+        periodEnd: Date
+        status: ConversionStatus
+        progress: number
+        settings: ConversionSettings
+        createdAt: Date
+      },
+      AppError
+    >
+  > {
     const project = await prisma.conversionProject.findUnique({
       where: { id: projectId },
     })
 
     if (!project) {
-      throw new Error(`Project not found: ${projectId}`)
+      return failure(createAppError(ERROR_CODES.NOT_FOUND, `Project not found: ${projectId}`))
     }
 
-    return {
+    return success({
       id: project.id,
       companyId: project.companyId,
       targetCoaId: project.targetCoaId,
@@ -315,7 +394,7 @@ export class ConversionEngine {
       progress: project.progress,
       settings: JSON.parse(project.settings) as ConversionSettings,
       createdAt: project.createdAt,
-    }
+    })
   }
 
   private async updateProjectStatus(
@@ -434,19 +513,21 @@ export class ConversionEngine {
     warnings: ConversionWarning[]
     errors: ConversionError[]
   }): Promise<ConversionResult> {
-    const result = await prisma.conversionResult.create({
-      data: {
-        projectId: data.projectId,
-        journalConversions: JSON.stringify(data.journalConversions),
-        balanceSheet: data.balanceSheet ? JSON.stringify(data.balanceSheet) : null,
-        profitLoss: data.profitLoss ? JSON.stringify(data.profitLoss) : null,
-        cashFlow: data.cashFlow ? JSON.stringify(data.cashFlow) : null,
-        conversionDate: new Date(),
-        conversionDurationMs: data.conversionDurationMs,
-        warnings: JSON.stringify(data.warnings),
-        errors: JSON.stringify(data.errors),
-      },
-    })
+    const result = await withRetry(() =>
+      prisma.conversionResult.create({
+        data: {
+          projectId: data.projectId,
+          journalConversions: JSON.stringify(data.journalConversions),
+          balanceSheet: data.balanceSheet ? JSON.stringify(data.balanceSheet) : null,
+          profitLoss: data.profitLoss ? JSON.stringify(data.profitLoss) : null,
+          cashFlow: data.cashFlow ? JSON.stringify(data.cashFlow) : null,
+          conversionDate: new Date(),
+          conversionDurationMs: data.conversionDurationMs,
+          warnings: JSON.stringify(data.warnings),
+          errors: JSON.stringify(data.errors),
+        },
+      })
+    )
 
     return {
       id: result.id,
@@ -459,6 +540,7 @@ export class ConversionEngine {
       conversionDurationMs: result.conversionDurationMs,
       warnings: data.warnings,
       errors: data.errors,
+      configVersion: CONFIG_VERSION,
     }
   }
 
@@ -488,6 +570,7 @@ export class ConversionEngine {
       conversionDurationMs: Date.now() - startTime,
       warnings: dryRunResult.warnings,
       errors: [],
+      configVersion: CONFIG_VERSION,
     }
   }
 }

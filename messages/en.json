@@ -28,6 +28,11 @@
     "audit": "Audit",
     "journals": "Journals",
     "journalProposal": "Journal Proposal AI",
+    "conversion": "Accounting Standard Conversion",
+    "valuation": "Business Valuation",
+    "financialDD": "Financial DD",
+    "board": "Board",
+    "businessReport": "Business Report",
     "tax": "Tax Management",
     "socialInsurance": "Social Insurance",
     "deferredAccrual": "Deferred & Accrual",
@@ -38,9 +43,7 @@
     "accountingBasis": "Accrual vs Cash Basis",
     "inventory": "Inventory Management",
     "periodicReports": "Periodic Reports",
-    "kpi": "KPI",
-    "board": "Board",
-    "businessReport": "Business Report"
+    "kpi": "KPI"
   },
   "report": {
     "balanceSheet": "Balance Sheet",

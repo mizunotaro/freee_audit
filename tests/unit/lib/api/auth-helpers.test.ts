@@ -7,9 +7,14 @@ import {
   extractCompanyId,
   AuthenticationError,
   AuthorizationError,
+  getAuthUser,
+  requireAuth,
+  getCompanyId,
+  requireCompanyId,
+  withAuth,
 } from '@/lib/api/auth-helpers'
 import { validateSession } from '@/lib/auth'
-import { NextRequest } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 
 vi.mock('@/lib/auth', () => ({
   validateSession: vi.fn(),
@@ -206,6 +211,138 @@ describe('Auth Helpers', () => {
     it('AuthorizationError should have default message', () => {
       const error = new AuthorizationError()
       expect(error.message).toBe('Insufficient permissions')
+    })
+  })
+
+  describe('getAuthUser', () => {
+    it('should return null when no token in cookies', async () => {
+      const request = createMockRequest({ cookies: {} })
+      const result = await getAuthUser(request)
+      expect(result).toBeNull()
+    })
+
+    it('should return null when invalid token', async () => {
+      vi.mocked(validateSession).mockResolvedValueOnce(null)
+      const request = createMockRequest({ cookies: { session: 'invalid_token' } })
+      const result = await getAuthUser(request)
+      expect(result).toBeNull()
+    })
+
+    it('should return user when valid token', async () => {
+      const mockUser = createMockUser()
+      vi.mocked(validateSession).mockResolvedValueOnce(mockUser)
+      const request = createMockRequest({ cookies: { session: 'valid_token' } })
+      const result = await getAuthUser(request)
+      expect(result).toEqual(mockUser)
+    })
+  })
+
+  describe('requireAuth', () => {
+    it('should return 401 response when no token', async () => {
+      const request = createMockRequest({ cookies: {} })
+      const result = await requireAuth(request)
+      expect(result).toBeInstanceOf(NextResponse)
+      const response = result as NextResponse
+      expect(response.status).toBe(401)
+      const json = await response.json()
+      expect(json).toEqual({ error: 'Unauthorized' })
+    })
+
+    it('should return 401 response when invalid token', async () => {
+      vi.mocked(validateSession).mockResolvedValueOnce(null)
+      const request = createMockRequest({ cookies: { session: 'invalid_token' } })
+      const result = await requireAuth(request)
+      expect(result).toBeInstanceOf(NextResponse)
+      const response = result as NextResponse
+      expect(response.status).toBe(401)
+    })
+
+    it('should return user when valid token', async () => {
+      const mockUser = createMockUser()
+      vi.mocked(validateSession).mockResolvedValueOnce(mockUser)
+      const request = createMockRequest({ cookies: { session: 'valid_token' } })
+      const result = await requireAuth(request)
+      expect(result).not.toBeInstanceOf(NextResponse)
+      expect(result).toEqual(mockUser)
+    })
+  })
+
+  describe('getCompanyId', () => {
+    it('should return companyId when user has one', () => {
+      const user = createMockUser({ companyId: 'company-123' })
+      const result = getCompanyId(user)
+      expect(result).toBe('company-123')
+    })
+
+    it('should return null when user has no companyId', () => {
+      const user = createMockUser({ companyId: null })
+      const result = getCompanyId(user)
+      expect(result).toBeNull()
+    })
+
+    it('should return null when companyId is undefined', () => {
+      const user = { ...createMockUser(), companyId: undefined } as unknown as ReturnType<
+        typeof createMockUser
+      >
+      const result = getCompanyId(user)
+      expect(result).toBeNull()
+    })
+  })
+
+  describe('requireCompanyId', () => {
+    it('should return success with companyId when user has one', () => {
+      const user = createMockUser({ companyId: 'company-123' })
+      const result = requireCompanyId(user)
+      expect(result.success).toBe(true)
+      if (result.success) {
+        expect(result.data).toBe('company-123')
+      }
+    })
+
+    it('should return failure when user has no companyId', () => {
+      const user = createMockUser({ companyId: null })
+      const result = requireCompanyId(user)
+      expect(result.success).toBe(false)
+      if (!result.success) {
+        expect(result.error.code).toBe('VALIDATION_ERROR')
+        expect(result.error.message).toContain('Company ID is required')
+      }
+    })
+  })
+
+  describe('withAuth', () => {
+    it('should return 401 when not authenticated', async () => {
+      const handler = vi.fn().mockResolvedValue(NextResponse.json({ data: 'test' }))
+      const wrapped = withAuth(handler)
+      const request = createMockRequest({ cookies: {} })
+      const result = await wrapped(request)
+      expect(handler).not.toHaveBeenCalled()
+      expect(result.status).toBe(401)
+    })
+
+    it('should call handler with user when authenticated', async () => {
+      const mockUser = createMockUser()
+      vi.mocked(validateSession).mockResolvedValueOnce(mockUser)
+      const handler = vi.fn().mockResolvedValue(NextResponse.json({ data: 'test' }))
+      const wrapped = withAuth(handler)
+      const request = createMockRequest({ cookies: { session: 'valid_token' } })
+      const result = await wrapped(request)
+      expect(handler).toHaveBeenCalledWith(request, mockUser)
+      expect(result.status).toBe(200)
+    })
+
+    it('should propagate handler response', async () => {
+      const mockUser = createMockUser()
+      vi.mocked(validateSession).mockResolvedValueOnce(mockUser)
+      const handler = vi
+        .fn()
+        .mockResolvedValue(NextResponse.json({ custom: 'response' }, { status: 201 }))
+      const wrapped = withAuth(handler)
+      const request = createMockRequest({ cookies: { session: 'valid_token' } })
+      const result = await wrapped(request)
+      expect(result.status).toBe(201)
+      const json = await result.json()
+      expect(json).toEqual({ custom: 'response' })
     })
   })
 })

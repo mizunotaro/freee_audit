@@ -11,6 +11,29 @@ export interface AIConfig {
   maxTokens?: number
 }
 
+export interface GenerateMessage {
+  role: 'system' | 'user' | 'assistant'
+  content: string
+}
+
+export interface GenerateOptions {
+  messages: GenerateMessage[]
+  model?: string
+  temperature?: number
+  maxTokens?: number
+  timeout?: number
+}
+
+export interface GenerateResult {
+  content: string
+  model: string
+  usage?: {
+    promptTokens: number
+    completionTokens: number
+    totalTokens: number
+  }
+}
+
 export interface DocumentAnalysisRequest {
   documentBase64: string
   documentType: 'pdf' | 'image' | 'excel'
@@ -35,6 +58,7 @@ export interface AIProvider {
   readonly name: AIProviderType
   analyzeDocument(request: DocumentAnalysisRequest): Promise<DocumentAnalysisResult>
   validateEntry(request: EntryValidationRequest): Promise<EntryValidationResult>
+  generate(options: GenerateOptions): Promise<GenerateResult>
 }
 
 export abstract class BaseAIProvider implements AIProvider {
@@ -47,6 +71,7 @@ export abstract class BaseAIProvider implements AIProvider {
 
   abstract analyzeDocument(request: DocumentAnalysisRequest): Promise<DocumentAnalysisResult>
   abstract validateEntry(request: EntryValidationRequest): Promise<EntryValidationResult>
+  abstract generate(options: GenerateOptions): Promise<GenerateResult>
 
   protected getSystemPrompt(): string {
     return `You are an expert in accounting document analysis.

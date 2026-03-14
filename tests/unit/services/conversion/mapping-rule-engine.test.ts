@@ -15,7 +15,10 @@ describe('MappingRuleEngine', () => {
 
       const result = engine.calculateAmount(rule, 1000)
 
-      expect(result).toBe(1000)
+      expect(result.success).toBe(true)
+      if (result.success) {
+        expect(result.data).toBe(1000)
+      }
     })
 
     it('should calculate percentage split', () => {
@@ -26,7 +29,10 @@ describe('MappingRuleEngine', () => {
 
       const result = engine.calculateAmount(rule, 1000)
 
-      expect(result).toBe(300)
+      expect(result.success).toBe(true)
+      if (result.success) {
+        expect(result.data).toBe(300)
+      }
     })
 
     it('should calculate formula', () => {
@@ -37,7 +43,10 @@ describe('MappingRuleEngine', () => {
 
       const result = engine.calculateAmount(rule, 1000)
 
-      expect(result).toBe(500)
+      expect(result.success).toBe(true)
+      if (result.success) {
+        expect(result.data).toBe(500)
+      }
     })
 
     it('should calculate formula with context', () => {
@@ -48,15 +57,21 @@ describe('MappingRuleEngine', () => {
 
       const result = engine.calculateAmount(rule, 1000, { amount: 500 })
 
-      expect(result).toBe(1500)
+      expect(result.success).toBe(true)
+      if (result.success) {
+        expect(result.data).toBe(1500)
+      }
     })
 
-    it('should throw error for percentage rule without percentage', () => {
+    it('should return error for percentage rule without percentage', () => {
       const rule: ConversionRule = { type: 'percentage' }
 
-      expect(() => engine.calculateAmount(rule, 1000)).toThrow(
-        'Percentage rule requires percentage value'
-      )
+      const result = engine.calculateAmount(rule, 1000)
+
+      expect(result.success).toBe(false)
+      if (!result.success) {
+        expect(result.error.message).toBe('Percentage rule requires percentage value')
+      }
     })
 
     it('should return source amount for ai_suggested type', () => {
@@ -64,7 +79,10 @@ describe('MappingRuleEngine', () => {
 
       const result = engine.calculateAmount(rule, 1000)
 
-      expect(result).toBe(1000)
+      expect(result.success).toBe(true)
+      if (result.success) {
+        expect(result.data).toBe(1000)
+      }
     })
   })
 

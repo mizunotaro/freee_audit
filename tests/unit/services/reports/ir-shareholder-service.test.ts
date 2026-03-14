@@ -5,6 +5,7 @@ import type {
   ShareholderComposition,
   CreateShareholderData,
   UpdateShareholderData,
+  ShareholderCategory,
 } from '@/types/ir-report'
 
 type ShareholderServiceError = {
@@ -217,7 +218,6 @@ describe('IRShareholderService', () => {
     sharesHeld: 1000000,
     percentage: 25.5,
     createdAt: new Date(),
-    updatedAt: new Date(),
   }
 
   beforeEach(() => {

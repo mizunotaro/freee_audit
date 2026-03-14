@@ -11,6 +11,29 @@ import {
 } from '@/lib/integrations/ai/factory'
 import type { AIConfig } from '@/lib/integrations/ai/factory'
 
+vi.mock('openai', () => ({
+  default: class MockOpenAI {
+    constructor() {}
+  },
+}))
+
+vi.mock('@anthropic-ai/sdk', () => ({
+  default: class MockAnthropic {
+    constructor() {}
+  },
+}))
+
+vi.mock('@google/generative-ai', () => ({
+  GoogleGenerativeAI: class MockGoogleGenerativeAI {
+    constructor() {}
+    getGenerativeModel() {
+      return {
+        generateContent: vi.fn().mockResolvedValue({ response: { text: () => '' } }),
+      }
+    }
+  },
+}))
+
 describe('AI Factory - Fallback Integration', () => {
   const originalEnv = { ...process.env }
 

@@ -4,6 +4,8 @@ import {
   AIConfig,
   DocumentAnalysisRequest,
   EntryValidationRequest,
+  GenerateOptions,
+  GenerateResult,
 } from './provider'
 import { DocumentAnalysisResult, EntryValidationResult, ValidationIssue } from '@/types/audit'
 import { API_TIMEOUTS } from '@/lib/utils/timeout'
@@ -257,6 +259,36 @@ export class OpenAIProvider extends BaseAIProvider {
         actualValue: issue.actualValue,
       })) as ValidationIssue[],
       suggestions: result.suggestions,
+    }
+  }
+
+  async generate(options: GenerateOptions): Promise<GenerateResult> {
+    const model = options.model || this.resolvedModel
+    const temperature = options.temperature ?? this.config.temperature ?? 0.1
+    const maxTokens = options.maxTokens ?? this.config.maxTokens ?? 1024
+
+    const response = await this.withRetry(async () => {
+      return this.client.chat.completions.create({
+        model,
+        messages: options.messages.map((m) => ({
+          role: m.role,
+          content: m.content,
+        })),
+        max_tokens: maxTokens,
+        temperature,
+      })
+    }, 'generate')
+
+    return {
+      content: response.choices[0]?.message?.content || '',
+      model: response.model,
+      usage: response.usage
+        ? {
+            promptTokens: response.usage.prompt_tokens,
+            completionTokens: response.usage.completion_tokens,
+            totalTokens: response.usage.total_tokens,
+          }
+        : undefined,
     }
   }
 }

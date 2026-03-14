@@ -8,18 +8,18 @@ datasource db {
 }
 
 model User {
-  id                    String               @id @default(cuid())
-  email                 String               @unique
-  passwordHash          String?              @map("password_hash")
-  name                  String
-  role                  String               @default("VIEWER")
-  companyId             String?              @map("company_id")
-  company               Company?             @relation(fields: [companyId], references: [id])
-  sessions              Session[]
-  auditLogs             AuditLog[]
-  investorInvitations   InvestorInvitation[]
-  createdAt             DateTime             @default(now()) @map("created_at")
-  updatedAt             DateTime             @updatedAt @map("updated_at")
+  id                  String               @id @default(cuid())
+  email               String               @unique
+  passwordHash        String?              @map("password_hash")
+  name                String
+  role                String               @default("VIEWER")
+  companyId           String?              @map("company_id")
+  company             Company?             @relation(fields: [companyId], references: [id])
+  sessions            Session[]
+  auditLogs           AuditLog[]
+  investorInvitations InvestorInvitation[]
+  createdAt           DateTime             @default(now()) @map("created_at")
+  updatedAt           DateTime             @updatedAt @map("updated_at")
 
   @@map("users")
 }
@@ -38,53 +38,62 @@ model Session {
 }
 
 model Company {
-  id                     String                  @id @default(cuid())
-  freeeCompanyId         String?                 @unique @map("freee_company_id")
-  name                   String
-  fiscalYearStart        Int                     @default(1) @map("fiscal_year_start")
-  users                  User[]
-  journals               Journal[]
-  documents              Document[]
-  budgets                Budget[]
-  cashFlows              CashFlow[]
-  kpis                   FinancialKPI[]
-  apiKeys                ApiKey[]
-  monthlyBalances        MonthlyBalance[]
-  accountItems           AccountItem[]
-  debts                  Debt[]
-  taxSchedules           TaxSchedule[]
-  boardMeetings          BoardMeeting[]
-  customKPIs             CustomKPI[]
-  boardReports           BoardReport[]
-  analysisPrompts        AnalysisPrompt[]
-  fixedAssets            FixedAsset[]
-  taxEffectAccounting    TaxEffectAccounting[]
-  inventoryAdjustments   InventoryAdjustment[]
+  id                       String                       @id @default(cuid())
+  freeeCompanyId           String?                      @unique @map("freee_company_id")
+  name                     String
+  fiscalYearStart          Int                          @default(1) @map("fiscal_year_start")
+  users                    User[]
+  journals                 Journal[]
+  documents                Document[]
+  budgets                  Budget[]
+  cashFlows                CashFlow[]
+  kpis                     FinancialKPI[]
+  apiKeys                  ApiKey[]
+  monthlyBalances          MonthlyBalance[]
+  accountItems             AccountItem[]
+  debts                    Debt[]
+  taxSchedules             TaxSchedule[]
+  boardMeetings            BoardMeeting[]
+  customKPIs               CustomKPI[]
+  boardReports             BoardReport[]
+  analysisPrompts          AnalysisPrompt[]
+  fixedAssets              FixedAsset[]
+  taxEffectAccounting      TaxEffectAccounting[]
+  inventoryAdjustments     InventoryAdjustment[]
   socialInsuranceSchedules SocialInsuranceSchedule[]
-  socialInsurancePayments SocialInsurancePayment[]
-  prepaidExpenses        PrepaidExpense[]
-  accrualExpenses        AccrualExpense[]
-  taxSettings            TaxSettings?
-  chartOfAccounts        ChartOfAccount[]
-  accountMappings        AccountMapping[]
-  conversionProjects     ConversionProject[]
-  foreignTransactions    ForeignCurrencyTransaction[]
-  settings               CompanySettings?
-  receiptDocuments       ReceiptDocument[]
-  journalProposals       JournalProposal[]
-  createdAt              DateTime                @default(now()) @map("created_at")
-  updatedAt              DateTime                @updatedAt @map("updated_at")
+  socialInsurancePayments  SocialInsurancePayment[]
+  prepaidExpenses          PrepaidExpense[]
+  accrualExpenses          AccrualExpense[]
+  taxSettings              TaxSettings?
+  chartOfAccounts          ChartOfAccount[]
+  accountMappings          AccountMapping[]
+  conversionProjects       ConversionProject[]
+  foreignTransactions      ForeignCurrencyTransaction[]
+  settings                 CompanySettings?
+  receiptDocuments         ReceiptDocument[]
+  journalProposals         JournalProposal[]
+  irReports                IRReport[]
+  shareholderCompositions  ShareholderComposition[]
+  irEvents                 IREvent[]
+  ddChecklists             DDChecklist[]
+  ddFindings               DDFinding[]
+  ddReports                DDReport[]
+  ddConversions            DDConversion[]
+  peerCompanies            PeerCompany[]
+  marketDataProviders      MarketDataProvider[]
+  createdAt                DateTime                     @default(now()) @map("created_at")
+  updatedAt                DateTime                     @updatedAt @map("updated_at")
 
   @@map("companies")
 }
 
 model ApiKey {
-  id              String   @id @default(cuid())
-  companyId       String   @map("company_id")
-  company         Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  id              String    @id @default(cuid())
+  companyId       String    @map("company_id")
+  company         Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
   provider        String
-  encryptedKey    String   @map("encrypted_key")
-  encryptedSecret String?  @map("encrypted_secret")
+  encryptedKey    String    @map("encrypted_key")
+  encryptedSecret String?   @map("encrypted_secret")
   metadata        String?
   expiresAt       DateTime? @map("expires_at")
   createdAt       DateTime  @default(now()) @map("created_at")
@@ -95,24 +104,24 @@ model ApiKey {
 }
 
 model Journal {
-  id             String        @id @default(cuid())
-  companyId      String        @map("company_id")
-  company        Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  freeeJournalId String        @unique @map("freee_journal_id")
-  entryDate      DateTime      @map("entry_date")
-  description    String
-  debitAccount   String        @map("debit_account")
-  creditAccount  String        @map("credit_account")
-  amount         Float
-  taxAmount      Float         @default(0) @map("tax_amount")
-  taxType        String?       @map("tax_type")
-  documentId     String?       @unique @map("document_id")
-  document       Document?     @relation(fields: [documentId], references: [id])
-  auditStatus    String        @default("PENDING") @map("audit_status")
-  auditResults   AuditResult[]
+  id                          String                       @id @default(cuid())
+  companyId                   String                       @map("company_id")
+  company                     Company                      @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  freeeJournalId              String                       @unique @map("freee_journal_id")
+  entryDate                   DateTime                     @map("entry_date")
+  description                 String
+  debitAccount                String                       @map("debit_account")
+  creditAccount               String                       @map("credit_account")
+  amount                      Float
+  taxAmount                   Float                        @default(0) @map("tax_amount")
+  taxType                     String?                      @map("tax_type")
+  documentId                  String?                      @unique @map("document_id")
+  document                    Document?                    @relation(fields: [documentId], references: [id])
+  auditStatus                 String                       @default("PENDING") @map("audit_status")
+  auditResults                AuditResult[]
   foreignCurrencyTransactions ForeignCurrencyTransaction[]
-  syncedAt       DateTime      @map("synced_at")
-  createdAt      DateTime      @default(now()) @map("created_at")
+  syncedAt                    DateTime                     @map("synced_at")
+  createdAt                   DateTime                     @default(now()) @map("created_at")
 
   @@index([companyId, entryDate])
   @@index([companyId, auditStatus])
@@ -138,17 +147,17 @@ model Document {
 }
 
 model AuditResult {
-  id              String   @id @default(cuid())
-  journalId       String   @map("journal_id")
-  journal         Journal  @relation(fields: [journalId], references: [id], onDelete: Cascade)
-  documentId      String?  @map("document_id")
+  id              String    @id @default(cuid())
+  journalId       String    @map("journal_id")
+  journal         Journal   @relation(fields: [journalId], references: [id], onDelete: Cascade)
+  documentId      String?   @map("document_id")
   document        Document? @relation(fields: [documentId], references: [id])
   status          String
   issues          String
-  confidenceScore Float?   @map("confidence_score")
-  rawAiResponse   String?  @map("raw_ai_response")
-  analyzedAt      DateTime @map("analyzed_at")
-  createdAt       DateTime @default(now()) @map("created_at")
+  confidenceScore Float?    @map("confidence_score")
+  rawAiResponse   String?   @map("raw_ai_response")
+  analyzedAt      DateTime  @map("analyzed_at")
+  createdAt       DateTime  @default(now()) @map("created_at")
 
   @@index([journalId])
   @@index([status])
@@ -228,21 +237,21 @@ model Currency {
 }
 
 model ExchangeRate {
-  id           String   @id @default(cuid())
-  rateDate     DateTime @map("rate_date")
-  fromCurrency String   @map("from_currency")
-  toCurrency   String   @map("to_currency")
-  rate         Float
-  source       String
-  sourceUrl    String?  @map("source_url")
-  confidence   Float    @default(1.0)
-  isOfficial   Boolean  @default(false) @map("is_official")
-  kpis         FinancialKPI[]
-  transactionRates    ForeignCurrencyTransaction[] @relation("TransactionRate")
-  settlementRates     ForeignCurrencyTransaction[] @relation("SettlementRate")
-  revaluationRates    ForeignCurrencyTransaction[] @relation("RevaluationRate")
-  createdAt    DateTime @default(now()) @map("created_at")
-  updatedAt    DateTime @updatedAt @map("updated_at")
+  id               String                       @id @default(cuid())
+  rateDate         DateTime                     @map("rate_date")
+  fromCurrency     String                       @map("from_currency")
+  toCurrency       String                       @map("to_currency")
+  rate             Float
+  source           String
+  sourceUrl        String?                      @map("source_url")
+  confidence       Float                        @default(1.0)
+  isOfficial       Boolean                      @default(false) @map("is_official")
+  kpis             FinancialKPI[]
+  transactionRates ForeignCurrencyTransaction[] @relation("TransactionRate")
+  settlementRates  ForeignCurrencyTransaction[] @relation("SettlementRate")
+  revaluationRates ForeignCurrencyTransaction[] @relation("RevaluationRate")
+  createdAt        DateTime                     @default(now()) @map("created_at")
+  updatedAt        DateTime                     @updatedAt @map("updated_at")
 
   @@unique([rateDate, fromCurrency, toCurrency, source])
   @@index([rateDate])
@@ -251,47 +260,47 @@ model ExchangeRate {
 }
 
 model ForeignCurrencyTransaction {
-  id                String    @id @default(cuid())
-  companyId         String    @map("company_id")
-  company           Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  id        String  @id @default(cuid())
+  companyId String  @map("company_id")
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
 
-  transactionDate   DateTime  @map("transaction_date")
-  transactionType   String    @map("transaction_type")
-  currencyCode      String    @map("currency_code")
-  currency          Currency  @relation(fields: [currencyCode], references: [code])
+  transactionDate DateTime @map("transaction_date")
+  transactionType String   @map("transaction_type")
+  currencyCode    String   @map("currency_code")
+  currency        Currency @relation(fields: [currencyCode], references: [code])
 
-  originalAmount    Float     @map("original_amount")
-  exchangeRateId    String    @map("exchange_rate_id")
-  exchangeRate      ExchangeRate @relation("TransactionRate", fields: [exchangeRateId], references: [id])
-  exchangedAmount   Float     @map("exchanged_amount")
+  originalAmount  Float        @map("original_amount")
+  exchangeRateId  String       @map("exchange_rate_id")
+  exchangeRate    ExchangeRate @relation("TransactionRate", fields: [exchangeRateId], references: [id])
+  exchangedAmount Float        @map("exchanged_amount")
 
-  referenceNumber   String?   @map("reference_number")
-  partnerId         String?   @map("partner_id")
-  partnerName       String?   @map("partner_name")
-  documentId        String?   @map("document_id")
-  description       String?
+  referenceNumber String? @map("reference_number")
+  partnerId       String? @map("partner_id")
+  partnerName     String? @map("partner_name")
+  documentId      String? @map("document_id")
+  description     String?
 
-  settlementDate        DateTime?   @map("settlement_date")
-  settlementRateId      String?     @map("settlement_rate_id")
-  settlementRate        ExchangeRate? @relation("SettlementRate", fields: [settlementRateId], references: [id])
-  settlementAmount      Float?      @map("settlement_amount")
-  exchangeGainLoss      Float?      @map("exchange_gain_loss")
-  exchangeGainLossType  String?     @map("exchange_gain_loss_type")
+  settlementDate       DateTime?     @map("settlement_date")
+  settlementRateId     String?       @map("settlement_rate_id")
+  settlementRate       ExchangeRate? @relation("SettlementRate", fields: [settlementRateId], references: [id])
+  settlementAmount     Float?        @map("settlement_amount")
+  exchangeGainLoss     Float?        @map("exchange_gain_loss")
+  exchangeGainLossType String?       @map("exchange_gain_loss_type")
 
-  revaluationDate       DateTime?   @map("revaluation_date")
-  revaluationRateId     String?     @map("revaluation_rate_id")
-  revaluationRate       ExchangeRate? @relation("RevaluationRate", fields: [revaluationRateId], references: [id])
-  revaluationGainLoss   Float?      @map("revaluation_gain_loss")
+  revaluationDate     DateTime?     @map("revaluation_date")
+  revaluationRateId   String?       @map("revaluation_rate_id")
+  revaluationRate     ExchangeRate? @relation("RevaluationRate", fields: [revaluationRateId], references: [id])
+  revaluationGainLoss Float?        @map("revaluation_gain_loss")
 
-  journalId             String?     @map("journal_id")
-  journal               Journal?    @relation(fields: [journalId], references: [id])
-  settlementJournalId   String?     @map("settlement_journal_id")
-  revaluationJournalId  String?     @map("revaluation_journal_id")
+  journalId            String?  @map("journal_id")
+  journal              Journal? @relation(fields: [journalId], references: [id])
+  settlementJournalId  String?  @map("settlement_journal_id")
+  revaluationJournalId String?  @map("revaluation_journal_id")
 
-  status                String      @default("open")
+  status String @default("open")
 
-  createdAt             DateTime    @default(now()) @map("created_at")
-  updatedAt             DateTime    @updatedAt @map("updated_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   @@index([companyId, transactionDate])
   @@index([companyId, status])
@@ -317,28 +326,28 @@ model ExchangeRateFetchLog {
 }
 
 model ExchangeRateSettings {
-  id                        String   @id @default(cuid())
-  companyId                 String   @unique @map("company_id")
+  id        String @id @default(cuid())
+  companyId String @unique @map("company_id")
 
-  slackEnabled              Boolean  @default(false) @map("slack_enabled")
-  slackWebhookUrl           String?  @map("slack_webhook_url")
-  slackChannel              String?  @map("slack_channel")
-  slackNotifyOnFailure      Boolean  @default(true) @map("slack_notify_on_failure")
-  slackNotifyOnSuccess      Boolean  @default(false) @map("slack_notify_on_success")
+  slackEnabled         Boolean @default(false) @map("slack_enabled")
+  slackWebhookUrl      String? @map("slack_webhook_url")
+  slackChannel         String? @map("slack_channel")
+  slackNotifyOnFailure Boolean @default(true) @map("slack_notify_on_failure")
+  slackNotifyOnSuccess Boolean @default(false) @map("slack_notify_on_success")
 
-  emailEnabled              Boolean  @default(false) @map("email_enabled")
-  emailRecipients           String?  @map("email_recipients")
-  emailNotifyOnFailure      Boolean  @default(true) @map("email_notify_on_failure")
+  emailEnabled         Boolean @default(false) @map("email_enabled")
+  emailRecipients      String? @map("email_recipients")
+  emailNotifyOnFailure Boolean @default(true) @map("email_notify_on_failure")
 
-  autoFetchEnabled          Boolean  @default(true) @map("auto_fetch_enabled")
-  fetchTime                 String   @default("11:00") @map("fetch_time")
-  retryDelays               String   @default("[300000,900000,3600000]") @map("retry_delays")
+  autoFetchEnabled Boolean @default(true) @map("auto_fetch_enabled")
+  fetchTime        String  @default("11:00") @map("fetch_time")
+  retryDelays      String  @default("[300000,900000,3600000]") @map("retry_delays")
 
-  autoRevaluationEnabled    Boolean  @default(true) @map("auto_revaluation_enabled")
-  revaluationMonths         String   @default("[3,12]") @map("revaluation_months")
+  autoRevaluationEnabled Boolean @default(true) @map("auto_revaluation_enabled")
+  revaluationMonths      String  @default("[3,12]") @map("revaluation_months")
 
-  createdAt                 DateTime @default(now()) @map("created_at")
-  updatedAt                 DateTime @updatedAt @map("updated_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   @@map("exchange_rate_settings")
 }
@@ -362,16 +371,16 @@ model FinancialKPI {
 }
 
 model MonthlyBalance {
-  id           String   @id @default(cuid())
-  companyId    String   @map("company_id")
-  company      Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  fiscalYear   Int      @map("fiscal_year")
-  month        Int
-  accountCode  String   @map("account_code")
-  accountName  String   @map("account_name")
-  category     String
-  amount       Float
-  createdAt    DateTime @default(now()) @map("created_at")
+  id          String   @id @default(cuid())
+  companyId   String   @map("company_id")
+  company     Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  fiscalYear  Int      @map("fiscal_year")
+  month       Int
+  accountCode String   @map("account_code")
+  accountName String   @map("account_name")
+  category    String
+  amount      Float
+  createdAt   DateTime @default(now()) @map("created_at")
 
   @@unique([companyId, fiscalYear, month, accountCode])
   @@index([companyId, fiscalYear])
@@ -407,57 +416,57 @@ model BoxToken {
 }
 
 model Settings {
-  id                  String   @id @default(cuid())
-  userId              String   @unique @map("user_id")
-  theme               String   @default("system")
-  aiProvider          String   @default("openai") @map("ai_provider")
-  aiModel             String?  @map("ai_model")
-  aiZdrEnabled        Boolean? @default(true) @map("ai_zdr_enabled")
-  aiDataResidency     String?  @map("ai_data_residency")
-  openaiApiKey        String?  @map("openai_api_key")
-  geminiApiKey        String?  @map("gemini_api_key")
-  claudeApiKey        String?  @map("claude_api_key")
-  azureApiKey         String?  @map("azure_api_key")
-  azureEndpoint       String?  @map("azure_endpoint")
-  awsAccessKeyId      String?  @map("aws_access_key_id")
-  awsSecretAccessKey  String?  @map("aws_secret_access_key")
-  awsRegion           String?  @map("aws_region")
-  gcpApiKey           String?  @map("gcp_api_key")
-  gcpProjectId        String?  @map("gcp_project_id")
-  openrouterApiKey    String?  @map("openrouter_api_key")
-  secretSource        String   @default("local") @map("secret_source")
-  freeeClientId       String?  @map("freee_client_id")
-  freeeClientSecret   String?  @map("freee_client_secret")
-  freeeCompanyId      String?  @map("freee_company_id")
-  analysisPrompt      String?  @map("analysis_prompt")
-  fiscalYearEndMonth  Int?     @map("fiscal_year_end_month")
-  taxBusinessType     String?  @map("tax_business_type")
-  createdAt           DateTime @default(now()) @map("created_at")
-  updatedAt           DateTime @updatedAt @map("updated_at")
+  id                 String   @id @default(cuid())
+  userId             String   @unique @map("user_id")
+  theme              String   @default("system")
+  aiProvider         String   @default("openai") @map("ai_provider")
+  aiModel            String?  @map("ai_model")
+  aiZdrEnabled       Boolean? @default(true) @map("ai_zdr_enabled")
+  aiDataResidency    String?  @map("ai_data_residency")
+  openaiApiKey       String?  @map("openai_api_key")
+  geminiApiKey       String?  @map("gemini_api_key")
+  claudeApiKey       String?  @map("claude_api_key")
+  azureApiKey        String?  @map("azure_api_key")
+  azureEndpoint      String?  @map("azure_endpoint")
+  awsAccessKeyId     String?  @map("aws_access_key_id")
+  awsSecretAccessKey String?  @map("aws_secret_access_key")
+  awsRegion          String?  @map("aws_region")
+  gcpApiKey          String?  @map("gcp_api_key")
+  gcpProjectId       String?  @map("gcp_project_id")
+  openrouterApiKey   String?  @map("openrouter_api_key")
+  secretSource       String   @default("local") @map("secret_source")
+  freeeClientId      String?  @map("freee_client_id")
+  freeeClientSecret  String?  @map("freee_client_secret")
+  freeeCompanyId     String?  @map("freee_company_id")
+  analysisPrompt     String?  @map("analysis_prompt")
+  fiscalYearEndMonth Int?     @map("fiscal_year_end_month")
+  taxBusinessType    String?  @map("tax_business_type")
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
 
   @@map("settings")
 }
 
 model AccountItem {
-  id                        String   @id @default(cuid())
-  companyId                 String   @map("company_id")
-  company                   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  freeeId                   Int      @map("freee_id")
-  name                      String
-  shortcut                  String?
-  shortcutNum               String?  @map("shortcut_num")
-  categoryId                Int      @map("category_id")
-  categoryName              String   @map("category_name")
-  categoryType              String   @map("category_type")
-  correspondingIncomeId     Int?     @map("corresponding_income_id")
-  correspondingIncomeName   String?  @map("corresponding_income_name")
-  correspondingExpenseId    Int?     @map("corresponding_expense_id")
-  correspondingExpenseName  String?  @map("corresponding_expense_name")
-  searchable                Boolean  @default(true)
-  cumulable                 Boolean  @default(false)
-  balance                   String
-  createdAt                 DateTime @default(now()) @map("created_at")
-  updatedAt                 DateTime @updatedAt @map("updated_at")
+  id                       String   @id @default(cuid())
+  companyId                String   @map("company_id")
+  company                  Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  freeeId                  Int      @map("freee_id")
+  name                     String
+  shortcut                 String?
+  shortcutNum              String?  @map("shortcut_num")
+  categoryId               Int      @map("category_id")
+  categoryName             String   @map("category_name")
+  categoryType             String   @map("category_type")
+  correspondingIncomeId    Int?     @map("corresponding_income_id")
+  correspondingIncomeName  String?  @map("corresponding_income_name")
+  correspondingExpenseId   Int?     @map("corresponding_expense_id")
+  correspondingExpenseName String?  @map("corresponding_expense_name")
+  searchable               Boolean  @default(true)
+  cumulable                Boolean  @default(false)
+  balance                  String
+  createdAt                DateTime @default(now()) @map("created_at")
+  updatedAt                DateTime @updatedAt @map("updated_at")
 
   @@unique([companyId, freeeId])
   @@index([companyId, categoryType])
@@ -465,20 +474,20 @@ model AccountItem {
 }
 
 model Debt {
-  id               String    @id @default(cuid())
-  companyId        String    @map("company_id")
-  company          Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  freeeDealId      String?   @map("freee_deal_id")
-  partnerId        String?   @map("partner_id")
-  partnerName      String?   @map("partner_name")
-  description      String?
-  amount           Float
-  dueDate          DateTime  @map("due_date")
-  paymentDate      DateTime? @map("payment_date")
-  status           String    @default("PENDING")
-  category         String
-  createdAt        DateTime  @default(now()) @map("created_at")
-  updatedAt        DateTime  @updatedAt @map("updated_at")
+  id          String    @id @default(cuid())
+  companyId   String    @map("company_id")
+  company     Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  freeeDealId String?   @map("freee_deal_id")
+  partnerId   String?   @map("partner_id")
+  partnerName String?   @map("partner_name")
+  description String?
+  amount      Float
+  dueDate     DateTime  @map("due_date")
+  paymentDate DateTime? @map("payment_date")
+  status      String    @default("PENDING")
+  category    String
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
 
   @@index([companyId, dueDate])
   @@index([companyId, status])
@@ -486,20 +495,20 @@ model Debt {
 }
 
 model TaxSchedule {
-  id              String       @id @default(cuid())
-  companyId       String       @map("company_id")
-  company         Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  taxType         String       @map("tax_type")
-  fiscalYear      Int          @map("fiscal_year")
-  dueDate         DateTime     @map("due_date")
-  amount          Float?
-  status          String       @default("PENDING")
-  filedDate       DateTime?    @map("filed_date")
-  paidDate        DateTime?    @map("paid_date")
-  note            String?
-  payments        TaxPayment[]
-  createdAt       DateTime     @default(now()) @map("created_at")
-  updatedAt       DateTime     @updatedAt @map("updated_at")
+  id         String       @id @default(cuid())
+  companyId  String       @map("company_id")
+  company    Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  taxType    String       @map("tax_type")
+  fiscalYear Int          @map("fiscal_year")
+  dueDate    DateTime     @map("due_date")
+  amount     Float?
+  status     String       @default("PENDING")
+  filedDate  DateTime?    @map("filed_date")
+  paidDate   DateTime?    @map("paid_date")
+  note       String?
+  payments   TaxPayment[]
+  createdAt  DateTime     @default(now()) @map("created_at")
+  updatedAt  DateTime     @updatedAt @map("updated_at")
 
   @@unique([companyId, taxType, fiscalYear])
   @@index([companyId, fiscalYear])
@@ -522,70 +531,70 @@ model TaxPayment {
 }
 
 model BoardMeeting {
-  id                String       @id @default(cuid())
-  companyId         String       @map("company_id")
-  company           Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  meetingDate       DateTime     @map("meeting_date")
-  meetingType       String       @map("meeting_type")
-  agendaItems       AgendaItem[]
-  minutes           String?
-  status            String       @default("SCHEDULED")
-  createdAt         DateTime     @default(now()) @map("created_at")
-  updatedAt         DateTime     @updatedAt @map("updated_at")
+  id          String       @id @default(cuid())
+  companyId   String       @map("company_id")
+  company     Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  meetingDate DateTime     @map("meeting_date")
+  meetingType String       @map("meeting_type")
+  agendaItems AgendaItem[]
+  minutes     String?
+  status      String       @default("SCHEDULED")
+  createdAt   DateTime     @default(now()) @map("created_at")
+  updatedAt   DateTime     @updatedAt @map("updated_at")
 
   @@index([companyId, meetingDate])
   @@map("board_meetings")
 }
 
 model AgendaItem {
-  id                  String       @id @default(cuid())
-  boardMeetingId      String       @map("board_meeting_id")
-  boardMeeting        BoardMeeting @relation(fields: [boardMeetingId], references: [id], onDelete: Cascade)
-  title               String
-  description         String?
-  category            String
-  decisionType        String       @map("decision_type")
-  requiredByLaw       Boolean      @default(false) @map("required_by_law")
-  legalBasis          String?      @map("legal_basis")
-  aiAnalysis          String?      @map("ai_analysis")
-  resolution          String?
-  resolutionStatus    String       @default("PENDING") @map("resolution_status")
-  createdAt           DateTime     @default(now()) @map("created_at")
-  updatedAt           DateTime     @updatedAt @map("updated_at")
+  id               String       @id @default(cuid())
+  boardMeetingId   String       @map("board_meeting_id")
+  boardMeeting     BoardMeeting @relation(fields: [boardMeetingId], references: [id], onDelete: Cascade)
+  title            String
+  description      String?
+  category         String
+  decisionType     String       @map("decision_type")
+  requiredByLaw    Boolean      @default(false) @map("required_by_law")
+  legalBasis       String?      @map("legal_basis")
+  aiAnalysis       String?      @map("ai_analysis")
+  resolution       String?
+  resolutionStatus String       @default("PENDING") @map("resolution_status")
+  createdAt        DateTime     @default(now()) @map("created_at")
+  updatedAt        DateTime     @updatedAt @map("updated_at")
 
   @@index([boardMeetingId])
   @@map("agenda_items")
 }
 
 model CustomKPI {
-  id                 String   @id @default(cuid())
-  companyId          String   @map("company_id")
-  company            Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  id        String  @id @default(cuid())
+  companyId String  @map("company_id")
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
 
-  name               String
-  code               String
-  description        String?
-  category           String
+  name        String
+  code        String
+  description String?
+  category    String
 
-  calculationType    String   @map("calculation_type")
-  formula            String?
-  dataSource         String?  @map("data_source")
+  calculationType String  @map("calculation_type")
+  formula         String?
+  dataSource      String? @map("data_source")
 
-  unit               String   @default("number")
-  displayFormat      String?  @map("display_format")
-  decimalPlaces      Int      @default(0) @map("decimal_places")
-  isVisible          Boolean  @default(true) @map("is_visible")
-  sortOrder          Int      @default(0) @map("sort_order")
+  unit          String  @default("number")
+  displayFormat String? @map("display_format")
+  decimalPlaces Int     @default(0) @map("decimal_places")
+  isVisible     Boolean @default(true) @map("is_visible")
+  sortOrder     Int     @default(0) @map("sort_order")
 
-  targetValue        Float?   @map("target_value")
-  warningThreshold   Float?   @map("warning_threshold")
-  criticalThreshold  Float?   @map("critical_threshold")
-  comparisonType     String   @default("higher_better") @map("comparison_type")
+  targetValue       Float? @map("target_value")
+  warningThreshold  Float? @map("warning_threshold")
+  criticalThreshold Float? @map("critical_threshold")
+  comparisonType    String @default("higher_better") @map("comparison_type")
 
-  createdAt          DateTime @default(now()) @map("created_at")
-  updatedAt          DateTime @updatedAt @map("updated_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
-  values             CustomKPIValue[]
+  values CustomKPIValue[]
 
   @@unique([companyId, code])
   @@index([companyId])
@@ -593,22 +602,22 @@ model CustomKPI {
 }
 
 model CustomKPIValue {
-  id             String    @id @default(cuid())
-  customKPIId    String    @map("custom_kpi_id")
-  customKPI      CustomKPI @relation(fields: [customKPIId], references: [id], onDelete: Cascade)
+  id          String    @id @default(cuid())
+  customKPIId String    @map("custom_kpi_id")
+  customKPI   CustomKPI @relation(fields: [customKPIId], references: [id], onDelete: Cascade)
 
-  fiscalYear     Int       @map("fiscal_year")
-  month          Int
+  fiscalYear Int @map("fiscal_year")
+  month      Int
 
-  value          Float
-  previousValue  Float?    @map("previous_value")
-  yoyChange      Float?    @map("yoy_change")
+  value         Float
+  previousValue Float? @map("previous_value")
+  yoyChange     Float? @map("yoy_change")
 
-  isCalculated   Boolean   @default(false) @map("is_calculated")
-  notes          String?
+  isCalculated Boolean @default(false) @map("is_calculated")
+  notes        String?
 
-  createdAt      DateTime  @default(now()) @map("created_at")
-  updatedAt      DateTime  @updatedAt @map("updated_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   @@unique([customKPIId, fiscalYear, month])
   @@index([customKPIId, fiscalYear])
@@ -616,26 +625,26 @@ model CustomKPIValue {
 }
 
 model BoardReport {
-  id            String   @id @default(cuid())
-  companyId     String   @map("company_id")
-  company       Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  id        String  @id @default(cuid())
+  companyId String  @map("company_id")
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
 
-  fiscalYear    Int      @map("fiscal_year")
-  month         Int
+  fiscalYear Int @map("fiscal_year")
+  month      Int
 
-  title         String
-  summary       String?
-  sections      BoardReportSection[]
+  title    String
+  summary  String?
+  sections BoardReportSection[]
 
-  status        String   @default("DRAFT")
-  generatedAt   DateTime? @map("generated_at")
-  presentedAt   DateTime? @map("presented_at")
+  status      String    @default("DRAFT")
+  generatedAt DateTime? @map("generated_at")
+  presentedAt DateTime? @map("presented_at")
 
-  approvedBy    String?  @map("approved_by")
-  approvedAt    DateTime? @map("approved_at")
+  approvedBy String?   @map("approved_by")
+  approvedAt DateTime? @map("approved_at")
 
-  createdAt     DateTime @default(now()) @map("created_at")
-  updatedAt     DateTime @updatedAt @map("updated_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   @@unique([companyId, fiscalYear, month])
   @@index([companyId, fiscalYear])
@@ -643,45 +652,45 @@ model BoardReport {
 }
 
 model BoardReportSection {
-  id           String      @id @default(cuid())
-  reportId     String      @map("report_id")
-  report       BoardReport @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  id       String      @id @default(cuid())
+  reportId String      @map("report_id")
+  report   BoardReport @relation(fields: [reportId], references: [id], onDelete: Cascade)
 
-  sectionType  String      @map("section_type")
-  title        String
-  content      String
-  data         String?
+  sectionType String  @map("section_type")
+  title       String
+  content     String
+  data        String?
 
-  sortOrder    Int         @map("sort_order")
+  sortOrder Int @map("sort_order")
 
-  createdAt    DateTime    @default(now()) @map("created_at")
-  updatedAt    DateTime    @updatedAt @map("updated_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   @@index([reportId])
   @@map("board_report_sections")
 }
 
 model AnalysisPrompt {
-  id                 String    @id @default(cuid())
-  companyId          String?   @map("company_id")
-  company            Company?  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  id        String   @id @default(cuid())
+  companyId String?  @map("company_id")
+  company   Company? @relation(fields: [companyId], references: [id], onDelete: Cascade)
 
-  analysisType       String    @map("analysis_type")
+  analysisType       String  @map("analysis_type")
   name               String
   description        String?
-  systemPrompt       String    @map("system_prompt")
-  userPromptTemplate String    @map("user_prompt_template")
+  systemPrompt       String  @map("system_prompt")
+  userPromptTemplate String  @map("user_prompt_template")
 
-  variables          String
+  variables String
 
-  isActive           Boolean   @default(true) @map("is_active")
-  isDefault          Boolean   @default(false) @map("is_default")
+  isActive  Boolean @default(true) @map("is_active")
+  isDefault Boolean @default(false) @map("is_default")
 
-  version            Int       @default(1)
-  parentPromptId     String?   @map("parent_prompt_id")
+  version        Int     @default(1)
+  parentPromptId String? @map("parent_prompt_id")
 
-  createdAt          DateTime  @default(now()) @map("created_at")
-  updatedAt          DateTime  @updatedAt @map("updated_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   @@unique([companyId, analysisType, isActive])
   @@index([companyId, analysisType])
@@ -690,20 +699,20 @@ model AnalysisPrompt {
 }
 
 model FixedAsset {
-  id                  String   @id @default(cuid())
-  companyId           String   @map("company_id")
-  company             Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  freeeAssetId        String?  @map("freee_asset_id")
-  name                String
-  acquisitionDate     DateTime @map("acquisition_date")
-  acquisitionCost     Float    @map("acquisition_cost")
-  salvageValue        Float    @map("salvage_value")
-  usefulLife          Int      @map("useful_life")
-  depreciationMethod  String   @map("depreciation_method")
-  accumulatedDep      Float    @default(0) @map("accumulated_dep")
-  bookValue           Float    @map("book_value")
-  createdAt           DateTime @default(now()) @map("created_at")
-  updatedAt           DateTime @updatedAt @map("updated_at")
+  id                 String   @id @default(cuid())
+  companyId          String   @map("company_id")
+  company            Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  freeeAssetId       String?  @map("freee_asset_id")
+  name               String
+  acquisitionDate    DateTime @map("acquisition_date")
+  acquisitionCost    Float    @map("acquisition_cost")
+  salvageValue       Float    @map("salvage_value")
+  usefulLife         Int      @map("useful_life")
+  depreciationMethod String   @map("depreciation_method")
+  accumulatedDep     Float    @default(0) @map("accumulated_dep")
+  bookValue          Float    @map("book_value")
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
 
   @@index([companyId])
   @@map("fixed_assets")
@@ -745,17 +754,17 @@ model InventoryAdjustment {
 }
 
 model SocialInsuranceSchedule {
-  id             String   @id @default(cuid())
-  companyId      String   @map("company_id")
-  company        Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  insuranceType  String   @map("insurance_type")
-  taskName       String   @map("task_name")
-  dueDate        DateTime @map("due_date")
-  completedDate  DateTime? @map("completed_date")
-  status         String   @default("PENDING")
-  notes          String?
-  createdAt      DateTime @default(now()) @map("created_at")
-  updatedAt      DateTime @updatedAt @map("updated_at")
+  id            String    @id @default(cuid())
+  companyId     String    @map("company_id")
+  company       Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  insuranceType String    @map("insurance_type")
+  taskName      String    @map("task_name")
+  dueDate       DateTime  @map("due_date")
+  completedDate DateTime? @map("completed_date")
+  status        String    @default("PENDING")
+  notes         String?
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
 
   @@index([companyId, dueDate])
   @@index([companyId, status])
@@ -801,47 +810,47 @@ model PrepaidExpense {
   createdAt       DateTime @default(now()) @map("created_at")
   updatedAt       DateTime @updatedAt @map("updated_at")
 
-  amortizations   PrepaidAmortization[]
+  amortizations PrepaidAmortization[]
 
   @@index([companyId, status])
   @@map("prepaid_expenses")
 }
 
 model PrepaidAmortization {
-  id             String   @id @default(cuid())
-  prepaidId      String   @map("prepaid_id")
+  id             String         @id @default(cuid())
+  prepaidId      String         @map("prepaid_id")
   prepaid        PrepaidExpense @relation(fields: [prepaidId], references: [id], onDelete: Cascade)
   year           Int
   month          Int
-  expectedAmount Float    @map("expected_amount")
-  actualAmount   Float    @map("actual_amount")
-  journalEntryId String?  @map("journal_entry_id")
-  status         String   @default("PENDING")
-  createdAt      DateTime @default(now()) @map("created_at")
-  updatedAt      DateTime @updatedAt @map("updated_at")
+  expectedAmount Float          @map("expected_amount")
+  actualAmount   Float          @map("actual_amount")
+  journalEntryId String?        @map("journal_entry_id")
+  status         String         @default("PENDING")
+  createdAt      DateTime       @default(now()) @map("created_at")
+  updatedAt      DateTime       @updatedAt @map("updated_at")
 
   @@unique([prepaidId, year, month])
   @@map("prepaid_amortizations")
 }
 
 model AccrualExpense {
-  id               String    @id @default(cuid())
-  companyId        String    @map("company_id")
-  company          Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  accountCode      String    @map("account_code")
-  accountName      String    @map("account_name")
-  accrualYear      Int       @map("accrual_year")
-  accrualMonth     Int       @map("accrual_month")
-  expectedAmount   Float     @map("expected_amount")
-  actualAmount     Float     @map("actual_amount")
-  accrualJournalId String?   @map("accrual_journal_id")
-  paymentYear      Int?      @map("payment_year")
-  paymentMonth     Int?      @map("payment_month")
-  paymentJournalId String?   @map("payment_journal_id")
-  status           String    @default("ACCRUED")
+  id               String   @id @default(cuid())
+  companyId        String   @map("company_id")
+  company          Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  accountCode      String   @map("account_code")
+  accountName      String   @map("account_name")
+  accrualYear      Int      @map("accrual_year")
+  accrualMonth     Int      @map("accrual_month")
+  expectedAmount   Float    @map("expected_amount")
+  actualAmount     Float    @map("actual_amount")
+  accrualJournalId String?  @map("accrual_journal_id")
+  paymentYear      Int?     @map("payment_year")
+  paymentMonth     Int?     @map("payment_month")
+  paymentJournalId String?  @map("payment_journal_id")
+  status           String   @default("ACCRUED")
   notes            String?
-  createdAt        DateTime  @default(now()) @map("created_at")
-  updatedAt        DateTime  @updatedAt @map("updated_at")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
 
   @@index([companyId, accrualYear, accrualMonth])
   @@map("accrual_expenses")
@@ -863,18 +872,18 @@ model TaxSettings {
 }
 
 model InvestorInvitation {
-  id           String    @id @default(cuid())
-  email        String
-  token        String    @unique
-  invitedBy    String    @map("invited_by")
-  invitedAt    DateTime  @default(now()) @map("invited_at")
-  expiresAt    DateTime  @map("expires_at")
-  status       String    @default("pending")
-  userId       String?   @map("user_id")
-  user         User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
-  acceptedAt   DateTime? @map("accepted_at")
-  createdAt    DateTime  @default(now()) @map("created_at")
-  updatedAt    DateTime  @updatedAt @map("updated_at")
+  id         String    @id @default(cuid())
+  email      String
+  token      String    @unique
+  invitedBy  String    @map("invited_by")
+  invitedAt  DateTime  @default(now()) @map("invited_at")
+  expiresAt  DateTime  @map("expires_at")
+  status     String    @default("pending")
+  userId     String?   @map("user_id")
+  user       User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
+  acceptedAt DateTime? @map("accepted_at")
+  createdAt  DateTime  @default(now()) @map("created_at")
+  updatedAt  DateTime  @updatedAt @map("updated_at")
 
   @@index([token])
   @@index([email])
@@ -894,7 +903,7 @@ model AccountingStandard {
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 
-  chartOfAccounts ChartOfAccount[]
+  chartOfAccounts            ChartOfAccount[]
   conversionProjectsAsSource ConversionProject[] @relation("SourceStandard")
   conversionProjectsAsTarget ConversionProject[] @relation("TargetStandard")
 
@@ -902,26 +911,26 @@ model AccountingStandard {
 }
 
 model ChartOfAccount {
-  id          String   @id @default(cuid())
-  companyId   String   @map("company_id")
-  company     Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  
-  standardId  String   @map("standard_id")
-  standard    AccountingStandard @relation(fields: [standardId], references: [id])
-  
+  id        String  @id @default(cuid())
+  companyId String  @map("company_id")
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  standardId String             @map("standard_id")
+  standard   AccountingStandard @relation(fields: [standardId], references: [id])
+
   name        String
   description String?
-  version     Int      @default(1)
-  isActive    Boolean  @default(true) @map("is_active")
-  isDefault   Boolean  @default(false) @map("is_default")
-  
-  items       ChartOfAccountItem[]
-  mappingsAsSource AccountMapping[] @relation("SourceMapping")
-  mappingsAsTarget AccountMapping[] @relation("TargetMapping")
+  version     Int     @default(1)
+  isActive    Boolean @default(true) @map("is_active")
+  isDefault   Boolean @default(false) @map("is_default")
+
+  items              ChartOfAccountItem[]
+  mappingsAsSource   AccountMapping[]     @relation("SourceMapping")
+  mappingsAsTarget   AccountMapping[]     @relation("TargetMapping")
   conversionProjects ConversionProject[]
-  
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   @@unique([companyId, standardId, version])
   @@index([companyId, isActive])
@@ -929,33 +938,33 @@ model ChartOfAccount {
 }
 
 model ChartOfAccountItem {
-  id             String   @id @default(cuid())
-  coaId          String   @map("coa_id")
-  coa            ChartOfAccount @relation(fields: [coaId], references: [id], onDelete: Cascade)
-  
-  code           String
-  name           String
-  nameEn         String   @map("name_en")
-  
-  category       String
-  subcategory    String?  @map("subcategory")
-  
-  normalBalance  String   @map("normal_balance")
-  parentId       String?  @map("parent_id")
-  parent         ChartOfAccountItem?  @relation("AccountHierarchy", fields: [parentId], references: [id])
-  children       ChartOfAccountItem[] @relation("AccountHierarchy")
-  
-  level          Int      @default(0)
-  sortOrder      Int      @default(0) @map("sort_order")
-  isConvertible  Boolean  @default(true) @map("is_convertible")
-  
-  metadata       String?
-  
+  id    String         @id @default(cuid())
+  coaId String         @map("coa_id")
+  coa   ChartOfAccount @relation(fields: [coaId], references: [id], onDelete: Cascade)
+
+  code   String
+  name   String
+  nameEn String @map("name_en")
+
+  category    String
+  subcategory String? @map("subcategory")
+
+  normalBalance String               @map("normal_balance")
+  parentId      String?              @map("parent_id")
+  parent        ChartOfAccountItem?  @relation("AccountHierarchy", fields: [parentId], references: [id])
+  children      ChartOfAccountItem[] @relation("AccountHierarchy")
+
+  level         Int     @default(0)
+  sortOrder     Int     @default(0) @map("sort_order")
+  isConvertible Boolean @default(true) @map("is_convertible")
+
+  metadata String?
+
   mappingsAsSource AccountMapping[] @relation("SourceItemMapping")
   mappingsAsTarget AccountMapping[] @relation("TargetItemMapping")
-  
-  createdAt      DateTime @default(now()) @map("created_at")
-  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   @@unique([coaId, code])
   @@index([coaId, category])
@@ -963,36 +972,36 @@ model ChartOfAccountItem {
 }
 
 model AccountMapping {
-  id                 String   @id @default(cuid())
-  companyId          String   @map("company_id")
-  company            Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  
-  sourceCoaId        String   @map("source_coa_id")
-  sourceCoa          ChartOfAccount @relation("SourceMapping", fields: [sourceCoaId], references: [id], onDelete: Cascade)
-  sourceItemId       String   @map("source_item_id")
-  sourceItem         ChartOfAccountItem @relation("SourceItemMapping", fields: [sourceItemId], references: [id], onDelete: Cascade)
-  
-  targetCoaId        String   @map("target_coa_id")
-  targetCoa          ChartOfAccount @relation("TargetMapping", fields: [targetCoaId], references: [id], onDelete: Cascade)
-  targetItemId       String   @map("target_item_id")
-  targetItem         ChartOfAccountItem @relation("TargetItemMapping", fields: [targetItemId], references: [id], onDelete: Cascade)
-  
-  mappingType        String   @map("mapping_type")
-  conversionRule     String?  @map("conversion_rule")
-  percentage         Float?
-  
-  confidence         Float    @default(1.0)
-  isManualReview     Boolean  @default(false) @map("is_manual_review")
-  isApproved         Boolean  @default(false) @map("is_approved")
-  
-  notes              String?
-  
-  createdBy          String?  @map("created_by")
-  approvedBy         String?  @map("approved_by")
-  approvedAt         DateTime? @map("approved_at")
-  
-  createdAt          DateTime @default(now()) @map("created_at")
-  updatedAt          DateTime @updatedAt @map("updated_at")
+  id        String  @id @default(cuid())
+  companyId String  @map("company_id")
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  sourceCoaId  String             @map("source_coa_id")
+  sourceCoa    ChartOfAccount     @relation("SourceMapping", fields: [sourceCoaId], references: [id], onDelete: Cascade)
+  sourceItemId String             @map("source_item_id")
+  sourceItem   ChartOfAccountItem @relation("SourceItemMapping", fields: [sourceItemId], references: [id], onDelete: Cascade)
+
+  targetCoaId  String             @map("target_coa_id")
+  targetCoa    ChartOfAccount     @relation("TargetMapping", fields: [targetCoaId], references: [id], onDelete: Cascade)
+  targetItemId String             @map("target_item_id")
+  targetItem   ChartOfAccountItem @relation("TargetItemMapping", fields: [targetItemId], references: [id], onDelete: Cascade)
+
+  mappingType    String  @map("mapping_type")
+  conversionRule String? @map("conversion_rule")
+  percentage     Float?
+
+  confidence     Float   @default(1.0)
+  isManualReview Boolean @default(false) @map("is_manual_review")
+  isApproved     Boolean @default(false) @map("is_approved")
+
+  notes String?
+
+  createdBy  String?   @map("created_by")
+  approvedBy String?   @map("approved_by")
+  approvedAt DateTime? @map("approved_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   @@unique([companyId, sourceItemId, targetCoaId])
   @@index([companyId, sourceCoaId])
@@ -1001,46 +1010,46 @@ model AccountMapping {
 }
 
 model ConversionProject {
-  id              String   @id @default(cuid())
-  companyId       String   @map("company_id")
-  company         Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  
-  name            String
-  description     String?
-  
-  sourceStandardId String  @map("source_standard_id")
-  sourceStandard  AccountingStandard @relation("SourceStandard", fields: [sourceStandardId], references: [id])
-  
-  targetStandardId String  @map("target_standard_id")
-  targetStandard  AccountingStandard @relation("TargetStandard", fields: [targetStandardId], references: [id])
-  
-  targetCoaId     String   @map("target_coa_id")
-  targetCoa       ChartOfAccount @relation(fields: [targetCoaId], references: [id])
-  
-  periodStart     DateTime @map("period_start")
-  periodEnd       DateTime @map("period_end")
-  
-  status          String   @default("draft")
-  progress        Float    @default(0)
-  
-  settings        String
-  statistics      String?
-  
-  results         ConversionResult[]
+  id        String  @id @default(cuid())
+  companyId String  @map("company_id")
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  name        String
+  description String?
+
+  sourceStandardId String             @map("source_standard_id")
+  sourceStandard   AccountingStandard @relation("SourceStandard", fields: [sourceStandardId], references: [id])
+
+  targetStandardId String             @map("target_standard_id")
+  targetStandard   AccountingStandard @relation("TargetStandard", fields: [targetStandardId], references: [id])
+
+  targetCoaId String         @map("target_coa_id")
+  targetCoa   ChartOfAccount @relation(fields: [targetCoaId], references: [id])
+
+  periodStart DateTime @map("period_start")
+  periodEnd   DateTime @map("period_end")
+
+  status   String @default("draft")
+  progress Float  @default(0)
+
+  settings   String
+  statistics String?
+
+  results          ConversionResult[]
   adjustingEntries AdjustingEntry[]
-  auditLogs       ConversionAuditLog[]
-  rationales      ConversionRationale[]
+  auditLogs        ConversionAuditLog[]
+  rationales       ConversionRationale[]
   approvalWorkflow ApprovalWorkflow?
-  disclosures     DisclosureDocument[]
-  
-  rationaleReviewStatus  String?  @map("rationale_review_status")
-  rationaleReviewedBy    String?  @map("rationale_reviewed_by")
-  rationaleReviewedAt    DateTime? @map("rationale_reviewed_at")
-  
-  createdBy       String?  @map("created_by")
-  createdAt       DateTime @default(now()) @map("created_at")
-  updatedAt       DateTime @updatedAt @map("updated_at")
-  completedAt     DateTime? @map("completed_at")
+  disclosures      DisclosureDocument[]
+
+  rationaleReviewStatus String?   @map("rationale_review_status")
+  rationaleReviewedBy   String?   @map("rationale_reviewed_by")
+  rationaleReviewedAt   DateTime? @map("rationale_reviewed_at")
+
+  createdBy   String?   @map("created_by")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  completedAt DateTime? @map("completed_at")
 
   @@index([companyId, status])
   @@index([companyId, periodStart, periodEnd])
@@ -1048,74 +1057,74 @@ model ConversionProject {
 }
 
 model StandardReference {
-  id              String   @id @default(cuid())
-  
+  id String @id @default(cuid())
+
   standard        String
-  referenceType   String   @map("reference_type")
-  referenceNumber String   @map("reference_number")
-  
-  title           String
-  titleEn         String?  @map("title_en")
-  description     String?
-  descriptionEn   String?  @map("description_en")
-  
-  effectiveDate   DateTime? @map("effective_date")
-  supersededDate  DateTime? @map("superseded_date")
-  isActive        Boolean  @default(true) @map("is_active")
-  
-  officialUrl     String?  @map("official_url")
-  keywords        String?
-  
-  createdAt       DateTime @default(now()) @map("created_at")
-  updatedAt       DateTime @updatedAt @map("updated_at")
-  
-  sourceRationales  ConversionRationale[] @relation("SourceRef")
-  targetRationales  ConversionRationale[] @relation("TargetRef")
-  
+  referenceType   String @map("reference_type")
+  referenceNumber String @map("reference_number")
+
+  title         String
+  titleEn       String? @map("title_en")
+  description   String?
+  descriptionEn String? @map("description_en")
+
+  effectiveDate  DateTime? @map("effective_date")
+  supersededDate DateTime? @map("superseded_date")
+  isActive       Boolean   @default(true) @map("is_active")
+
+  officialUrl String? @map("official_url")
+  keywords    String?
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  sourceRationales ConversionRationale[] @relation("SourceRef")
+  targetRationales ConversionRationale[] @relation("TargetRef")
+
   @@unique([standard, referenceNumber])
   @@index([standard, isActive])
   @@map("standard_references")
 }
 
 model ConversionRationale {
-  id              String   @id @default(cuid())
-  
-  projectId       String   @map("project_id")
-  project         ConversionProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  
-  entityType      String   @map("entity_type")
-  entityId        String   @map("entity_id")
-  
-  rationaleType   String   @map("rationale_type")
-  
-  sourceReferenceId String? @map("source_reference_id")
+  id String @id @default(cuid())
+
+  projectId String            @map("project_id")
+  project   ConversionProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  entityType String @map("entity_type")
+  entityId   String @map("entity_id")
+
+  rationaleType String @map("rationale_type")
+
+  sourceReferenceId String?            @map("source_reference_id")
   sourceReference   StandardReference? @relation("SourceRef", fields: [sourceReferenceId], references: [id])
-  
-  targetReferenceId String? @map("target_reference_id")
+
+  targetReferenceId String?            @map("target_reference_id")
   targetReference   StandardReference? @relation("TargetRef", fields: [targetReferenceId], references: [id])
-  
-  summary         String
-  summaryEn       String?  @map("summary_en")
-  detailedExplanation String? @map("detailed_explanation")
+
+  summary               String
+  summaryEn             String? @map("summary_en")
+  detailedExplanation   String? @map("detailed_explanation")
   detailedExplanationEn String? @map("detailed_explanation_en")
-  
-  impactAmount    Float?   @map("impact_amount")
-  impactDirection String?  @map("impact_direction")
-  
-  isAiGenerated   Boolean  @default(false) @map("is_ai_generated")
-  aiModelUsed     String?  @map("ai_model_used")
-  aiConfidence    Float?   @map("ai_confidence")
-  
-  isReviewed      Boolean  @default(false) @map("is_reviewed")
-  reviewedBy      String?  @map("reviewed_by")
-  reviewedAt      DateTime? @map("reviewed_at")
-  
-  createdBy       String?  @map("created_by")
-  createdAt       DateTime @default(now()) @map("created_at")
-  updatedAt       DateTime @updatedAt @map("updated_at")
-  
-  auditTrail      RationaleAuditTrail[]
-  
+
+  impactAmount    Float?  @map("impact_amount")
+  impactDirection String? @map("impact_direction")
+
+  isAiGenerated Boolean @default(false) @map("is_ai_generated")
+  aiModelUsed   String? @map("ai_model_used")
+  aiConfidence  Float?  @map("ai_confidence")
+
+  isReviewed Boolean   @default(false) @map("is_reviewed")
+  reviewedBy String?   @map("reviewed_by")
+  reviewedAt DateTime? @map("reviewed_at")
+
+  createdBy String?  @map("created_by")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  auditTrail RationaleAuditTrail[]
+
   @@unique([projectId, entityType, entityId, rationaleType])
   @@index([projectId, entityType])
   @@index([projectId, createdAt])
@@ -1123,107 +1132,107 @@ model ConversionRationale {
 }
 
 model RationaleAuditTrail {
-  id              String   @id @default(cuid())
-  rationaleId     String   @map("rationale_id")
-  rationale       ConversionRationale @relation(fields: [rationaleId], references: [id], onDelete: Cascade)
-  
-  action          String
-  
-  previousValue   String?  @map("previous_value")
-  newValue        String?  @map("new_value")
-  
-  changedFields   String?  @map("changed_fields")
-  
-  userId          String?  @map("user_id")
-  userName        String?
-  userRole        String?  @map("user_role")
-  
-  ipAddress       String?  @map("ip_address")
-  userAgent       String?  @map("user_agent")
-  
-  notes           String?
-  
-  createdAt       DateTime @default(now()) @map("created_at")
-  
+  id          String              @id @default(cuid())
+  rationaleId String              @map("rationale_id")
+  rationale   ConversionRationale @relation(fields: [rationaleId], references: [id], onDelete: Cascade)
+
+  action String
+
+  previousValue String? @map("previous_value")
+  newValue      String? @map("new_value")
+
+  changedFields String? @map("changed_fields")
+
+  userId   String? @map("user_id")
+  userName String?
+  userRole String? @map("user_role")
+
+  ipAddress String? @map("ip_address")
+  userAgent String? @map("user_agent")
+
+  notes String?
+
+  createdAt DateTime @default(now()) @map("created_at")
+
   @@index([rationaleId, createdAt])
   @@map("rationale_audit_trails")
 }
 
 model ConversionResult {
-  id                    String   @id @default(cuid())
-  projectId             String   @map("project_id")
-  project               ConversionProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  
-  journalConversions    String?  @map("journal_conversions")
-  balanceSheet          String?  @map("balance_sheet")
-  profitLoss            String?  @map("profit_loss")
-  cashFlow              String?  @map("cash_flow")
-  
-  disclosures           String?
-  aiAnalysis            String?  @map("ai_analysis")
-  
-  conversionDate        DateTime @map("conversion_date")
-  conversionDurationMs  Int      @map("conversion_duration_ms")
-  
-  warnings              String?
-  errors                String?
-  
-  exports               ConversionExport[]
-  
-  createdAt             DateTime @default(now()) @map("created_at")
+  id        String            @id @default(cuid())
+  projectId String            @map("project_id")
+  project   ConversionProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  journalConversions String? @map("journal_conversions")
+  balanceSheet       String? @map("balance_sheet")
+  profitLoss         String? @map("profit_loss")
+  cashFlow           String? @map("cash_flow")
+
+  disclosures String?
+  aiAnalysis  String? @map("ai_analysis")
+
+  conversionDate       DateTime @map("conversion_date")
+  conversionDurationMs Int      @map("conversion_duration_ms")
+
+  warnings String?
+  errors   String?
+
+  exports ConversionExport[]
+
+  createdAt DateTime @default(now()) @map("created_at")
 
   @@index([projectId])
   @@map("conversion_results")
 }
 
 model AdjustingEntry {
-  id              String   @id @default(cuid())
-  projectId       String   @map("project_id")
-  project         ConversionProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  
-  type            String
-  description     String
-  descriptionEn   String?  @map("description_en")
-  
-  lines           String
-  
-  ifrsReference   String?  @map("ifrs_reference")
-  usgaapReference String?  @map("usgaap_reference")
-  
-  aiSuggested     Boolean  @default(false) @map("ai_suggested")
-  isApproved      Boolean  @default(false) @map("is_approved")
-  
-  approvedBy      String?  @map("approved_by")
-  approvedAt      DateTime? @map("approved_at")
-  
-  sortOrder       Int      @default(0) @map("sort_order")
-  
-  createdAt       DateTime @default(now()) @map("created_at")
-  updatedAt       DateTime @updatedAt @map("updated_at")
+  id        String            @id @default(cuid())
+  projectId String            @map("project_id")
+  project   ConversionProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  type          String
+  description   String
+  descriptionEn String? @map("description_en")
+
+  lines String
+
+  ifrsReference   String? @map("ifrs_reference")
+  usgaapReference String? @map("usgaap_reference")
+
+  aiSuggested Boolean @default(false) @map("ai_suggested")
+  isApproved  Boolean @default(false) @map("is_approved")
+
+  approvedBy String?   @map("approved_by")
+  approvedAt DateTime? @map("approved_at")
+
+  sortOrder Int @default(0) @map("sort_order")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   @@index([projectId, type])
   @@map("adjusting_entries")
 }
 
 model ConversionAuditLog {
-  id          String   @id @default(cuid())
-  projectId   String   @map("project_id")
-  project     ConversionProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  
-  action      String
-  entityType  String   @map("entity_type")
-  entityId    String?  @map("entity_id")
-  
-  oldValue    String?  @map("old_value")
-  newValue    String?  @map("new_value")
-  
-  userId      String?  @map("user_id")
-  ipAddress   String?  @map("ip_address")
-  userAgent   String?  @map("user_agent")
-  
-  notes       String?
-  
-  createdAt   DateTime @default(now()) @map("created_at")
+  id        String            @id @default(cuid())
+  projectId String            @map("project_id")
+  project   ConversionProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  action     String
+  entityType String  @map("entity_type")
+  entityId   String? @map("entity_id")
+
+  oldValue String? @map("old_value")
+  newValue String? @map("new_value")
+
+  userId    String? @map("user_id")
+  ipAddress String? @map("ip_address")
+  userAgent String? @map("user_agent")
+
+  notes String?
+
+  createdAt DateTime @default(now()) @map("created_at")
 
   @@index([projectId, action])
   @@index([projectId, createdAt])
@@ -1231,41 +1240,41 @@ model ConversionAuditLog {
 }
 
 model ConversionExport {
-  id            String   @id @default(cuid())
-  resultId      String   @map("result_id")
-  result        ConversionResult @relation(fields: [resultId], references: [id], onDelete: Cascade)
-  
-  format        String
-  config        String
-  
-  fileName      String   @map("file_name")
-  filePath      String?  @map("file_path")
-  fileSize      Int      @map("file_size")
-  
-  generatedBy   String?  @map("generated_by")
-  generatedAt   DateTime @default(now()) @map("generated_at")
-  expiresAt     DateTime? @map("expires_at")
+  id       String           @id @default(cuid())
+  resultId String           @map("result_id")
+  result   ConversionResult @relation(fields: [resultId], references: [id], onDelete: Cascade)
+
+  format String
+  config String
+
+  fileName String  @map("file_name")
+  filePath String? @map("file_path")
+  fileSize Int     @map("file_size")
+
+  generatedBy String?   @map("generated_by")
+  generatedAt DateTime  @default(now()) @map("generated_at")
+  expiresAt   DateTime? @map("expires_at")
 
   @@index([resultId])
   @@map("conversion_exports")
 }
 
 model ApprovalWorkflow {
-  id              String   @id @default(cuid())
-  projectId       String   @map("project_id")
-  project         ConversionProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  
-  stage           String   @default("mapping_review")
-  status          String   @default("pending")
-  
-  dueDate         DateTime? @map("due_date")
-  completedAt     DateTime? @map("completed_at")
-  
-  assignees       ApprovalAssignee[]
-  history         ApprovalHistoryEntry[]
-  
-  createdAt       DateTime @default(now()) @map("created_at")
-  updatedAt       DateTime @updatedAt @map("updated_at")
+  id        String            @id @default(cuid())
+  projectId String            @map("project_id")
+  project   ConversionProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  stage  String @default("mapping_review")
+  status String @default("pending")
+
+  dueDate     DateTime? @map("due_date")
+  completedAt DateTime? @map("completed_at")
+
+  assignees ApprovalAssignee[]
+  history   ApprovalHistoryEntry[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   @@unique([projectId])
   @@index([projectId, status])
@@ -1273,20 +1282,20 @@ model ApprovalWorkflow {
 }
 
 model ApprovalAssignee {
-  id              String   @id @default(cuid())
-  workflowId      String   @map("workflow_id")
-  workflow        ApprovalWorkflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
-  
-  userId          String   @map("user_id")
-  userName        String   @map("user_name")
-  userRole        String   @map("user_role")
-  
-  isRequired      Boolean  @default(true) @map("is_required")
-  
-  assignedAt      DateTime @default(now()) @map("assigned_at")
-  approvedAt      DateTime? @map("approved_at")
-  comment         String?
-  
+  id         String           @id @default(cuid())
+  workflowId String           @map("workflow_id")
+  workflow   ApprovalWorkflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+
+  userId   String @map("user_id")
+  userName String @map("user_name")
+  userRole String @map("user_role")
+
+  isRequired Boolean @default(true) @map("is_required")
+
+  assignedAt DateTime  @default(now()) @map("assigned_at")
+  approvedAt DateTime? @map("approved_at")
+  comment    String?
+
   @@unique([workflowId, userId])
   @@index([workflowId])
   @@index([userId])
@@ -1294,51 +1303,51 @@ model ApprovalAssignee {
 }
 
 model ApprovalHistoryEntry {
-  id              String   @id @default(cuid())
-  workflowId      String   @map("workflow_id")
-  workflow        ApprovalWorkflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
-  
-  stage           String
-  action          String
-  
-  userId          String   @map("user_id")
-  userName        String   @map("user_name")
-  userRole        String   @map("user_role")
-  comment         String?
-  
-  createdAt       DateTime @default(now()) @map("created_at")
+  id         String           @id @default(cuid())
+  workflowId String           @map("workflow_id")
+  workflow   ApprovalWorkflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+
+  stage  String
+  action String
+
+  userId   String  @map("user_id")
+  userName String  @map("user_name")
+  userRole String  @map("user_role")
+  comment  String?
+
+  createdAt DateTime @default(now()) @map("created_at")
 
   @@index([workflowId, createdAt])
   @@map("approval_history_entries")
 }
 
 model DisclosureDocument {
-  id            String   @id @default(cuid())
-  projectId     String   @map("project_id")
-  project       ConversionProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  
-  category      String
-  
-  title         String
-  titleEn       String   @map("title_en")
-  
-  content       String
-  contentEn     String?  @map("content_en")
-  
-  sections      String?
-  
-  isGenerated   Boolean  @default(false) @map("is_generated")
-  isAiEnhanced  Boolean  @default(false) @map("is_ai_enhanced")
-  
-  generatedAt   DateTime @default(now()) @map("generated_at")
-  updatedAt     DateTime @updatedAt @map("updated_at")
-  reviewedBy    String?  @map("reviewed_by")
-  reviewedAt    DateTime? @map("reviewed_at")
-  
-  references    DisclosureStandardReference[]
+  id        String            @id @default(cuid())
+  projectId String            @map("project_id")
+  project   ConversionProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  category String
+
+  title   String
+  titleEn String @map("title_en")
+
+  content   String
+  contentEn String? @map("content_en")
+
+  sections String?
+
+  isGenerated  Boolean @default(false) @map("is_generated")
+  isAiEnhanced Boolean @default(false) @map("is_ai_enhanced")
+
+  generatedAt DateTime  @default(now()) @map("generated_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  reviewedBy  String?   @map("reviewed_by")
+  reviewedAt  DateTime? @map("reviewed_at")
+
+  references     DisclosureStandardReference[]
   rationaleLinks DisclosureRationaleLink[]
-  
-  sortOrder     Int      @default(0) @map("sort_order")
+
+  sortOrder Int @default(0) @map("sort_order")
 
   @@index([projectId])
   @@index([projectId, category])
@@ -1346,28 +1355,28 @@ model DisclosureDocument {
 }
 
 model DisclosureStandardReference {
-  id              String   @id @default(cuid())
-  disclosureId    String   @map("disclosure_id")
-  disclosure      DisclosureDocument @relation(fields: [disclosureId], references: [id], onDelete: Cascade)
-  
-  referenceNumber String   @map("reference_number")
+  id           String             @id @default(cuid())
+  disclosureId String             @map("disclosure_id")
+  disclosure   DisclosureDocument @relation(fields: [disclosureId], references: [id], onDelete: Cascade)
+
+  referenceNumber String @map("reference_number")
   title           String
   source          String
-  
-  sortOrder       Int      @default(0) @map("sort_order")
+
+  sortOrder Int @default(0) @map("sort_order")
 
   @@index([disclosureId])
   @@map("disclosure_standard_references")
 }
 
 model DisclosureRationaleLink {
-  id            String   @id @default(cuid())
-  disclosureId  String   @map("disclosure_id")
-  disclosure    DisclosureDocument @relation(fields: [disclosureId], references: [id], onDelete: Cascade)
-  
-  rationaleId   String   @map("rationale_id")
-  
-  createdAt     DateTime @default(now()) @map("created_at")
+  id           String             @id @default(cuid())
+  disclosureId String             @map("disclosure_id")
+  disclosure   DisclosureDocument @relation(fields: [disclosureId], references: [id], onDelete: Cascade)
+
+  rationaleId String @map("rationale_id")
+
+  createdAt DateTime @default(now()) @map("created_at")
 
   @@unique([disclosureId, rationaleId])
   @@index([disclosureId])
@@ -1376,50 +1385,50 @@ model DisclosureRationaleLink {
 }
 
 model CompanySettings {
-  id              String   @id @default(cuid())
-  companyId       String   @unique @map("company_id")
-  company         Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  
-  ocrEngine       String   @default("ndlocr") @map("ocr_engine")
-  
-  aiProvider      String?  @map("ai_provider")
-  aiModel         String?  @map("ai_model")
-  aiTemperature   Float?   @map("ai_temperature")
-  aiMaxTokens     Int?     @map("ai_max_tokens")
-  
-  updatedAt       DateTime @updatedAt @map("updated_at")
-  updatedBy       String   @map("updated_by")
-  
+  id        String  @id @default(cuid())
+  companyId String  @unique @map("company_id")
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  ocrEngine String @default("ndlocr") @map("ocr_engine")
+
+  aiProvider    String? @map("ai_provider")
+  aiModel       String? @map("ai_model")
+  aiTemperature Float?  @map("ai_temperature")
+  aiMaxTokens   Int?    @map("ai_max_tokens")
+
+  updatedAt DateTime @updatedAt @map("updated_at")
+  updatedBy String   @map("updated_by")
+
   @@index([companyId])
   @@map("company_settings")
 }
 
 model ReceiptDocument {
-  id              String   @id @default(cuid())
-  companyId       String   @map("company_id")
-  company         Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  
-  encryptedPath   String   @map("encrypted_path")
-  originalName    String   @map("original_name")
-  contentType     String   @map("content_type")
-  fileSize        Int      @map("file_size")
-  fileHash        String   @map("file_hash")
-  
-  ocrResult       String?  @map("ocr_result")
-  ocrEngine       String?  @map("ocr_engine")
-  ocrConfidence   Float?   @map("ocr_confidence")
-  
-  status          String   @default("uploaded")
-  
-  expiresAt       DateTime? @map("expires_at")
-  deletedAt       DateTime? @map("deleted_at")
-  
-  uploadedBy      String   @map("uploaded_by")
-  uploadedAt      DateTime @default(now()) @map("uploaded_at")
-  lastAccessedAt  DateTime? @map("last_accessed_at")
-  
+  id        String  @id @default(cuid())
+  companyId String  @map("company_id")
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  encryptedPath String @map("encrypted_path")
+  originalName  String @map("original_name")
+  contentType   String @map("content_type")
+  fileSize      Int    @map("file_size")
+  fileHash      String @map("file_hash")
+
+  ocrResult     String? @map("ocr_result")
+  ocrEngine     String? @map("ocr_engine")
+  ocrConfidence Float?  @map("ocr_confidence")
+
+  status String @default("uploaded")
+
+  expiresAt DateTime? @map("expires_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  uploadedBy     String    @map("uploaded_by")
+  uploadedAt     DateTime  @default(now()) @map("uploaded_at")
+  lastAccessedAt DateTime? @map("last_accessed_at")
+
   journalProposal JournalProposal?
-  
+
   @@index([companyId])
   @@index([status])
   @@index([expiresAt])
@@ -1428,29 +1437,328 @@ model ReceiptDocument {
 }
 
 model JournalProposal {
-  id              String   @id @default(cuid())
-  companyId       String   @map("company_id")
-  company         Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  
-  documentId      String   @unique @map("document_id")
-  document        ReceiptDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
-  
-  userContext     String   @map("user_context")
-  
-  proposals       String   @map("proposals")
-  
-  aiProvider      String   @map("ai_provider")
-  aiModel         String   @map("ai_model")
-  
-  status          String   @default("pending")
-  
-  createdBy       String   @map("created_by")
-  createdAt       DateTime @default(now()) @map("created_at")
-  reviewedBy      String?  @map("reviewed_by")
-  reviewedAt      DateTime? @map("reviewed_at")
-  
+  id        String  @id @default(cuid())
+  companyId String  @map("company_id")
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  documentId String          @unique @map("document_id")
+  document   ReceiptDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  userContext String @map("user_context")
+
+  proposals String @map("proposals")
+
+  aiProvider String @map("ai_provider")
+  aiModel    String @map("ai_model")
+
+  status String @default("pending")
+
+  createdBy  String    @map("created_by")
+  createdAt  DateTime  @default(now()) @map("created_at")
+  reviewedBy String?   @map("reviewed_by")
+  reviewedAt DateTime? @map("reviewed_at")
+
   @@index([companyId])
   @@index([status])
   @@index([createdAt])
   @@map("journal_proposals")
+}
+
+model IRReport {
+  id        String  @id @default(cuid())
+  companyId String  @map("company_id")
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  reportType String @map("report_type")
+  fiscalYear Int    @map("fiscal_year")
+  quarter    Int?
+
+  title     String
+  titleEn   String? @map("title_en")
+  summary   String?
+  summaryEn String? @map("summary_en")
+
+  sections IRReportSection[]
+
+  status   String @default("DRAFT")
+  language String @default("ja")
+
+  publishedAt DateTime? @map("published_at")
+  publishedBy String?   @map("published_by")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([companyId, reportType, fiscalYear, quarter])
+  @@index([companyId, fiscalYear])
+  @@map("ir_reports")
+}
+
+model IRReportSection {
+  id       String   @id @default(cuid())
+  reportId String   @map("report_id")
+  report   IRReport @relation(fields: [reportId], references: [id], onDelete: Cascade)
+
+  sectionType String  @map("section_type")
+  title       String
+  titleEn     String? @map("title_en")
+  content     String
+  contentEn   String? @map("content_en")
+  data        String?
+
+  sortOrder Int @map("sort_order")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([reportId])
+  @@map("ir_report_sections")
+}
+
+model ShareholderComposition {
+  id        String  @id @default(cuid())
+  companyId String  @map("company_id")
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  asOfDate DateTime @map("as_of_date")
+
+  shareholderType String  @map("shareholder_type")
+  shareholderName String? @map("shareholder_name")
+  sharesHeld      Float   @map("shares_held")
+  percentage      Float
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([companyId, asOfDate])
+  @@map("shareholder_compositions")
+}
+
+model IREvent {
+  id        String  @id @default(cuid())
+  companyId String  @map("company_id")
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  eventType     String   @map("event_type")
+  title         String
+  titleEn       String?  @map("title_en")
+  description   String?
+  descriptionEn String?  @map("description_en")
+  scheduledDate DateTime @map("scheduled_date")
+
+  status String @default("scheduled")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([companyId, scheduledDate])
+  @@map("ir_events")
+}
+
+model FAQ {
+  id        String @id @default(cuid())
+  companyId String @map("company_id")
+
+  question String
+  answer   String
+  category String?
+
+  sortOrder Int     @default(0) @map("sort_order")
+  isActive  Boolean @default(true) @map("is_active")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([companyId])
+  @@index([companyId, category])
+  @@index([companyId, isActive])
+  @@map("faqs")
+}
+
+// ============================================
+// DD (Due Diligence) Models - SQLite compatible (String only)
+// ============================================
+
+model DDChecklist {
+  id            String          @id @default(cuid())
+  companyId     String          @map("company_id")
+  company       Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  type          String          // IPO_SHORT_REVIEW, MA_FINANCIAL_DD, TAX_DD, COMPREHENSIVE
+  fiscalYear    Int             @map("fiscal_year")
+  status        String          @default("IN_PROGRESS") // IN_PROGRESS, COMPLETED, REVIEWED, APPROVED
+  items         DDChecklistItem[]
+  findings      DDFinding[]
+  materiality   Float?          @map("materiality")
+  overallScore  Int?            @map("overall_score")
+  createdBy     String?         @map("created_by")
+  createdAt     DateTime        @default(now()) @map("created_at")
+  updatedAt     DateTime        @updatedAt @map("updated_at")
+
+  @@unique([companyId, type, fiscalYear])
+  @@index([companyId, status])
+  @@map("dd_checklists")
+}
+
+model DDChecklistItem {
+  id             String          @id @default(cuid())
+  checklistId    String          @map("checklist_id")
+  checklist      DDChecklist     @relation(fields: [checklistId], references: [id], onDelete: Cascade)
+  category       String          @map("category")
+  itemCode       String          @map("item_code")
+  title          String
+  description    String
+  status         String          @default("PENDING") // PENDING, IN_PROGRESS, PASSED, FAILED, N_A
+  severity       String          // CRITICAL, HIGH, MEDIUM, LOW, INFO
+  findings       String?
+  recommendation String?
+  evidence       String?
+  checkedAt      DateTime?       @map("checked_at")
+  checkedBy      String?         @map("checked_by")
+  createdAt      DateTime        @default(now()) @map("created_at")
+  updatedAt      DateTime        @updatedAt @map("updated_at")
+
+  @@index([checklistId, category])
+  @@index([checklistId, status])
+  @@map("dd_checklist_items")
+}
+
+model DDFinding {
+  id              String          @id @default(cuid())
+  companyId       String          @map("company_id")
+  company         Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  checklistId     String?         @map("checklist_id")
+  checklist       DDChecklist?    @relation(fields: [checklistId], references: [id])
+  category        String
+  severity        String          // CRITICAL, HIGH, MEDIUM, LOW, INFO
+  title           String
+  description     String
+  impact          String?
+  impactAmount    Float?          @map("impact_amount")
+  recommendation  String?
+  relatedStandard String?         @map("related_standard")
+  status          String          @default("OPEN") // OPEN, IN_PROGRESS, RESOLVED, ACCEPTED
+  assignee        String?
+  deadline        DateTime?
+  resolvedAt      DateTime?       @map("resolved_at")
+  resolvedBy      String?         @map("resolved_by")
+  resolution      String?
+  createdAt       DateTime        @default(now()) @map("created_at")
+  updatedAt       DateTime        @updatedAt @map("updated_at")
+
+  @@index([companyId, status])
+  @@index([companyId, severity])
+  @@map("dd_findings")
+}
+
+model DDReport {
+  id                 String          @id @default(cuid())
+  companyId          String          @map("company_id")
+  company            Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  type               String          // IPO_SHORT_REVIEW, MA_DD, TAX_DD, CONVERSION, COMPREHENSIVE
+  format             String          // PDF, EXCEL, MARKDOWN, CSV
+  fiscalYears        String          @map("fiscal_years")
+  accountingStandard String          @map("accounting_standard")
+  status             String          @default("DRAFT")
+  filePath           String?         @map("file_path")
+  fileSize           Int?            @map("file_size")
+  overallScore       Int?            @map("overall_score")
+  generatedBy        String?         @map("generated_by")
+  generatedAt        DateTime        @default(now()) @map("generated_at")
+  expiresAt          DateTime?       @map("expires_at")
+
+  @@index([companyId, type])
+  @@map("dd_reports")
+}
+
+model DDConversion {
+  id                  String          @id @default(cuid())
+  companyId           String          @map("company_id")
+  company             Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  sourceStandard      String          @map("source_standard")
+  targetStandard      String          @map("target_standard")
+  fiscalYear          Int             @map("fiscal_year")
+  sourceTrialBalance  String          @map("source_trial_balance")
+  targetTrialBalance  String?         @map("target_trial_balance")
+  adjustments         String?
+  reconciliation      String?
+  conversionNotes     String?         @map("conversion_notes")
+  status              String          @default("PENDING") // PENDING, IN_PROGRESS, COMPLETED, ERROR
+  qualityScore        Int?            @map("quality_score")
+  createdAt           DateTime        @default(now()) @map("created_at")
+  updatedAt           DateTime        @updatedAt @map("updated_at")
+
+  @@unique([companyId, sourceStandard, targetStandard, fiscalYear])
+  @@index([companyId, status])
+  @@map("dd_conversions")
+}
+
+// ============================================
+// 類似企業・市場データ
+// ============================================
+
+model PeerCompany {
+  id              String   @id @default(cuid())
+  companyId       String   @map("company_id")
+  company         Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  // 企業情報
+  ticker          String?  @map("ticker")
+  name            String
+  nameEn          String?  @map("name_en")
+  exchange        String?
+  industry        String?
+
+  // 財務指標
+  marketCap       Float?   @map("market_cap")
+  revenue         Float?
+  employees       Int?
+
+  // バリュエーション指標
+  per             Float?
+  pbr             Float?
+  evEbitda        Float?   @map("ev_ebitda")
+  psr             Float?
+  beta            Float?
+
+  // 類似度スコア
+  similarityScore Float?   @map("similarity_score")
+
+  // データソース
+  dataSource      String   @default("manual") @map("data_source")
+  sourceUrl       String?  @map("source_url")
+
+  // 有効フラグ
+  isActive        Boolean  @default(true) @map("is_active")
+
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  @@unique([companyId, ticker])
+  @@index([companyId])
+  @@index([companyId, isActive])
+  @@map("peer_companies")
+}
+
+model MarketDataProvider {
+  id                 String    @id @default(cuid())
+  companyId          String    @map("company_id")
+  company            Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  provider           String
+
+  // 認証情報（暗号化保存）
+  encryptedEmail     String?   @map("encrypted_email")
+  encryptedPassword  String?   @map("encrypted_password")
+  encryptedApiKey    String?   @map("encrypted_api_key")
+
+  // 設定
+  enabled            Boolean   @default(true) @map("enabled")
+  priority           Int       @default(10) @map("priority")
+  lastSyncAt         DateTime? @map("last_sync_at")
+  lastError          String?   @map("last_error")
+
+  createdAt          DateTime  @default(now()) @map("created_at")
+  updatedAt          DateTime  @updatedAt @map("updated_at")
+
+  @@unique([companyId, provider])
+  @@map("market_data_providers")
 }

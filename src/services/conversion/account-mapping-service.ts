@@ -1,5 +1,14 @@
 import { prisma } from '@/lib/db'
 import type { AccountMapping, ConversionRule, MappingCondition } from '@/types/conversion'
+import {
+  type Result,
+  type AppError,
+  success,
+  failure,
+  isFailure,
+  createAppError,
+  ERROR_CODES,
+} from '@/types/result'
 
 export interface CreateMappingInput {
   companyId: string
@@ -61,8 +70,11 @@ export interface MappingStatistics {
 }
 
 export class AccountMappingService {
-  async create(data: CreateMappingInput): Promise<AccountMapping> {
-    await this.validateMappingInput(data)
+  async create(data: CreateMappingInput): Promise<Result<AccountMapping, AppError>> {
+    const validationResult = await this.validateMappingInput(data)
+    if (isFailure(validationResult)) {
+      return validationResult
+    }
 
     const existingMapping = await prisma.accountMapping.findUnique({
       where: {
@@ -75,10 +87,18 @@ export class AccountMappingService {
     })
 
     if (existingMapping) {
-      throw new Error('Duplicate mapping: this source item is already mapped to this target COA')
+      return failure(
+        createAppError(
+          ERROR_CODES.VALIDATION_ERROR,
+          'Duplicate mapping: this source item is already mapped to this target COA'
+        )
+      )
     }
 
-    await this.checkCircularReference(data.sourceItemId, data.targetItemId)
+    const circularResult = await this.checkCircularReference(data.sourceItemId, data.targetItemId)
+    if (isFailure(circularResult)) {
+      return circularResult
+    }
 
     const mapping = await prisma.accountMapping.create({
       data: {
@@ -102,7 +122,7 @@ export class AccountMappingService {
       },
     })
 
-    return this.mapToAccountMapping(mapping)
+    return success(this.mapToAccountMapping(mapping))
   }
 
   async createBatch(mappings: CreateMappingInput[]): Promise<BatchResult> {
@@ -238,17 +258,23 @@ export class AccountMappingService {
     return mappings.map((m) => this.mapToAccountMapping(m))
   }
 
-  async update(id: string, data: UpdateMappingInput): Promise<AccountMapping> {
+  async update(id: string, data: UpdateMappingInput): Promise<Result<AccountMapping, AppError>> {
     const existing = await prisma.accountMapping.findUnique({
       where: { id },
     })
 
     if (!existing) {
-      throw new Error(`Mapping not found: ${id}`)
+      return failure(createAppError(ERROR_CODES.NOT_FOUND, `Mapping not found: ${id}`))
     }
 
     if (data.targetItemId && data.targetItemId !== existing.targetItemId) {
-      await this.checkCircularReference(existing.sourceItemId, data.targetItemId)
+      const circularResult = await this.checkCircularReference(
+        existing.sourceItemId,
+        data.targetItemId
+      )
+      if (isFailure(circularResult)) {
+        return circularResult
+      }
     }
 
     const mapping = await prisma.accountMapping.update({
@@ -268,30 +294,32 @@ export class AccountMappingService {
       },
     })
 
-    return this.mapToAccountMapping(mapping)
+    return success(this.mapToAccountMapping(mapping))
   }
 
-  async delete(id: string): Promise<void> {
+  async delete(id: string): Promise<Result<void, AppError>> {
     const mapping = await prisma.accountMapping.findUnique({
       where: { id },
     })
 
     if (!mapping) {
-      throw new Error(`Mapping not found: ${id}`)
+      return failure(createAppError(ERROR_CODES.NOT_FOUND, `Mapping not found: ${id}`))
     }
 
     await prisma.accountMapping.delete({
       where: { id },
     })
+
+    return success(undefined)
   }
 
-  async approve(id: string, userId: string): Promise<AccountMapping> {
+  async approve(id: string, userId: string): Promise<Result<AccountMapping, AppError>> {
     const mapping = await prisma.accountMapping.findUnique({
       where: { id },
     })
 
     if (!mapping) {
-      throw new Error(`Mapping not found: ${id}`)
+      return failure(createAppError(ERROR_CODES.NOT_FOUND, `Mapping not found: ${id}`))
     }
 
     const updated = await prisma.accountMapping.update({
@@ -312,7 +340,7 @@ export class AccountMappingService {
       newStatus: 'approved',
     })
 
-    return this.mapToAccountMapping(updated)
+    return success(this.mapToAccountMapping(updated))
   }
 
   async approveBatch(ids: string[], userId: string): Promise<BatchResult> {
@@ -439,13 +467,15 @@ export class AccountMappingService {
     }
   }
 
-  private async validateMappingInput(data: CreateMappingInput): Promise<void> {
+  private async validateMappingInput(data: CreateMappingInput): Promise<Result<void, AppError>> {
     const sourceItem = await prisma.chartOfAccountItem.findUnique({
       where: { id: data.sourceItemId },
     })
 
     if (!sourceItem) {
-      throw new Error(`Source item not found: ${data.sourceItemId}`)
+      return failure(
+        createAppError(ERROR_CODES.NOT_FOUND, `Source item not found: ${data.sourceItemId}`)
+      )
     }
 
     const targetItem = await prisma.chartOfAccountItem.findUnique({
@@ -453,7 +483,9 @@ export class AccountMappingService {
     })
 
     if (!targetItem) {
-      throw new Error(`Target item not found: ${data.targetItemId}`)
+      return failure(
+        createAppError(ERROR_CODES.NOT_FOUND, `Target item not found: ${data.targetItemId}`)
+      )
     }
 
     const sourceCoa = await prisma.chartOfAccount.findUnique({
@@ -461,7 +493,9 @@ export class AccountMappingService {
     })
 
     if (!sourceCoa) {
-      throw new Error(`Source COA not found: ${data.sourceCoaId}`)
+      return failure(
+        createAppError(ERROR_CODES.NOT_FOUND, `Source COA not found: ${data.sourceCoaId}`)
+      )
     }
 
     const targetCoa = await prisma.chartOfAccount.findUnique({
@@ -469,65 +503,112 @@ export class AccountMappingService {
     })
 
     if (!targetCoa) {
-      throw new Error(`Target COA not found: ${data.targetCoaId}`)
+      return failure(
+        createAppError(ERROR_CODES.NOT_FOUND, `Target COA not found: ${data.targetCoaId}`)
+      )
     }
 
     if (sourceItem.coaId !== data.sourceCoaId) {
-      throw new Error('Source item does not belong to the specified source COA')
+      return failure(
+        createAppError(
+          ERROR_CODES.VALIDATION_ERROR,
+          'Source item does not belong to the specified source COA'
+        )
+      )
     }
 
     if (targetItem.coaId !== data.targetCoaId) {
-      throw new Error('Target item does not belong to the specified target COA')
+      return failure(
+        createAppError(
+          ERROR_CODES.VALIDATION_ERROR,
+          'Target item does not belong to the specified target COA'
+        )
+      )
     }
 
     if (data.conversionRule) {
-      this.validateConversionRule(data.conversionRule)
+      const ruleResult = this.validateConversionRule(data.conversionRule)
+      if (isFailure(ruleResult)) {
+        return ruleResult
+      }
     }
 
     if (data.percentage !== undefined && (data.percentage < 0 || data.percentage > 100)) {
-      throw new Error('Percentage must be between 0 and 100')
+      return failure(
+        createAppError(ERROR_CODES.VALIDATION_ERROR, 'Percentage must be between 0 and 100')
+      )
     }
+
+    return success(undefined)
   }
 
-  private validateConversionRule(rule: ConversionRule): void {
+  private validateConversionRule(rule: ConversionRule): Result<void, AppError> {
     const validTypes = ['direct', 'percentage', 'formula', 'ai_suggested']
     if (!validTypes.includes(rule.type)) {
-      throw new Error(`Invalid conversion rule type: ${rule.type}`)
+      return failure(
+        createAppError(ERROR_CODES.VALIDATION_ERROR, `Invalid conversion rule type: ${rule.type}`)
+      )
     }
 
     if (rule.type === 'percentage' && rule.percentage === undefined) {
-      throw new Error('Percentage rule requires percentage value')
+      return failure(
+        createAppError(ERROR_CODES.VALIDATION_ERROR, 'Percentage rule requires percentage value')
+      )
     }
 
     if (rule.type === 'formula' && !rule.formula) {
-      throw new Error('Formula rule requires formula expression')
+      return failure(
+        createAppError(ERROR_CODES.VALIDATION_ERROR, 'Formula rule requires formula expression')
+      )
     }
 
     if (rule.conditions) {
       for (const condition of rule.conditions) {
-        this.validateCondition(condition)
+        const conditionResult = this.validateCondition(condition)
+        if (isFailure(conditionResult)) {
+          return conditionResult
+        }
       }
     }
+
+    return success(undefined)
   }
 
-  private validateCondition(condition: MappingCondition): void {
+  private validateCondition(condition: MappingCondition): Result<void, AppError> {
     const validOperators = ['equals', 'contains', 'gt', 'lt', 'between']
     if (!validOperators.includes(condition.operator)) {
-      throw new Error(`Invalid condition operator: ${condition.operator}`)
+      return failure(
+        createAppError(
+          ERROR_CODES.VALIDATION_ERROR,
+          `Invalid condition operator: ${condition.operator}`
+        )
+      )
     }
 
     if (!condition.field || condition.field.trim() === '') {
-      throw new Error('Condition field is required')
+      return failure(createAppError(ERROR_CODES.VALIDATION_ERROR, 'Condition field is required'))
     }
 
     if (!condition.targetAccountId || condition.targetAccountId.trim() === '') {
-      throw new Error('Condition target account ID is required')
+      return failure(
+        createAppError(ERROR_CODES.VALIDATION_ERROR, 'Condition target account ID is required')
+      )
     }
+
+    return success(undefined)
   }
 
-  private async checkCircularReference(sourceItemId: string, targetItemId: string): Promise<void> {
+  private async checkCircularReference(
+    sourceItemId: string,
+    targetItemId: string
+  ): Promise<Result<void, AppError>> {
     if (sourceItemId === targetItemId) {
-      throw new Error('Circular reference: source and target items cannot be the same')
+      return failure(
+        createAppError(
+          ERROR_CODES.VALIDATION_ERROR,
+          'Circular reference: source and target items cannot be the same'
+        )
+      )
     }
 
     const visited = new Set<string>()
@@ -537,7 +618,12 @@ export class AccountMappingService {
       const currentId = queue.shift()!
 
       if (currentId === sourceItemId) {
-        throw new Error('Circular reference detected in mapping chain')
+        return failure(
+          createAppError(
+            ERROR_CODES.VALIDATION_ERROR,
+            'Circular reference detected in mapping chain'
+          )
+        )
       }
 
       if (visited.has(currentId)) continue
@@ -552,6 +638,8 @@ export class AccountMappingService {
         queue.push(mapping.targetItemId)
       }
     }
+
+    return success(undefined)
   }
 
   private async createAuditLog(

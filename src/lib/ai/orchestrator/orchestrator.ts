@@ -13,6 +13,8 @@ import { classifyTask } from './task-classifier'
 import { analyzeComplexity } from './complexity-analyzer'
 import { synthesizeResponses } from './response-synthesizer'
 import { getPersona } from '@/lib/ai/personas/registry'
+import { getAIService } from '@/lib/integrations/ai'
+import type { PersonaResponse } from '@/lib/ai/personas/types'
 
 type Result<T> = { success: true; data: T } | { success: false; error: Error }
 
@@ -443,35 +445,48 @@ export class AIOrchestrator {
         return step.optional ? null : null
       }
 
-      const mockResponse: PersonaAnalysis = {
+      const aiService = getAIService()
+      const aiProvider = await aiService.getProvider()
+
+      if (!aiProvider) {
+        this.emitEvent({
+          type: 'persona_failed',
+          data: { persona: step.persona, error: new Error('AI provider not available') },
+        })
+        return step.optional ? null : null
+      }
+
+      const response = await aiProvider.generate({
+        messages: [
+          { role: 'system', content: promptResult.data.systemPrompt },
+          { role: 'user', content: promptResult.data.userPrompt },
+        ],
+        temperature: persona.temperature,
+        maxTokens: 4096,
+        timeout: this.timeoutMs,
+      })
+
+      const parsedResponse = this.parseResponse(response.content, step.persona)
+
+      const analysis: PersonaAnalysis = {
         persona: step.persona,
         response: {
+          ...parsedResponse,
           persona: step.persona,
-          conclusion: `[${step.persona}] Analysis of: ${request.query.slice(0, 100)}`,
-          confidence: 0.85,
-          reasoning: [
-            {
-              point: 'Key finding',
-              analysis: 'Detailed analysis',
-              evidence: 'Data evidence',
-              confidence: 0.9,
-            },
-          ],
-          risks: [],
           metadata: {
-            modelUsed: 'gpt-5-nano',
-            tokensUsed: 500,
+            modelUsed: response.model,
+            tokensUsed: response.usage?.totalTokens ?? 0,
             processingTimeMs: Date.now() - startTime,
             templateVersion: '1.0.0',
           },
         },
         executionTimeMs: Date.now() - startTime,
-        modelUsed: 'gpt-5-nano',
-        tokensUsed: 500,
+        modelUsed: response.model,
+        tokensUsed: response.usage?.totalTokens ?? 0,
       }
 
-      this.emitEvent({ type: 'persona_completed', data: mockResponse })
-      return mockResponse
+      this.emitEvent({ type: 'persona_completed', data: analysis })
+      return analysis
     } catch (error) {
       this.emitEvent({
         type: 'persona_failed',
@@ -481,6 +496,35 @@ export class AIOrchestrator {
         },
       })
       return step.optional ? null : null
+    }
+  }
+
+  private parseResponse(
+    content: string,
+    _persona: string
+  ): Omit<PersonaResponse, 'persona' | 'metadata'> {
+    try {
+      const parsed = JSON.parse(content)
+      return {
+        conclusion: parsed.conclusion || '',
+        confidence: typeof parsed.confidence === 'number' ? parsed.confidence : 0.5,
+        reasoning: Array.isArray(parsed.reasoning) ? parsed.reasoning : [],
+        risks: Array.isArray(parsed.risks) ? parsed.risks : [],
+      }
+    } catch {
+      return {
+        conclusion: content.slice(0, 500),
+        confidence: 0.5,
+        reasoning: [
+          {
+            point: 'Raw response',
+            analysis: content.slice(0, 1000),
+            evidence: '',
+            confidence: 0.5,
+          },
+        ],
+        risks: [],
+      }
     }
   }
 

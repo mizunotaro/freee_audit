@@ -1,4 +1,5 @@
-export default function HomePage({ params: { locale } }: { params: { locale: string } }) {
+export default async function HomePage({ params }: { params: Promise<{ locale: string }> }) {
+  const { locale } = await params
   return (
     <div className="container mx-auto px-4 py-8">
       <h1 className="mb-6 text-3xl font-bold">freee_audit</h1>

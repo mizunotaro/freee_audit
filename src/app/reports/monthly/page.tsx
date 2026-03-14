@@ -7,6 +7,7 @@ import { KPICard } from '@/components/charts/KPIGauge'
 import { MultiMonthReportTable } from '@/components/reports/templates/monthly-report-template'
 import type { MultiMonthReport, MonthlyTrend } from '@/types'
 import { formatFiscalYear } from '@/lib/utils'
+import { fetchWithTimeout, FetchTimeoutError } from '@/lib/api/fetch-with-timeout'
 
 export default function MonthlyReportPage() {
   const [report, setReport] = useState<MultiMonthReport | null>(null)
@@ -19,14 +20,18 @@ export default function MonthlyReportPage() {
   const fetchData = useCallback(async () => {
     setLoading(true)
     try {
-      const res = await fetch(
-        `/api/reports/monthly?fiscalYear=${fiscalYear}&endMonth=${endMonth}&monthCount=${monthCount}`
+      const res = await fetchWithTimeout(
+        `/api/reports/monthly?fiscalYear=${fiscalYear}&endMonth=${endMonth}&monthCount=${monthCount}`,
+        { timeout: 30000 }
       )
       const data = await res.json()
       setReport(data.report)
       setTrend(data.trend || [])
     } catch (error) {
       console.error('Failed to fetch report:', error)
+      if (error instanceof FetchTimeoutError) {
+        console.error('Request timed out')
+      }
     } finally {
       setLoading(false)
     }

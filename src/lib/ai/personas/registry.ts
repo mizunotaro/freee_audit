@@ -4,6 +4,7 @@ import { CPAPersona } from './personas/cpa'
 import { TaxAccountantPersona } from './personas/tax-accountant'
 import { CFOPersona } from './personas/cfo'
 import { FinancialAnalystPersona } from './personas/financial-analyst'
+import { Big4AuditorPersona } from './big4-auditor'
 
 class PersonaRegistry {
   private personas: Map<PersonaType, BasePersona>
@@ -26,6 +27,7 @@ class PersonaRegistry {
     this.register(new TaxAccountantPersona())
     this.register(new CFOPersona())
     this.register(new FinancialAnalystPersona())
+    this.register(new Big4AuditorPersona())
   }
 
   register(persona: BasePersona): void {

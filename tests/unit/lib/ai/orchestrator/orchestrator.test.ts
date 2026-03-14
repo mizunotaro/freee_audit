@@ -4,6 +4,9 @@ import type {
   OrchestratorContext,
   OrchestratorEvent,
 } from '@/lib/ai/orchestrator/orchestrator-types'
+import * as aiModule from '@/lib/integrations/ai'
+import type { AIProvider, GenerateResult } from '@/lib/integrations/ai/provider'
+import { vi, beforeEach, afterEach, describe, it, expect } from 'vitest'
 
 const mockContext: OrchestratorContext = {
   sessionId: 'test-session',
@@ -17,7 +20,52 @@ const createMockRequest = (query: string): OrchestratorRequest => ({
   context: mockContext,
 })
 
+const createMockAIProvider = (): AIProvider => ({
+  name: 'openai',
+  analyzeDocument: vi.fn(),
+  validateEntry: vi.fn(),
+  generate: vi.fn(
+    async (): Promise<GenerateResult> => ({
+      content: JSON.stringify({
+        conclusion: 'Mock analysis conclusion',
+        confidence: 0.85,
+        reasoning: [
+          {
+            point: 'Key finding',
+            analysis: 'Detailed analysis',
+            evidence: 'Data evidence',
+            confidence: 0.9,
+          },
+        ],
+        risks: [],
+      }),
+      model: 'gpt-5-nano',
+      usage: {
+        promptTokens: 100,
+        completionTokens: 200,
+        totalTokens: 300,
+      },
+    })
+  ),
+})
+
+vi.mock('@/lib/integrations/ai', () => ({
+  getAIService: vi.fn(),
+  resetAIService: vi.fn(),
+}))
+
 describe('orchestrator', () => {
+  beforeEach(() => {
+    const mockProvider = createMockAIProvider()
+    vi.mocked(aiModule.getAIService).mockReturnValue({
+      getProvider: vi.fn().mockResolvedValue(mockProvider),
+    } as unknown as ReturnType<typeof aiModule.getAIService>)
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
   describe('AIOrchestrator', () => {
     it('should create orchestrator instance', () => {
       const orchestrator = new AIOrchestrator()

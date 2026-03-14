@@ -14,6 +14,41 @@ const intlMiddleware = createMiddleware({
 
 const publicPaths = ['/login', '/api/auth/login', '/api/auth/logout', '/api/health']
 
+const staticPaths = [
+  '/favicon.ico',
+  '/apple-touch-icon.png',
+  '/manifest.json',
+  '/robots.txt',
+  '/sitemap.xml',
+]
+
+const staticExtensions = [
+  '.ico',
+  '.png',
+  '.jpg',
+  '.jpeg',
+  '.gif',
+  '.svg',
+  '.webp',
+  '.woff',
+  '.woff2',
+  '.ttf',
+  '.eot',
+  '.css',
+  '.js',
+  '.map',
+  '.json',
+  '.xml',
+  '.txt',
+]
+
+function isStaticFile(pathname: string): boolean {
+  if (staticPaths.includes(pathname)) {
+    return true
+  }
+  return staticExtensions.some((ext) => pathname.endsWith(ext))
+}
+
 function isPublicPath(pathname: string): boolean {
   return publicPaths.some(
     (path) => pathname === path || pathname === `/ja${path}` || pathname === `/en${path}`
@@ -22,6 +57,10 @@ function isPublicPath(pathname: string): boolean {
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
+
+  if (isStaticFile(pathname)) {
+    return NextResponse.next()
+  }
 
   if (pathname.startsWith('/api/')) {
     if (isPublicPath(pathname)) {
@@ -49,6 +88,10 @@ export async function middleware(request: NextRequest) {
     response.headers.set('x-user-company-id', user.companyId || '')
 
     return response
+  }
+
+  if (pathname.startsWith('/_next/')) {
+    return NextResponse.next()
   }
 
   const localeMatch = locales.find(
@@ -79,9 +122,15 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  return intlMiddleware(request)
+  if (localeMatch) {
+    return intlMiddleware(request)
+  }
+
+  return NextResponse.next()
 }
 
 export const config = {
-  matcher: ['/((?!api|_next|_vercel|.*\\..*).*)'],
+  matcher: [
+    '/((?!api|_next/static|_next/image|favicon.ico|apple-touch-icon.png|manifest.json|robots.txt|sitemap.xml).*)',
+  ],
 }

@@ -3,6 +3,8 @@ import {
   AIProviderType,
   DocumentAnalysisRequest,
   EntryValidationRequest,
+  GenerateOptions,
+  GenerateResult,
 } from './provider'
 import { DocumentAnalysisResult, EntryValidationResult } from '@/types/audit'
 import { CircuitBreaker, CircuitState } from './circuit-breaker'
@@ -179,6 +181,24 @@ export class FallbackAIProvider implements AIProvider {
     }
 
     const result = await this.executeSequential((p) => p.validateEntry(request), 'validateEntry')
+    this.setCache(cacheKey, result)
+    return result
+  }
+
+  async generate(options: GenerateOptions): Promise<GenerateResult> {
+    const cacheKey = this.getCacheKey('generate', options)
+    const cached = this.getFromCache<GenerateResult>(cacheKey)
+    if (cached) {
+      return cached
+    }
+
+    if (this.parallelMode) {
+      const result = await this.executeParallel((p) => p.generate(options), 'generate')
+      this.setCache(cacheKey, result)
+      return result
+    }
+
+    const result = await this.executeSequential((p) => p.generate(options), 'generate')
     this.setCache(cacheKey, result)
     return result
   }

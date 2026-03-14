@@ -20,6 +20,8 @@ import {
   FileText,
   ChevronDown,
   Sparkles,
+  ArrowLeftRight,
+  SearchCheck,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
@@ -52,6 +54,9 @@ interface SidebarProps {
 const navItems: NavItem[] = [
   { key: 'dashboard', href: '/dashboard', icon: LayoutDashboard },
   { key: 'audit', href: '/audit/journals', icon: FileCheck },
+  { key: 'conversion', href: '/conversion/projects', icon: ArrowLeftRight },
+  { key: 'valuation', href: '/valuation', icon: TrendingUp },
+  { key: 'financialDD', href: '/financial-dd', icon: SearchCheck },
   { key: 'journalProposal', href: '/journal-proposal', icon: Sparkles, requiredRole: 'ACCOUNTANT' },
   { key: 'reports', href: '/reports', icon: BarChart3 },
   { key: 'periodicReports', href: '/reports/periodic', icon: TrendingUp },
@@ -163,7 +168,9 @@ export function Sidebar({ user, locale }: SidebarProps) {
         </SheetTrigger>
         <SheetContent side="left" className="w-64 p-4">
           <div className="mb-4 flex items-center justify-between">
-            <span className="text-lg font-bold">freee_audit</span>
+            <Link href={`/${locale}/dashboard`} className="text-lg font-bold hover:text-primary">
+              freee_audit
+            </Link>
           </div>
           <NavLinks />
           <div className="mt-auto pt-4">
@@ -171,7 +178,9 @@ export function Sidebar({ user, locale }: SidebarProps) {
           </div>
         </SheetContent>
       </Sheet>
-      <span className="font-semibold">freee_audit</span>
+      <Link href={`/${locale}/dashboard`} className="font-semibold hover:text-primary">
+        freee_audit
+      </Link>
     </header>
   )
 }

@@ -1,5 +1,13 @@
 import type { AdjustmentType, AdjustingEntry, AdjustmentRecommendation } from '@/types/conversion'
 import {
+  type Result,
+  type AppError,
+  success,
+  failure,
+  createAppError,
+  ERROR_CODES,
+} from '@/types/result'
+import {
   type AdjustmentStrategy,
   type SourceFinancialData,
   type ImpactEstimate,
@@ -77,28 +85,32 @@ export class AdjustmentCalculator {
     type: AdjustmentType,
     sourceData: SourceFinancialData,
     targetStandard: 'USGAAP' | 'IFRS'
-  ): Promise<AdjustingEntry | null> {
+  ): Promise<Result<AdjustingEntry | null, AppError>> {
     const calculator = this.calculators.get(type)
     if (!calculator) {
-      throw new Error(`Unknown adjustment type: ${type}`)
+      return failure(
+        createAppError(ERROR_CODES.VALIDATION_ERROR, `Unknown adjustment type: ${type}`)
+      )
     }
 
     const isApplicable = calculator.isApplicable(sourceData, targetStandard)
     if (!isApplicable) {
-      return null
+      return success(null)
     }
 
     const entry = await calculator.calculate(projectId, sourceData, targetStandard)
     if (!entry) {
-      return null
+      return success(null)
     }
 
     const validation = validateAdjustingEntry(entry)
     if (!validation.isValid) {
-      throw new Error(`Invalid adjusting entry: ${validation.error}`)
+      return failure(
+        createAppError(ERROR_CODES.VALIDATION_ERROR, `Invalid adjusting entry: ${validation.error}`)
+      )
     }
 
-    return entry
+    return success(entry)
   }
 
   async generateRecommendations(

@@ -16,6 +16,9 @@ import type {
 
 const AI_TIMEOUT_MS = 60000
 const MAX_ACCOUNTS_PER_REQUEST = 50
+const AI_TEMPERATURE = 0.1
+const AI_RETRIES = 3
+const AI_RETRY_DELAY_MS = 1000
 
 interface MockResponses {
   mappingSuggestions: Array<{
@@ -74,10 +77,35 @@ const MOCK_RESPONSES: MockResponses = {
 export class AIConversionAdvisor {
   private aiProvider: AIProvider | null
   private isMockMode: boolean
+  private model: string
 
   constructor() {
     this.isMockMode = process.env.AI_MOCK_MODE === 'true'
     this.aiProvider = createAIProviderFromEnv()
+    this.model =
+      process.env.OPENAI_MODEL ||
+      process.env.CLAUDE_MODEL ||
+      process.env.GEMINI_MODEL ||
+      process.env.OPENROUTER_MODEL ||
+      'gpt-4.1-mini'
+  }
+
+  private async withRetry<T>(
+    fn: () => Promise<T>,
+    retries: number = AI_RETRIES,
+    delay: number = AI_RETRY_DELAY_MS
+  ): Promise<T> {
+    for (let i = 0; i < retries; i++) {
+      try {
+        return await fn()
+      } catch (error) {
+        if (i === retries - 1) throw error
+        const backoffDelay = delay * Math.pow(2, i)
+        console.warn(`[AIConversionAdvisor] Retry ${i + 1}/${retries} after ${backoffDelay}ms`)
+        await new Promise((r) => setTimeout(r, backoffDelay))
+      }
+    }
+    throw new Error('Max retries exceeded')
   }
 
   private async callAI(prompt: string): Promise<string> {
@@ -90,18 +118,20 @@ export class AIConversionAdvisor {
     })
 
     try {
-      const result = await Promise.race([
-        this.aiProvider.analyzeDocument({
-          documentBase64: Buffer.from(prompt).toString('base64'),
-          documentType: 'pdf',
-          mimeType: 'text/plain',
-        }),
-        timeoutPromise,
-      ])
+      const result = await this.withRetry(async () => {
+        return Promise.race([
+          this.aiProvider!.analyzeDocument({
+            documentBase64: Buffer.from(prompt).toString('base64'),
+            documentType: 'pdf',
+            mimeType: 'text/plain',
+          }),
+          timeoutPromise,
+        ])
+      })
 
       return result.rawText || ''
     } catch (error) {
-      console.error('[AIConversionAdvisor] AI call failed:', error)
+      console.error('[AIConversionAdvisor] AI call failed after retries:', error)
       throw error
     }
   }
@@ -314,7 +344,8 @@ export class AIConversionAdvisor {
       riskAssessments,
       qualityScore: qualityReview.overallScore,
       generatedAt: new Date(),
-      modelUsed: this.isMockMode ? 'mock' : this.aiProvider?.name || 'unknown',
+      modelUsed: this.isMockMode ? 'mock' : this.model,
+      temperature: AI_TEMPERATURE,
     }
   }
 

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { validateSession } from '@/lib/auth'
+import { getAuthUser } from '@/lib/api/auth-helpers'
 import {
   getBudgets,
   createBudget,
@@ -19,12 +19,6 @@ import {
 } from '@/services/budget/actual-vs-budget'
 import { calculateDetailedActualVsBudget } from '@/services/budget/detailed-actual-vs-budget'
 import type { ProfitLoss } from '@/types'
-
-async function getAuthUser(request: NextRequest) {
-  const token = request.cookies.get('session')?.value
-  if (!token) return null
-  return validateSession(token)
-}
 
 function generateSamplePL(
   fiscalYear: number,

@@ -4,87 +4,20 @@ import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import { CashFlowChart } from '@/components/charts/CashFlowChart'
 import { formatCurrency } from '@/lib/utils'
-
-interface CashFlowData {
-  month: string
-  operating: number
-  investing: number
-  financing: number
-  netCash: number
-  cumulative: number
-}
-
-interface CashPosition {
-  fiscalYear: number
-  months: {
-    month: number
-    beginningCash: number
-    operatingNet: number
-    investingNet: number
-    financingNet: number
-    netChange: number
-    endingCash: number
-  }[]
-  annualTotal: {
-    operatingNet: number
-    investingNet: number
-    financingNet: number
-    netChange: number
-  }
-}
-
-interface RunwayData {
-  monthlyBurnRate: number
-  runwayMonths: number
-  scenarios: {
-    optimistic: { burnRate: number; runwayMonths: number }
-    realistic: { burnRate: number; runwayMonths: number }
-    pessimistic: { burnRate: number; runwayMonths: number }
-  }
-}
-
-interface RunwayAlert {
-  level: 'safe' | 'warning' | 'critical'
-  message: string
-  recommendation: string
-}
-
-interface CashFlowStatementItem {
-  month: number
-  operatingActivities: {
-    netCashFromOperating: number
-  }
-  investingActivities: {
-    netCashFromInvesting: number
-  }
-  financingActivities: {
-    netCashFromFinancing: number
-  }
-}
-
-interface CashOutForecast {
-  date: string
-  amount: number
-  category: string
-  description: string
-  partnerName: string | null
-  urgency: 'high' | 'medium' | 'low'
-}
-
-interface MonthlyCashOutSummary {
-  month: string
-  totalAmount: number
-  itemCount: number
-  categories: {
-    payable: number
-    loan: number
-    other: number
-  }
-}
+import { fetchWithTimeout, FetchTimeoutError } from '@/lib/api/fetch-with-timeout'
+import type {
+  CashFlowChartData as CashFlowData,
+  CashFlowPosition,
+  RunwayData,
+  RunwayAlert,
+  CashFlowStatementItem,
+  CashOutForecast,
+  MonthlyCashOutSummary,
+} from '@/types/reports'
 
 export default function CashflowPage() {
   const [cashFlows, setCashFlows] = useState<CashFlowStatementItem[]>([])
-  const [cashPosition, setCashPosition] = useState<CashPosition | null>(null)
+  const [cashPosition, setCashPosition] = useState<CashFlowPosition | null>(null)
   const [runway, setRunway] = useState<RunwayData | null>(null)
   const [alert, setAlert] = useState<RunwayAlert | null>(null)
   const [cashOutForecasts, setCashOutForecasts] = useState<CashOutForecast[]>([])
@@ -95,21 +28,38 @@ export default function CashflowPage() {
   const fetchData = useCallback(async () => {
     setLoading(true)
     try {
-      const [cashflowRes, debtRes] = await Promise.all([
-        fetch(`/api/reports/cashflow?fiscalYear=${fiscalYear}`),
-        fetch('/api/debt/forecast'),
+      const [cashflowResult, debtResult] = await Promise.allSettled([
+        fetchWithTimeout(`/api/reports/cashflow?fiscalYear=${fiscalYear}`, { timeout: 30000 }),
+        fetchWithTimeout('/api/debt/forecast', { timeout: 30000 }),
       ])
-      const cashflowData = await cashflowRes.json()
-      const debtData = await debtRes.json()
 
-      setCashFlows(cashflowData.cashFlows || [])
-      setCashPosition(cashflowData.cashPosition)
-      setRunway(cashflowData.runway)
-      setAlert(cashflowData.alert)
-      setCashOutForecasts(debtData.forecasts || [])
-      setMonthlyCashOut(debtData.monthlySummary || [])
+      if (cashflowResult.status === 'fulfilled') {
+        const cashflowData = await cashflowResult.value.json()
+        setCashFlows(cashflowData.cashFlows || [])
+        setCashPosition(cashflowData.cashPosition)
+        setRunway(cashflowData.runway)
+        setAlert(cashflowData.alert)
+      } else {
+        if (cashflowResult.reason instanceof FetchTimeoutError) {
+          console.error('Cashflow request timed out')
+        } else {
+          console.error('Failed to fetch cashflow:', cashflowResult.reason)
+        }
+      }
+
+      if (debtResult.status === 'fulfilled') {
+        const debtData = await debtResult.value.json()
+        setCashOutForecasts(debtData.forecasts || [])
+        setMonthlyCashOut(debtData.monthlySummary || [])
+      } else {
+        if (debtResult.reason instanceof FetchTimeoutError) {
+          console.error('Debt forecast request timed out')
+        } else {
+          console.error('Failed to fetch debt forecast:', debtResult.reason)
+        }
+      }
     } catch (error) {
-      console.error('Failed to fetch cashflow:', error)
+      console.error('Failed to fetch data:', error)
     } finally {
       setLoading(false)
     }

@@ -250,6 +250,7 @@ describe('IRReportService', () => {
   describe('createIRReport', () => {
     const createData: CreateIRReportData = {
       companyId: mockCompanyId,
+      reportType: 'annual',
       fiscalYear: 2024,
       title: '2024年度 IRレポート',
     }
@@ -649,7 +650,7 @@ describe('IRReportService', () => {
         return fn(tx)
       })
 
-      const result = await updateSection(mockReportId, 'COMPANY_OVERVIEW', {
+      const result = await updateSection(mockReportId, 'overview', {
         content: 'Updated content',
       })
 
@@ -660,7 +661,7 @@ describe('IRReportService', () => {
     })
 
     it('should return failure when reportId is missing', async () => {
-      const result = await updateSection('', 'COMPANY_OVERVIEW', { content: 'test' })
+      const result = await updateSection('', 'overview', { content: 'test' })
 
       expect(result.success).toBe(false)
       if (!result.success) {
@@ -678,7 +679,7 @@ describe('IRReportService', () => {
     })
 
     it('should return failure when no update data provided', async () => {
-      const result = await updateSection(mockReportId, 'COMPANY_OVERVIEW', {})
+      const result = await updateSection(mockReportId, 'overview', {})
 
       expect(result.success).toBe(false)
       if (!result.success) {
@@ -697,7 +698,7 @@ describe('IRReportService', () => {
         return fn(tx)
       })
 
-      const result = await updateSection(mockReportId, 'COMPANY_OVERVIEW', { content: 'test' })
+      const result = await updateSection(mockReportId, 'overview', { content: 'test' })
 
       expect(result.success).toBe(false)
       if (!result.success) {

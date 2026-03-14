@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { getAuthUser } from '@/lib/api/auth-helpers'
 import { analyzeFinancials } from '@/services/ai/analyzers'
 import { compareWithBenchmark } from '@/services/benchmark'
 import { CONFIG_VERSION } from '../config/constants'
@@ -62,6 +63,22 @@ import { addSecurityHeaders } from '../middleware/security-headers'
 async function handlePost(
   request: NextRequest
 ): Promise<NextResponse<ApiResponse<FinancialAnalysisOutput>>> {
+  const user = await getAuthUser(request)
+  if (!user) {
+    return NextResponse.json(
+      createErrorResponse(
+        {
+          code: 'UNAUTHORIZED' as ErrorCode,
+          message: 'Unauthorized',
+          timestamp: new Date().toISOString(),
+          requestId: 'auth',
+        },
+        { requestId: 'auth' }
+      ),
+      { status: 401 }
+    )
+  }
+
   const startTime = Date.now()
   const requestId = generateRequestId()
 

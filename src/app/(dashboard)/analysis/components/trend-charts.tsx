@@ -2,13 +2,7 @@
 
 import { memo } from 'react'
 import { cn } from '@/lib/utils'
-
-interface TrendData {
-  category: string
-  score: number
-  status: string
-  summary: string
-}
+import type { TrendData } from '@/types/reports'
 
 interface TrendChartsProps {
   readonly data: { categoryAnalyses: readonly TrendData[] } | undefined

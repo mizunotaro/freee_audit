@@ -1,10 +1,12 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, use } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import { Sidebar } from '@/components/layout/sidebar'
 import { DockSidebar } from '@/components/layout/dock-sidebar'
 import { BottomNavigation } from '@/components/layout/bottom-navigation'
+import { FloatingChatWidget } from '@/components/chat'
+import { PageContextProvider } from '@/contexts/page-context'
 
 interface User {
   id: string
@@ -16,11 +18,12 @@ interface User {
 
 export default function AuthenticatedLayout({
   children,
-  params: { locale },
+  params,
 }: {
   children: React.ReactNode
-  params: { locale: string }
+  params: Promise<{ locale: string }>
 }) {
+  const { locale } = use(params)
   const router = useRouter()
   const pathname = usePathname()
   const [user, setUser] = useState<User | null>(null)
@@ -60,29 +63,32 @@ export default function AuthenticatedLayout({
   }
 
   return (
-    <div className="min-h-screen bg-muted/40">
-      <DockSidebar
-        user={{
-          name: user.name,
-          email: user.email,
-          role: user.role,
-        }}
-        locale={locale}
-      />
-      <Sidebar
-        user={{
-          name: user.name,
-          email: user.email,
-          role: user.role,
-        }}
-        locale={locale}
-      />
-      <BottomNavigation locale={locale} />
-      <main className="min-h-screen lg:pl-16">
-        <div className="pt-14 lg:pt-0 pb-16 lg:pb-0">
-          <div className="p-4 lg:p-6">{children}</div>
-        </div>
-      </main>
-    </div>
+    <PageContextProvider>
+      <div className="min-h-screen bg-muted/40">
+        <DockSidebar
+          user={{
+            name: user.name,
+            email: user.email,
+            role: user.role,
+          }}
+          locale={locale}
+        />
+        <Sidebar
+          user={{
+            name: user.name,
+            email: user.email,
+            role: user.role,
+          }}
+          locale={locale}
+        />
+        <BottomNavigation locale={locale} />
+        <main className="min-h-screen lg:pl-16">
+          <div className="pt-14 lg:pt-0 pb-16 lg:pb-0">
+            <div className="p-4 lg:p-6">{children}</div>
+          </div>
+        </main>
+        <FloatingChatWidget />
+      </div>
+    </PageContextProvider>
   )
 }

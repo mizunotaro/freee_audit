@@ -4,6 +4,7 @@ import {
   accountMappingService,
 } from '@/services/conversion/account-mapping-service'
 import { prisma } from '@/lib/db'
+import { isSuccess, isFailure } from '@/types/result'
 
 vi.mock('@/lib/db', () => ({
   prisma: {
@@ -160,13 +161,15 @@ describe('AccountMappingService', () => {
         mappingType: '1to1',
       })
 
-      expect(result).toBeDefined()
-      expect(result.sourceAccountCode).toBe('1000')
-      expect(result.targetAccountCode).toBe('1100')
-      expect(result.mappingType).toBe('1to1')
+      expect(isSuccess(result)).toBe(true)
+      if (isSuccess(result)) {
+        expect(result.data.sourceAccountCode).toBe('1000')
+        expect(result.data.targetAccountCode).toBe('1100')
+        expect(result.data.mappingType).toBe('1to1')
+      }
     })
 
-    it('should reject duplicate mapping', async () => {
+    it('should return error for duplicate mapping', async () => {
       vi.mocked(prisma.chartOfAccountItem.findUnique)
         .mockResolvedValueOnce(mockSourceItem)
         .mockResolvedValueOnce(mockTargetItem)
@@ -175,19 +178,21 @@ describe('AccountMappingService', () => {
         .mockResolvedValueOnce(mockTargetCoa)
       vi.mocked(prisma.accountMapping.findUnique).mockResolvedValue(mockMapping)
 
-      await expect(
-        service.create({
-          companyId: 'company-1',
-          sourceCoaId: 'source-coa-1',
-          sourceItemId: 'source-item-1',
-          targetCoaId: 'target-coa-1',
-          targetItemId: 'target-item-1',
-          mappingType: '1to1',
-        })
-      ).rejects.toThrow('Duplicate mapping')
+      const result = await service.create({
+        companyId: 'company-1',
+        sourceCoaId: 'source-coa-1',
+        sourceItemId: 'source-item-1',
+        targetCoaId: 'target-coa-1',
+        targetItemId: 'target-item-1',
+        mappingType: '1to1',
+      })
+      expect(isFailure(result)).toBe(true)
+      if (isFailure(result)) {
+        expect(result.error.message).toContain('Duplicate mapping')
+      }
     })
 
-    it('should validate conversion rule', async () => {
+    it('should return error for invalid conversion rule', async () => {
       vi.mocked(prisma.chartOfAccountItem.findUnique)
         .mockResolvedValueOnce(mockSourceItem)
         .mockResolvedValueOnce(mockTargetItem)
@@ -195,49 +200,55 @@ describe('AccountMappingService', () => {
         .mockResolvedValueOnce(mockSourceCoa)
         .mockResolvedValueOnce(mockTargetCoa)
 
-      await expect(
-        service.create({
-          companyId: 'company-1',
-          sourceCoaId: 'source-coa-1',
-          sourceItemId: 'source-item-1',
-          targetCoaId: 'target-coa-1',
-          targetItemId: 'target-item-1',
-          mappingType: '1to1',
-          conversionRule: { type: 'invalid' as 'direct' },
-        })
-      ).rejects.toThrow('Invalid conversion rule type')
+      const result = await service.create({
+        companyId: 'company-1',
+        sourceCoaId: 'source-coa-1',
+        sourceItemId: 'source-item-1',
+        targetCoaId: 'target-coa-1',
+        targetItemId: 'target-item-1',
+        mappingType: '1to1',
+        conversionRule: { type: 'invalid' as 'direct' },
+      })
+      expect(isFailure(result)).toBe(true)
+      if (isFailure(result)) {
+        expect(result.error.message).toContain('Invalid conversion rule type')
+      }
     })
 
-    it('should throw error when source item not found', async () => {
+    it('should return error when source item not found', async () => {
       vi.mocked(prisma.chartOfAccountItem.findUnique).mockResolvedValue(null)
 
-      await expect(
-        service.create({
-          companyId: 'company-1',
-          sourceCoaId: 'source-coa-1',
-          sourceItemId: 'non-existent',
-          targetCoaId: 'target-coa-1',
-          targetItemId: 'target-item-1',
-          mappingType: '1to1',
-        })
-      ).rejects.toThrow('Source item not found')
+      const result = await service.create({
+        companyId: 'company-1',
+        sourceCoaId: 'source-coa-1',
+        sourceItemId: 'non-existent',
+        targetCoaId: 'target-coa-1',
+        targetItemId: 'target-item-1',
+        mappingType: '1to1',
+      })
+      expect(isFailure(result)).toBe(true)
+      if (isFailure(result)) {
+        expect(result.error.message).toContain('Source item not found')
+      }
     })
 
-    it('should throw error when target item not found', async () => {
+    it('should return error when target item not found', async () => {
       vi.mocked(prisma.chartOfAccountItem.findUnique)
         .mockResolvedValueOnce(mockSourceItem)
         .mockResolvedValueOnce(null)
 
-      await expect(
-        service.create({
-          companyId: 'company-1',
-          sourceCoaId: 'source-coa-1',
-          sourceItemId: 'source-item-1',
-          targetCoaId: 'target-coa-1',
-          targetItemId: 'non-existent',
-          mappingType: '1to1',
-        })
-      ).rejects.toThrow('Target item not found')
+      const result = await service.create({
+        companyId: 'company-1',
+        sourceCoaId: 'source-coa-1',
+        sourceItemId: 'source-item-1',
+        targetCoaId: 'target-coa-1',
+        targetItemId: 'non-existent',
+        mappingType: '1to1',
+      })
+      expect(isFailure(result)).toBe(true)
+      if (isFailure(result)) {
+        expect(result.error.message).toContain('Target item not found')
+      }
     })
   })
 
@@ -308,12 +319,14 @@ describe('AccountMappingService', () => {
       expect(result).toBeDefined()
     })
 
-    it('should throw error for non-existent mapping', async () => {
+    it('should return error for non-existent mapping', async () => {
       vi.mocked(prisma.accountMapping.findUnique).mockResolvedValue(null)
 
-      await expect(service.update('non-existent', { notes: 'test' })).rejects.toThrow(
-        'Mapping not found'
-      )
+      const result = await service.update('non-existent', { notes: 'test' })
+      expect(isFailure(result)).toBe(true)
+      if (isFailure(result)) {
+        expect(result.error.message).toContain('Mapping not found')
+      }
     })
   })
 
@@ -327,10 +340,14 @@ describe('AccountMappingService', () => {
       expect(prisma.accountMapping.delete).toHaveBeenCalledWith({ where: { id: 'mapping-1' } })
     })
 
-    it('should throw error for non-existent mapping', async () => {
+    it('should return error for non-existent mapping', async () => {
       vi.mocked(prisma.accountMapping.findUnique).mockResolvedValue(null)
 
-      await expect(service.delete('non-existent')).rejects.toThrow('Mapping not found')
+      const result = await service.delete('non-existent')
+      expect(isFailure(result)).toBe(true)
+      if (isFailure(result)) {
+        expect(result.error.message).toContain('Mapping not found')
+      }
     })
   })
 

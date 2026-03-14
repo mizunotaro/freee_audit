@@ -3,6 +3,7 @@ import {
   createBenchmarkService,
   compareWithBenchmark,
 } from '@/services/benchmark/benchmark-service'
+import { isSuccess, isFailure } from '@/types/result'
 import type { BenchmarkOptions, IndustrySector } from '@/services/benchmark/types'
 
 describe('BenchmarkService', () => {
@@ -24,8 +25,8 @@ describe('BenchmarkService', () => {
 
       const result = service.compare(ratios, { sector: 'manufacturing' })
 
-      expect(result.success).toBe(true)
-      if (result.success) {
+      expect(isSuccess(result)).toBe(true)
+      if (isSuccess(result)) {
         expect(result.data.industryComparisons.length).toBeGreaterThan(0)
       }
     })
@@ -39,8 +40,8 @@ describe('BenchmarkService', () => {
 
       const result = service.compare(ratios, { companySize: 'small' })
 
-      expect(result.success).toBe(true)
-      if (result.success) {
+      expect(isSuccess(result)).toBe(true)
+      if (isSuccess(result)) {
         expect(result.data.sizeComparisons.length).toBeGreaterThan(0)
       }
     })
@@ -53,8 +54,8 @@ describe('BenchmarkService', () => {
 
       const result = service.compare(ratios, { sector: 'manufacturing' })
 
-      expect(result.success).toBe(true)
-      if (result.success) {
+      expect(isSuccess(result)).toBe(true)
+      if (isSuccess(result)) {
         const comparison = result.data.industryComparisons.find(
           (c) => c.metricId === 'current_ratio'
         )
@@ -72,8 +73,8 @@ describe('BenchmarkService', () => {
 
       const result = service.compare(ratios, { sector: 'manufacturing' })
 
-      expect(result.success).toBe(true)
-      if (result.success) {
+      expect(isSuccess(result)).toBe(true)
+      if (isSuccess(result)) {
         const comparison = result.data.industryComparisons.find(
           (c) => c.metricId === 'current_ratio'
         )
@@ -91,8 +92,8 @@ describe('BenchmarkService', () => {
 
       const result = service.compare(ratios, { sector: 'manufacturing' })
 
-      expect(result.success).toBe(true)
-      if (result.success) {
+      expect(isSuccess(result)).toBe(true)
+      if (isSuccess(result)) {
         expect(result.data.strengths.length).toBeGreaterThanOrEqual(0)
         expect(result.data.weaknesses.length).toBeGreaterThanOrEqual(0)
       }
@@ -108,8 +109,8 @@ describe('BenchmarkService', () => {
 
       const result = service.compare(ratios, { sector: 'manufacturing' })
 
-      expect(result.success).toBe(true)
-      if (result.success) {
+      expect(isSuccess(result)).toBe(true)
+      if (isSuccess(result)) {
         expect(result.data.overallPercentile).toBeGreaterThanOrEqual(0)
         expect(result.data.overallPercentile).toBeLessThanOrEqual(100)
       }
@@ -121,7 +122,7 @@ describe('BenchmarkService', () => {
 
       const result = service.compare(ratios)
 
-      expect(result.success).toBe(true)
+      expect(isSuccess(result)).toBe(true)
     })
 
     it('should determine company size from employee count', () => {
@@ -130,7 +131,7 @@ describe('BenchmarkService', () => {
 
       const result = service.compare(ratios, { employeeCount: 50 })
 
-      expect(result.success).toBe(true)
+      expect(isSuccess(result)).toBe(true)
     })
 
     it('should determine company size from annual revenue', () => {
@@ -139,7 +140,7 @@ describe('BenchmarkService', () => {
 
       const result = service.compare(ratios, { annualRevenue: 50000000 })
 
-      expect(result.success).toBe(true)
+      expect(isSuccess(result)).toBe(true)
     })
 
     it('should filter specific metrics', () => {
@@ -155,8 +156,8 @@ describe('BenchmarkService', () => {
         metrics: ['current_ratio'],
       })
 
-      expect(result.success).toBe(true)
-      if (result.success) {
+      expect(isSuccess(result)).toBe(true)
+      if (isSuccess(result)) {
         expect(result.data.industryComparisons.length).toBe(1)
       }
     })
@@ -171,8 +172,8 @@ describe('BenchmarkService', () => {
 
       const result = service.compare(ratios, { sector: 'manufacturing' })
 
-      expect(result.success).toBe(true)
-      if (result.success) {
+      expect(isSuccess(result)).toBe(true)
+      if (isSuccess(result)) {
         expect(result.data.industryComparisons.length).toBe(1)
       }
     })
@@ -185,8 +186,8 @@ describe('BenchmarkService', () => {
         sector: 'invalid_sector' as IndustrySector,
       })
 
-      expect(result.success).toBe(false)
-      if (!result.success) {
+      expect(isFailure(result)).toBe(true)
+      if (isFailure(result)) {
         expect(result.error.code).toBe('benchmark_not_found')
       }
     })
@@ -197,8 +198,8 @@ describe('BenchmarkService', () => {
 
       const result = service.compare(ratios, { sector: 'manufacturing' })
 
-      expect(result.success).toBe(true)
-      if (result.success) {
+      expect(isSuccess(result)).toBe(true)
+      if (isSuccess(result)) {
         const comparison = result.data.industryComparisons[0]
         expect(typeof comparison.deviation).toBe('number')
       }
@@ -210,8 +211,8 @@ describe('BenchmarkService', () => {
 
       const result = service.compare(ratios, { sector: 'manufacturing' })
 
-      expect(result.success).toBe(true)
-      if (result.success) {
+      expect(isSuccess(result)).toBe(true)
+      if (isSuccess(result)) {
         const comparison = result.data.industryComparisons[0]
         expect(comparison.zScore).toBeDefined()
       }
@@ -247,7 +248,7 @@ describe('BenchmarkService', () => {
       const ratios = { current_ratio: 150 }
       const result = compareWithBenchmark(ratios, { sector: 'manufacturing' })
 
-      expect(result.success).toBe(true)
+      expect(isSuccess(result)).toBe(true)
     })
   })
 
@@ -256,8 +257,8 @@ describe('BenchmarkService', () => {
       const service = createBenchmarkService()
       const result = service.compare({ current_ratio: 0 }, { sector: 'manufacturing' })
 
-      expect(result.success).toBe(true)
-      if (result.success) {
+      expect(isSuccess(result)).toBe(true)
+      if (isSuccess(result)) {
         const comparison = result.data.industryComparisons[0]
         expect(comparison.percentile).toBe(0)
       }
@@ -267,8 +268,8 @@ describe('BenchmarkService', () => {
       const service = createBenchmarkService()
       const result = service.compare({ current_ratio: 10000 }, { sector: 'manufacturing' })
 
-      expect(result.success).toBe(true)
-      if (result.success) {
+      expect(isSuccess(result)).toBe(true)
+      if (isSuccess(result)) {
         const comparison = result.data.industryComparisons[0]
         expect(comparison.percentile).toBe(100)
       }
@@ -278,8 +279,8 @@ describe('BenchmarkService', () => {
       const service = createBenchmarkService()
       const result = service.compare({ current_ratio: 135 }, { sector: 'manufacturing' })
 
-      expect(result.success).toBe(true)
-      if (result.success) {
+      expect(isSuccess(result)).toBe(true)
+      if (isSuccess(result)) {
         const comparison = result.data.industryComparisons[0]
         expect(comparison.percentile).toBeGreaterThanOrEqual(40)
         expect(comparison.percentile).toBeLessThanOrEqual(60)
@@ -292,8 +293,8 @@ describe('BenchmarkService', () => {
       const service = createBenchmarkService()
       const result = service.compare({ current_ratio: 500 }, { sector: 'manufacturing' })
 
-      expect(result.success).toBe(true)
-      if (result.success) {
+      expect(isSuccess(result)).toBe(true)
+      if (isSuccess(result)) {
         const comparison = result.data.industryComparisons[0]
         expect(comparison.status).toBe('above_median')
       }
@@ -303,8 +304,8 @@ describe('BenchmarkService', () => {
       const service = createBenchmarkService()
       const result = service.compare({ current_ratio: 50 }, { sector: 'manufacturing' })
 
-      expect(result.success).toBe(true)
-      if (result.success) {
+      expect(isSuccess(result)).toBe(true)
+      if (isSuccess(result)) {
         const comparison = result.data.industryComparisons[0]
         expect(comparison.status).toBe('below_median')
       }
@@ -314,8 +315,8 @@ describe('BenchmarkService', () => {
       const service = createBenchmarkService()
       const result = service.compare({ current_ratio: 150 }, { sector: 'manufacturing' })
 
-      expect(result.success).toBe(true)
-      if (result.success) {
+      expect(isSuccess(result)).toBe(true)
+      if (isSuccess(result)) {
         const comparison = result.data.industryComparisons[0]
         expect(comparison.status).toBe('at_median')
       }
@@ -327,8 +328,8 @@ describe('BenchmarkService', () => {
       const service = createBenchmarkService()
       const result = service.compare({}, { sector: 'manufacturing' })
 
-      expect(result.success).toBe(true)
-      if (result.success) {
+      expect(isSuccess(result)).toBe(true)
+      if (isSuccess(result)) {
         expect(result.data.industryComparisons.length).toBe(0)
         expect(result.data.overallPercentile).toBe(50)
       }
@@ -338,21 +339,21 @@ describe('BenchmarkService', () => {
       const service = createBenchmarkService()
       const result = service.compare({ current_ratio: -100 }, { sector: 'manufacturing' })
 
-      expect(result.success).toBe(true)
+      expect(isSuccess(result)).toBe(true)
     })
 
     it('should handle zero values', () => {
       const service = createBenchmarkService()
       const result = service.compare({ current_ratio: 0 }, { sector: 'manufacturing' })
 
-      expect(result.success).toBe(true)
+      expect(isSuccess(result)).toBe(true)
     })
 
     it('should handle very large values', () => {
       const service = createBenchmarkService()
       const result = service.compare({ current_ratio: 1e10 }, { sector: 'manufacturing' })
 
-      expect(result.success).toBe(true)
+      expect(isSuccess(result)).toBe(true)
     })
   })
 
@@ -361,28 +362,28 @@ describe('BenchmarkService', () => {
       const service = createBenchmarkService()
       const result = service.compare({ current_ratio: 150 }, { sector: 'retail' })
 
-      expect(result.success).toBe(true)
+      expect(isSuccess(result)).toBe(true)
     })
 
     it('should work with technology sector', () => {
       const service = createBenchmarkService()
       const result = service.compare({ current_ratio: 200 }, { sector: 'technology' })
 
-      expect(result.success).toBe(true)
+      expect(isSuccess(result)).toBe(true)
     })
 
     it('should work with finance sector', () => {
       const service = createBenchmarkService()
       const result = service.compare({ roa: 1.2 }, { sector: 'finance' })
 
-      expect(result.success).toBe(true)
+      expect(isSuccess(result)).toBe(true)
     })
 
     it('should work with other sector', () => {
       const service = createBenchmarkService()
       const result = service.compare({ current_ratio: 150 }, { sector: 'other' })
 
-      expect(result.success).toBe(true)
+      expect(isSuccess(result)).toBe(true)
     })
   })
 })

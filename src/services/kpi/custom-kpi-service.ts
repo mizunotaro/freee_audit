@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/db'
+import { SafeFormulaEvaluator, FormulaError } from '@/lib/utils/safe-formula-evaluator'
 
 export type CalculationType = 'FORMULA' | 'MANUAL' | 'AGGREGATE'
 export type ComparisonType = 'higher_better' | 'lower_better' | 'range'
@@ -498,128 +499,141 @@ export interface KPIEvaluationContext {
   interest_expense: number
 }
 
+export type EvaluateResult = { success: true; data: number } | { success: false; error: string }
+
+const KPI_EVALUATOR_VARIABLES = [
+  'total_assets',
+  'current_assets',
+  'cash',
+  'accounts_receivable',
+  'inventory',
+  'total_liabilities',
+  'current_liabilities',
+  'equity',
+  'revenue',
+  'gross_profit',
+  'operating_income',
+  'net_income',
+  'depreciation',
+  'sga_expenses',
+  'operating_cf',
+  'investing_cf',
+  'financing_cf',
+  'free_cash_flow',
+  'employee_count',
+  'customer_count',
+  'active_users',
+  'burn_rate',
+  'runway',
+  'mrr',
+  'arr',
+  'labor_cost',
+  'added_value',
+  'fixed_assets',
+  'interest_expense',
+]
+
+const kpiEvaluator = new SafeFormulaEvaluator(KPI_EVALUATOR_VARIABLES, {
+  divisionByZeroBehavior: 'null',
+})
+
+function getDefaultContext(): Record<string, number> {
+  return {
+    total_assets: 0,
+    current_assets: 0,
+    cash: 0,
+    accounts_receivable: 0,
+    inventory: 0,
+    total_liabilities: 0,
+    current_liabilities: 0,
+    equity: 0,
+    revenue: 0,
+    gross_profit: 0,
+    operating_income: 0,
+    net_income: 0,
+    depreciation: 0,
+    sga_expenses: 0,
+    operating_cf: 0,
+    investing_cf: 0,
+    financing_cf: 0,
+    free_cash_flow: 0,
+    employee_count: 1,
+    customer_count: 0,
+    active_users: 0,
+    burn_rate: 0,
+    runway: 0,
+    mrr: 0,
+    arr: 0,
+    labor_cost: 0,
+    added_value: 0,
+    fixed_assets: 0,
+    interest_expense: 0,
+  }
+}
+
 export function evaluateCustomFormula(
   formula: string,
   context: Partial<KPIEvaluationContext>
 ): number | null {
   try {
-    const defaultContext: KPIEvaluationContext = {
-      total_assets: 0,
-      current_assets: 0,
-      cash: 0,
-      accounts_receivable: 0,
-      inventory: 0,
-      total_liabilities: 0,
-      current_liabilities: 0,
-      equity: 0,
-      revenue: 0,
-      gross_profit: 0,
-      operating_income: 0,
-      net_income: 0,
-      depreciation: 0,
-      sga_expenses: 0,
-      operating_cf: 0,
-      investing_cf: 0,
-      financing_cf: 0,
-      free_cash_flow: 0,
-      employee_count: 1,
-      customer_count: 0,
-      active_users: 0,
-      burn_rate: 0,
-      runway: 0,
-      mrr: 0,
-      arr: 0,
-      labor_cost: 0,
-      added_value: 0,
-      fixed_assets: 0,
-      interest_expense: 0,
-    }
+    const mergedContext = { ...getDefaultContext(), ...context } as Record<string, number>
+    const result = kpiEvaluator.evaluate(formula, mergedContext)
 
-    const mergedContext = { ...defaultContext, ...context }
-    const keys = Object.keys(mergedContext) as (keyof KPIEvaluationContext)[]
-    const values = keys.map((k) => mergedContext[k])
-
-    const fn = new Function(
-      ...keys,
-      `try { 
-        const result = ${formula};
-        if (typeof result !== 'number' || !isFinite(result)) return null;
-        return result;
-      } catch { return null; }`
-    )
-
-    const result = fn(...values)
-    return typeof result === 'number' ? Math.round(result * 100) / 100 : null
+    if (result === null) return null
+    return Math.round(result * 100) / 100
   } catch {
     return null
   }
 }
 
-export function validateFormula(formula: string): { valid: boolean; error?: string } {
-  const allowedVariables = Object.keys(AVAILABLE_VARIABLES)
-
-  const varPattern = /[a-zA-Z_][a-zA-Z0-9_]*/g
-  const matches = formula.match(varPattern) || []
-
-  for (const match of matches) {
-    if (!allowedVariables.includes(match) && !Object.prototype.hasOwnProperty.call(Math, match)) {
-      return { valid: false, error: `不明な変数: ${match}` }
-    }
-  }
-
-  const dangerousPatterns = [
-    /eval/,
-    /Function/,
-    /window/,
-    /document/,
-    /import/,
-    /require/,
-    /process/,
-  ]
-
-  for (const pattern of dangerousPatterns) {
-    if (pattern.test(formula)) {
-      return { valid: false, error: '安全でないコードが含まれています' }
-    }
-  }
-
+export function evaluateCustomFormulaWithResult(
+  formula: string,
+  context: Partial<KPIEvaluationContext>
+): EvaluateResult {
   try {
-    const testContext: KPIEvaluationContext = {
-      total_assets: 200,
-      current_assets: 100,
-      cash: 50,
-      accounts_receivable: 30,
-      inventory: 20,
-      total_liabilities: 100,
-      current_liabilities: 60,
-      equity: 100,
-      revenue: 100,
-      gross_profit: 50,
-      operating_income: 20,
-      net_income: 12,
-      depreciation: 5,
-      sga_expenses: 25,
-      operating_cf: 15,
-      investing_cf: -10,
-      financing_cf: -5,
-      free_cash_flow: 5,
-      employee_count: 10,
-      customer_count: 100,
-      active_users: 80,
-      burn_rate: 5,
-      runway: 10,
-      mrr: 10,
-      arr: 120,
-      labor_cost: 30,
-      added_value: 60,
-      fixed_assets: 100,
-      interest_expense: 3,
+    const mergedContext = { ...getDefaultContext(), ...context } as Record<string, number>
+    const result = kpiEvaluator.evaluate(formula, mergedContext)
+
+    if (result === null) {
+      return { success: false, error: '計算結果が無効です（ゼロ除算など）' }
     }
-    evaluateCustomFormula(formula, testContext)
-    return { valid: true }
-  } catch (e) {
-    return { valid: false, error: `数式エラー: ${e instanceof Error ? e.message : '不明'}` }
+    return { success: true, data: Math.round(result * 100) / 100 }
+  } catch (error) {
+    if (error instanceof FormulaError) {
+      return { success: false, error: error.message }
+    }
+    return { success: false, error: '数式の評価中にエラーが発生しました' }
   }
+}
+
+function translateError(error: string): string {
+  if (error.includes('Unknown variable or function:')) {
+    const varName = error.replace('Unknown variable or function: ', '')
+    return `不明な変数: ${varName}`
+  }
+  if (error.includes('dangerous pattern')) {
+    return '安全でないコードが含まれています'
+  }
+  if (error.includes('Syntax error:')) {
+    const syntaxError = error.replace('Syntax error: ', '')
+    return `構文エラー: ${syntaxError}`
+  }
+  if (error.includes('Function not allowed:')) {
+    const funcName = error.replace('Function not allowed: ', '')
+    return `使用できない関数: ${funcName}`
+  }
+  return error
+}
+
+export function validateFormula(formula: string): { valid: boolean; error?: string } {
+  const validation = kpiEvaluator.validate(formula)
+
+  if (!validation.isValid) {
+    const error = validation.errors[0] || '数式が無効です'
+    return { valid: false, error: translateError(error) }
+  }
+
+  return { valid: true }
 }
 
 export function evaluateKPIStatus(

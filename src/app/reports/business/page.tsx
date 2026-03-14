@@ -15,18 +15,8 @@ import {
 } from '@/components/ui/select'
 import { Download, Sparkles } from 'lucide-react'
 import { toast } from 'sonner'
-
-interface BusinessReportData {
-  fiscalYear: number
-  companyName: string
-  businessOverview: string
-  businessEnvironment: string
-  managementPolicy: string
-  issuesAndRisks: string
-  financialHighlights: string
-  researchAndDevelopment: string
-  corporateGovernance: string
-}
+import { fetchWithTimeout, FetchTimeoutError } from '@/lib/api/fetch-with-timeout'
+import type { BusinessReportData } from '@/types/reports'
 
 const defaultReportData: BusinessReportData = {
   fiscalYear: new Date().getFullYear(),
@@ -52,7 +42,7 @@ export default function BusinessReportPage() {
   const handleGenerateWithAI = async (section: keyof BusinessReportData) => {
     setGenerating(true)
     try {
-      const res = await fetch('/api/reports/business/generate', {
+      const res = await fetchWithTimeout('/api/reports/business/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -60,6 +50,7 @@ export default function BusinessReportPage() {
           companyName: reportData.companyName,
           fiscalYear: reportData.fiscalYear,
         }),
+        timeout: 30000,
       })
 
       if (res.ok) {
@@ -71,7 +62,11 @@ export default function BusinessReportPage() {
       }
     } catch (error) {
       console.error('Error generating content:', error)
-      toast.error('生成に失敗しました')
+      if (error instanceof FetchTimeoutError) {
+        toast.error('リクエストがタイムアウトしました')
+      } else {
+        toast.error('生成に失敗しました')
+      }
     } finally {
       setGenerating(false)
     }
@@ -80,10 +75,11 @@ export default function BusinessReportPage() {
   const handleExportPDF = async () => {
     setLoading(true)
     try {
-      const res = await fetch('/api/reports/business/export', {
+      const res = await fetchWithTimeout('/api/reports/business/export', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(reportData),
+        timeout: 30000,
       })
 
       if (res.ok) {
@@ -100,7 +96,11 @@ export default function BusinessReportPage() {
       }
     } catch (error) {
       console.error('Error exporting PDF:', error)
-      toast.error('PDFのエクスポートに失敗しました')
+      if (error instanceof FetchTimeoutError) {
+        toast.error('リクエストがタイムアウトしました')
+      } else {
+        toast.error('PDFのエクスポートに失敗しました')
+      }
     } finally {
       setLoading(false)
     }

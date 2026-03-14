@@ -4,6 +4,8 @@ import {
   AIConfig,
   DocumentAnalysisRequest,
   EntryValidationRequest,
+  GenerateOptions,
+  GenerateResult,
 } from './provider'
 import { DocumentAnalysisResult, EntryValidationResult, ValidationIssue } from '@/types/audit'
 import { API_TIMEOUTS, TimeoutError } from '@/lib/utils/timeout'
@@ -196,6 +198,56 @@ Return JSON with isValid, issues array, and optional suggestions.`
         actualValue: issue.actualValue,
       })) as ValidationIssue[],
       suggestions: parsedResult.suggestions as string[] | undefined,
+    }
+  }
+
+  async generate(options: GenerateOptions): Promise<GenerateResult> {
+    const model = options.model || this.resolvedModel
+    const temperature = options.temperature ?? this.config.temperature ?? getDefaultTemperature()
+    const maxTokens = options.maxTokens ?? this.config.maxTokens ?? getDefaultMaxTokens()
+    const timeout = options.timeout ?? API_TIMEOUTS.AI_API
+
+    const generativeModel = this.genAI.getGenerativeModel({
+      model,
+      safetySettings: this.safetySettings,
+    })
+
+    const parts: Part[] = []
+    const systemMessage = options.messages.find((m) => m.role === 'system')
+    const userMessages = options.messages.filter((m) => m.role === 'user')
+
+    if (systemMessage) {
+      parts.push({ text: systemMessage.content })
+    }
+
+    for (const msg of userMessages) {
+      parts.push({ text: msg.content })
+    }
+
+    const result = await withTimeout(
+      generativeModel.generateContent({
+        contents: [{ role: 'user', parts }],
+        generationConfig: {
+          temperature,
+          maxOutputTokens: maxTokens,
+        },
+      }),
+      timeout
+    )
+
+    const responseText = result.response.text()
+    const usageMetadata = result.response.usageMetadata
+
+    return {
+      content: responseText,
+      model,
+      usage: usageMetadata
+        ? {
+            promptTokens: usageMetadata.promptTokenCount ?? 0,
+            completionTokens: usageMetadata.candidatesTokenCount ?? 0,
+            totalTokens: usageMetadata.totalTokenCount ?? 0,
+          }
+        : undefined,
     }
   }
 }

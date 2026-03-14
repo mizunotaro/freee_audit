@@ -47,20 +47,22 @@ export interface BenchmarkComparison {
   readonly zScore?: number
 }
 
-export interface BenchmarkResult {
-  readonly success: boolean
-  readonly data?: {
-    readonly industryComparisons: readonly BenchmarkComparison[]
-    readonly sizeComparisons: readonly BenchmarkComparison[]
-    readonly overallPercentile: number
-    readonly strengths: readonly string[]
-    readonly weaknesses: readonly string[]
-  }
-  readonly error?: {
-    readonly code: string
-    readonly message: string
-  }
+export interface BenchmarkData {
+  readonly industryComparisons: readonly BenchmarkComparison[]
+  readonly sizeComparisons: readonly BenchmarkComparison[]
+  readonly overallPercentile: number
+  readonly strengths: readonly string[]
+  readonly weaknesses: readonly string[]
 }
+
+export interface BenchmarkError {
+  readonly code: string
+  readonly message: string
+}
+
+export type BenchmarkResult =
+  | { success: true; data: BenchmarkData }
+  | { success: false; error: BenchmarkError }
 
 export interface BenchmarkOptions {
   readonly sector?: IndustrySector

@@ -1,3 +1,4 @@
+import { sampleTherapeuticsData } from '@/lib/data/sample-therapeutics-data'
 import type {
   MonthlyReport,
   BalanceSheet,
@@ -15,6 +16,8 @@ import { calculateFinancialKPIs } from '@/services/analytics/financial-kpi'
 import { calculateActualVsBudget } from '@/services/budget/actual-vs-budget'
 import { prisma } from '@/lib/db'
 
+const DB_TIMEOUT_MS = 30000
+
 export interface MonthlyReportInput {
   companyId: string
   fiscalYear: number
@@ -22,18 +25,25 @@ export interface MonthlyReportInput {
 }
 
 export async function generateMonthlyReport(input: MonthlyReportInput): Promise<MonthlyReport> {
-  const company = await prisma.company.findFirst({
-    where: { id: input.companyId },
-  })
+  const company = await prisma.$transaction(
+    async (tx) => {
+      return tx.company.findFirst({
+        where: { id: input.companyId },
+      })
+    },
+    { maxWait: 5000, timeout: DB_TIMEOUT_MS }
+  )
 
   if (!company) {
     throw new Error('Company not found')
   }
 
-  const balanceSheet = await getBalanceSheet(input.companyId, input.fiscalYear, input.month)
-  const previousBS = await getBalanceSheet(input.companyId, input.fiscalYear, input.month - 1)
-  const profitLoss = await getProfitLoss(input.companyId, input.fiscalYear, input.month)
-  const previousPL = await getProfitLoss(input.companyId, input.fiscalYear - 1, input.month)
+  const [balanceSheet, previousBS, profitLoss, previousPL] = await Promise.all([
+    getBalanceSheet(input.companyId, input.fiscalYear, input.month),
+    getBalanceSheet(input.companyId, input.fiscalYear, input.month - 1),
+    getProfitLoss(input.companyId, input.fiscalYear, input.month),
+    getProfitLoss(input.companyId, input.fiscalYear - 1, input.month),
+  ])
 
   const cashFlow = calculateCashFlow(profitLoss, balanceSheet, previousBS)
 
@@ -73,13 +83,18 @@ async function getBalanceSheet(
   fiscalYear: number,
   month: number
 ): Promise<BalanceSheet> {
-  const balances = await prisma.monthlyBalance.findMany({
-    where: {
-      companyId,
-      fiscalYear,
-      month,
+  const balances = await prisma.$transaction(
+    async (tx) => {
+      return tx.monthlyBalance.findMany({
+        where: {
+          companyId,
+          fiscalYear,
+          month,
+        },
+      })
     },
-  })
+    { maxWait: 5000, timeout: DB_TIMEOUT_MS }
+  )
 
   if (balances.length === 0) {
     return generateSampleBalanceSheet(fiscalYear, month)
@@ -93,13 +108,18 @@ async function getProfitLoss(
   fiscalYear: number,
   month: number
 ): Promise<ProfitLoss> {
-  const balances = await prisma.monthlyBalance.findMany({
-    where: {
-      companyId,
-      fiscalYear,
-      month,
+  const balances = await prisma.$transaction(
+    async (tx) => {
+      return tx.monthlyBalance.findMany({
+        where: {
+          companyId,
+          fiscalYear,
+          month,
+        },
+      })
     },
-  })
+    { maxWait: 5000, timeout: DB_TIMEOUT_MS }
+  )
 
   if (balances.length === 0) {
     return generateSampleProfitLoss(fiscalYear, month)
@@ -232,88 +252,124 @@ function mapBalancesToProfitLoss(
 }
 
 function generateSampleBalanceSheet(fiscalYear: number, month: number): BalanceSheet {
-  const baseMultiplier = 1 + (month - 1) * 0.02
-
+  const monthlyBurn = sampleTherapeuticsData.monthlyBurn.find(m => m.month === month)
+  const bs = sampleTherapeuticsData.balanceSheet
+  
+  const cashBalance = monthlyBurn?.cashBalance ?? bs.assets.currentAssets.cash
+  const prepaidCRO = month >= 7 ? bs.assets.currentAssets.prepaidCRO : Math.round(bs.assets.currentAssets.prepaidCRO * 0.5)
+  const accruedCRO = month >= 7 ? bs.liabilities.currentLiabilities.accruedCROExpenses : Math.round(bs.liabilities.currentLiabilities.accruedCROExpenses * 0.5)
+  
+  const currentAssets = [
+    { code: '1000', name: '現金及び預金', amount: cashBalance },
+    { code: '1010', name: '制限付き現金', amount: bs.assets.currentAssets.restrictedCash },
+    { code: '1100', name: '前払費用', amount: bs.assets.currentAssets.prepaidExpenses },
+    { code: '1110', name: '前払CRO費用', amount: prepaidCRO },
+  ]
+  
+  const fixedAssets = [
+    { code: '2000', name: '研究用建物（純額）', amount: bs.assets.fixedAssets.tangible.laboratoryBuilding + bs.assets.fixedAssets.tangible.accumulatedDepreciationBuilding },
+    { code: '2100', name: '実験設備（純額）', amount: bs.assets.fixedAssets.tangible.labEquipment + bs.assets.fixedAssets.tangible.accumulatedDepreciationEquipment },
+    { code: '2200', name: '事務設備（純額）', amount: bs.assets.fixedAssets.tangible.officeEquipment + bs.assets.fixedAssets.tangible.accumulatedDepreciationOffice },
+    { code: '2300', name: '特許権', amount: bs.assets.fixedAssets.intangible.patents },
+    { code: '2310', name: 'ソフトウェア', amount: bs.assets.fixedAssets.intangible.software },
+  ]
+  
+  const currentLiabilities = [
+    { code: '3000', name: '買掛金', amount: bs.liabilities.currentLiabilities.accountsPayable },
+    { code: '3010', name: '未払CRO費用', amount: accruedCRO },
+    { code: '3020', name: '未払給与', amount: bs.liabilities.currentLiabilities.accruedSalaries },
+    { code: '3030', name: '未払賞与', amount: bs.liabilities.currentLiabilities.accruedBonus },
+  ]
+  
+  const fixedLiabilities = [
+    { code: '4000', name: '退職給付引当金', amount: bs.liabilities.fixedLiabilities.retirementAllowances },
+    { code: '4010', name: '研究助成金', amount: bs.liabilities.fixedLiabilities.researchGrants },
+  ]
+  
+  const equityItems = [
+    { code: '5000', name: '資本金', amount: bs.equity.capitalStock },
+    { code: '5010', name: '資本剰余金', amount: bs.equity.capitalSurplus },
+    { code: '5020', name: '繰越利益剰余金', amount: bs.equity.deficit },
+  ]
+  
+  const totalCurrentAssets = currentAssets.reduce((s, a) => s + a.amount, 0)
+  const totalFixedAssets = fixedAssets.reduce((s, a) => s + a.amount, 0)
+  const totalAssets = totalCurrentAssets + totalFixedAssets
+  
   return {
     fiscalYear,
     month,
     assets: {
-      current: [
-        { code: '100', name: '現金及び預金', amount: Math.round(15000000 * baseMultiplier) },
-        { code: '110', name: '売掛金', amount: Math.round(8000000 * baseMultiplier) },
-        { code: '120', name: '棚卸資産', amount: Math.round(3000000 * baseMultiplier) },
-        { code: '130', name: '前払費用', amount: Math.round(500000 * baseMultiplier) },
-      ],
-      fixed: [
-        { code: '200', name: '建物', amount: 10000000 },
-        { code: '210', name: '車両運搬具', amount: 3000000 },
-        { code: '220', name: '工具器具備品', amount: 2000000 },
-        { code: '230', name: 'ソフトウェア', amount: 1500000 },
-      ],
-      total: Math.round(43000000 * baseMultiplier),
+      current: currentAssets,
+      fixed: fixedAssets,
+      total: totalAssets,
     },
     liabilities: {
-      current: [
-        { code: '300', name: '買掛金', amount: Math.round(5000000 * baseMultiplier) },
-        { code: '310', name: '未払金', amount: Math.round(1000000 * baseMultiplier) },
-        { code: '320', name: '未払費用', amount: Math.round(800000 * baseMultiplier) },
-      ],
-      fixed: [{ code: '400', name: '長期借入金', amount: 5000000 }],
-      total: Math.round(11800000 * baseMultiplier),
+      current: currentLiabilities,
+      fixed: fixedLiabilities,
+      total: 358000000,
     },
     equity: {
-      items: [
-        { code: '500', name: '資本金', amount: 10000000 },
-        { code: '510', name: '利益剰余金', amount: Math.round(21200000 * baseMultiplier) },
-      ],
-      total: Math.round(31200000 * baseMultiplier),
+      items: equityItems,
+      total: bs.equity.totalEquity,
     },
-    totalAssets: Math.round(43000000 * baseMultiplier),
-    totalLiabilities: Math.round(11800000 * baseMultiplier),
-    totalEquity: Math.round(31200000 * baseMultiplier),
+    totalAssets,
+    totalLiabilities: 358000000,
+    totalEquity: bs.equity.totalEquity,
   }
 }
 
 function generateSampleProfitLoss(fiscalYear: number, month: number): ProfitLoss {
-  const baseMultiplier = 1 + (month - 1) * 0.03
-
-  const revenue = Math.round(5000000 * baseMultiplier)
-  const costOfSales = Math.round(2000000 * baseMultiplier)
-  const grossProfit = revenue - costOfSales
-
-  const sga = [
-    { code: '600', name: '給与手当', amount: 800000 },
-    { code: '610', name: '福利厚生費', amount: 160000 },
-    { code: '620', name: '旅費交通費', amount: 50000 },
-    { code: '630', name: '通信費', amount: 30000 },
-    { code: '640', name: '水道光熱費', amount: 40000 },
-    { code: '650', name: '地代家賃', amount: 200000 },
-    { code: '660', name: '広告宣伝費', amount: 100000 },
-    { code: '670', name: '減価償却費', amount: 50000 },
+  const monthlyBurn = sampleTherapeuticsData.monthlyBurn.find(m => m.month === month)
+  const pl = sampleTherapeuticsData.profitLoss
+  
+  const monthlyRdSpend = monthlyBurn?.rdSpend ?? Math.round(pl.expenses.rdExpenses.totalRd / 12)
+  const monthlySgaSpend = monthlyBurn?.sgaSpend ?? Math.round(pl.expenses.sgaExpenses.totalSga / 12)
+  const monthlyRevenue = Math.round(pl.revenue.totalRevenue / 12)
+  
+  const rdInternal = Math.round(monthlyRdSpend * 0.468)
+  const rdExternal = Math.round(monthlyRdSpend * 0.532)
+  
+  const sgaPersonnel = Math.round(monthlySgaSpend * 0.45)
+  const sgaProfessional = Math.round(monthlySgaSpend * 0.21)
+  const sgaFacilities = Math.round(monthlySgaSpend * 0.20)
+  const sgaOther = monthlySgaSpend - sgaPersonnel - sgaProfessional - sgaFacilities
+  
+  const sgaExpenses = [
+    { code: '5000', name: '研究開発費（内部）', amount: rdInternal },
+    { code: '5010', name: '研究開発費（外部CRO/CDMO）', amount: rdExternal },
+    { code: '5100', name: '管理部門人件費', amount: sgaPersonnel },
+    { code: '5110', name: '専門サービス費用', amount: sgaProfessional },
+    { code: '5120', name: '施設費', amount: sgaFacilities },
+    { code: '5130', name: 'その他経費', amount: sgaOther },
   ]
-
-  const totalSga = sga.reduce((sum, e) => sum + e.amount, 0)
-  const operatingIncome = grossProfit - totalSga
-
+  
+  const totalSga = sgaExpenses.reduce((s, e) => s + e.amount, 0)
+  const operatingLoss = -(totalSga - monthlyRevenue)
+  const interestIncome = Math.round(pl.nonOperating.interestIncome / 12)
+  
   return {
     fiscalYear,
     month,
-    revenue: [{ code: '400', name: '売上高', amount: revenue }],
-    costOfSales: [{ code: '500', name: '売上原価', amount: costOfSales }],
-    grossProfit,
-    grossProfitMargin: (grossProfit / revenue) * 100,
-    sgaExpenses: sga,
-    operatingIncome,
-    operatingMargin: (operatingIncome / revenue) * 100,
-    nonOperatingIncome: [],
+    revenue: [
+      { code: '4000', name: '助成金収入', amount: Math.round(monthlyRevenue * 0.73) },
+      { code: '4010', name: '共同研究収入', amount: Math.round(monthlyRevenue * 0.27) },
+    ],
+    costOfSales: [],
+    grossProfit: monthlyRevenue,
+    grossProfitMargin: 100,
+    sgaExpenses,
+    operatingIncome: operatingLoss,
+    operatingMargin: monthlyRevenue > 0 ? (operatingLoss / monthlyRevenue) * 100 : 0,
+    nonOperatingIncome: [{ code: '6000', name: '受取利息', amount: interestIncome }],
     nonOperatingExpenses: [],
-    ordinaryIncome: operatingIncome,
+    ordinaryIncome: operatingLoss + interestIncome,
     extraordinaryIncome: [],
     extraordinaryLoss: [],
-    incomeBeforeTax: operatingIncome,
-    incomeTax: Math.round(operatingIncome * 0.3),
-    netIncome: Math.round(operatingIncome * 0.7),
-    depreciation: 50000,
+    incomeBeforeTax: operatingLoss + interestIncome,
+    incomeTax: 0,
+    netIncome: operatingLoss + interestIncome,
+    depreciation: Math.round(pl.expenses.depreciation / 12),
   }
 }
 
@@ -387,9 +443,14 @@ export async function getMultiMonthReport(
   endMonth: number,
   monthCount: 3 | 6 | 12
 ): Promise<MultiMonthReport> {
-  const company = await prisma.company.findFirst({
-    where: { id: companyId },
-  })
+  const company = await prisma.$transaction(
+    async (tx) => {
+      return tx.company.findFirst({
+        where: { id: companyId },
+      })
+    },
+    { maxWait: 5000, timeout: DB_TIMEOUT_MS }
+  )
 
   if (!company) {
     throw new Error('Company not found')

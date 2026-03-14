@@ -10,6 +10,7 @@ const PERSONA_NAMES: Record<PersonaType, string> = {
   tax_accountant: '税理士',
   cfo: 'CFO',
   financial_analyst: '財務アナリスト',
+  big4_auditor: 'Big4監査法人',
 }
 
 const RATE_LIMIT_WINDOW_MS = 60 * 1000

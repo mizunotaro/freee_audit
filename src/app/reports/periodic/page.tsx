@@ -14,7 +14,9 @@ import {
 import { Switch } from '@/components/ui/switch'
 import { Label } from '@/components/ui/label'
 import { toast } from 'sonner'
+import { fetchWithTimeout, FetchTimeoutError } from '@/lib/api/fetch-with-timeout'
 import { Download, RefreshCw, TrendingUp, TrendingDown, Minus } from 'lucide-react'
+import type { PeriodicReportData } from '@/types/reports'
 import {
   Table,
   TableBody,
@@ -23,57 +25,6 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-
-interface PeriodData {
-  label: string
-  fiscalYear: number
-  startMonth: number
-  endMonth: number
-  balanceSheet: {
-    totalAssets: number
-    currentAssets: number
-    fixedAssets: number
-    totalLiabilities: number
-    currentLiabilities: number
-    fixedLiabilities: number
-    equity: number
-  }
-  profitLoss: {
-    revenue: number
-    costOfSales: number
-    grossProfit: number
-    operatingIncome: number
-    ordinaryIncome: number
-    netIncome: number
-  }
-  cashFlow: {
-    operatingCF: number
-    investingCF: number
-    financingCF: number
-    freeCashFlow: number
-  }
-  kpis: {
-    roe: number
-    roa: number
-    grossMargin: number
-    operatingMargin: number
-    currentRatio: number
-    debtToEquity: number
-  }
-  endingCash: number
-}
-
-interface PeriodicReportData {
-  periods: PeriodData[]
-  summary: {
-    revenueGrowth: number | null
-    profitGrowth: number | null
-    cashChange: number
-    avgROE: number
-    avgROA: number
-    trendAnalysis: string
-  }
-}
 
 const formatCurrency = (value: number): string => {
   if (Math.abs(value) >= 1000000000) {
@@ -108,7 +59,7 @@ export default function PeriodicReportPage() {
         includePreviousYear: includePreviousYear.toString(),
         fiscalYearEndMonth: fiscalYearEndMonth.toString(),
       })
-      const res = await fetch(`/api/reports/periodic?${params}`)
+      const res = await fetchWithTimeout(`/api/reports/periodic?${params}`, { timeout: 30000 })
       if (res.ok) {
         const data = await res.json()
         setReport(data)
@@ -117,7 +68,11 @@ export default function PeriodicReportPage() {
       }
     } catch (error) {
       console.error('Failed to fetch report:', error)
-      toast.error('レポートの取得に失敗しました')
+      if (error instanceof FetchTimeoutError) {
+        toast.error('リクエストがタイムアウトしました')
+      } else {
+        toast.error('レポートの取得に失敗しました')
+      }
     } finally {
       setLoading(false)
     }

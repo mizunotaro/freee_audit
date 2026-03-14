@@ -4,6 +4,8 @@ import {
   AIConfig,
   DocumentAnalysisRequest,
   EntryValidationRequest,
+  GenerateOptions,
+  GenerateResult,
 } from './provider'
 import { DocumentAnalysisResult, EntryValidationResult, ValidationIssue } from '@/types/audit'
 import { API_TIMEOUTS } from '@/lib/utils/timeout'
@@ -200,6 +202,48 @@ Return JSON with isValid, issues array, and optional suggestions.`,
         actualValue: issue.actualValue,
       })) as ValidationIssue[],
       suggestions: parsedResult.suggestions as string[] | undefined,
+    }
+  }
+
+  async generate(options: GenerateOptions): Promise<GenerateResult> {
+    const model = options.model || this.resolvedModel
+    const maxTokens = options.maxTokens ?? this.config.maxTokens ?? 1024
+
+    const systemMessage = options.messages.find((m) => m.role === 'system')
+    const nonSystemMessages = options.messages.filter((m) => m.role !== 'system')
+
+    const messages: Anthropic.Messages.MessageParam[] = nonSystemMessages.map((m) => ({
+      role: m.role as 'user' | 'assistant',
+      content: sanitizeInput(m.content),
+    }))
+
+    const requestParams: Anthropic.Messages.MessageCreateParams = {
+      model,
+      max_tokens: maxTokens,
+      messages,
+    }
+
+    if (systemMessage) {
+      requestParams.system = sanitizeInput(systemMessage.content)
+    }
+
+    const response = await this.withRetry(() => this.client.messages.create(requestParams))
+
+    const textBlock = response.content.find(
+      (block): block is Anthropic.TextBlock => block.type === 'text'
+    )
+    const responseText = textBlock?.text || ''
+
+    return {
+      content: responseText,
+      model: response.model,
+      usage: response.usage
+        ? {
+            promptTokens: response.usage.input_tokens,
+            completionTokens: response.usage.output_tokens,
+            totalTokens: response.usage.input_tokens + response.usage.output_tokens,
+          }
+        : undefined,
     }
   }
 }

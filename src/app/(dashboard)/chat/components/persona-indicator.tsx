@@ -15,6 +15,7 @@ const PERSONA_CONFIG: Record<PersonaType, { name: string; color: string; initial
   tax_accountant: { name: '税理士', color: 'bg-green-500', initials: '税' },
   cfo: { name: 'CFO', color: 'bg-purple-500', initials: 'CFO' },
   financial_analyst: { name: '財務アナリスト', color: 'bg-orange-500', initials: 'FA' },
+  big4_auditor: { name: 'Big4監査人', color: 'bg-red-500', initials: 'B4' },
 } as const
 
 const DEFAULT_CONFIG = { name: 'AI', color: 'bg-gray-500', initials: 'AI' } as const

@@ -12,6 +12,10 @@ import type {
   FreeeDocument,
   FreeeCompany,
   FreeePaginatedResponse,
+  FreeeDealParams,
+  FreeeDealsResponse,
+  FreeeDeal,
+  FreeeReceipt,
 } from './types'
 import { FreeeApiError } from './types'
 import { freeeRateLimiter, freeeCircuitBreaker, withRetry } from './rate-limiter'
@@ -396,6 +400,43 @@ export class FreeeClient {
 
   async disconnect(companyId: string): Promise<void> {
     await deleteToken(companyId)
+  }
+
+  async getDeals(companyId: number, params?: FreeeDealParams): Promise<FreeeDealsResponse> {
+    return this.request<FreeeDealsResponse>('GET', '/api/1/deals', {
+      params: {
+        company_id: companyId,
+        start_issue_date: params?.start_issue_date,
+        end_issue_date: params?.end_issue_date,
+        partner_id: params?.partner_id,
+        status: params?.status,
+        type: params?.type,
+        offset: params?.offset,
+        limit: params?.limit,
+      },
+      rateLimitType: 'data',
+    })
+  }
+
+  async getDeal(companyId: number, dealId: number): Promise<FreeeDeal> {
+    const response = await this.request<{ deal: FreeeDeal }>('GET', `/api/1/deals/${dealId}`, {
+      params: { company_id: companyId },
+      rateLimitType: 'data',
+    })
+    return response.deal
+  }
+
+  async getReceiptDetails(
+    companyId: number,
+    receiptId: number
+  ): Promise<FreeeReceipt & { deal_id: number | null }> {
+    const response = await this.request<{
+      receipt: FreeeReceipt & { deal_id: number | null }
+    }>('GET', `/api/1/receipts/${receiptId}`, {
+      params: { company_id: companyId },
+      rateLimitType: 'data',
+    })
+    return response.receipt
   }
 
   private getMockTokenResponse(): FreeeTokenResponse {

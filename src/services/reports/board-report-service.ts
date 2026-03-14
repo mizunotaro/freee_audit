@@ -6,6 +6,8 @@ import {
 } from '@/services/budget/detailed-actual-vs-budget'
 import { calculateRunway, getRunwayAlert } from '@/services/cashflow/runway-calculator'
 
+const DB_TIMEOUT_MS = 30000
+
 export type BoardReportStatus = 'DRAFT' | 'REVIEW' | 'APPROVED' | 'PRESENTED'
 export type SectionType =
   | 'FINANCIAL_SUMMARY'
@@ -134,15 +136,20 @@ export interface GenerateReportOptions {
 }
 
 export async function getBoardReports(companyId: string): Promise<BoardReportDetail[]> {
-  const reports = await prisma.boardReport.findMany({
-    where: { companyId },
-    include: {
-      sections: {
-        orderBy: { sortOrder: 'asc' },
-      },
+  const reports = await prisma.$transaction(
+    async (tx) => {
+      return tx.boardReport.findMany({
+        where: { companyId },
+        include: {
+          sections: {
+            orderBy: { sortOrder: 'asc' },
+          },
+        },
+        orderBy: [{ fiscalYear: 'desc' }, { month: 'desc' }],
+      })
     },
-    orderBy: [{ fiscalYear: 'desc' }, { month: 'desc' }],
-  })
+    { maxWait: 5000, timeout: DB_TIMEOUT_MS }
+  )
 
   return reports.map((r) => ({
     id: r.id,
@@ -167,14 +174,19 @@ export async function getBoardReports(companyId: string): Promise<BoardReportDet
 }
 
 export async function getBoardReport(id: string): Promise<BoardReportDetail | null> {
-  const report = await prisma.boardReport.findUnique({
-    where: { id },
-    include: {
-      sections: {
-        orderBy: { sortOrder: 'asc' },
-      },
+  const report = await prisma.$transaction(
+    async (tx) => {
+      return tx.boardReport.findUnique({
+        where: { id },
+        include: {
+          sections: {
+            orderBy: { sortOrder: 'asc' },
+          },
+        },
+      })
     },
-  })
+    { maxWait: 5000, timeout: DB_TIMEOUT_MS }
+  )
 
   if (!report) return null
 
@@ -250,30 +262,35 @@ export async function generateBoardReport(
     })
   }
 
-  const report = await prisma.boardReport.create({
-    data: {
-      companyId,
-      fiscalYear,
-      month,
-      title: `${fiscalYear}年度 ${month}月 取締役会報告資料`,
-      status: 'DRAFT',
-      generatedAt: new Date(),
-      sections: {
-        create: sections.map((s) => ({
-          sectionType: s.sectionType,
-          title: s.title,
-          content: s.content,
-          data: s.data,
-          sortOrder: s.sortOrder,
-        })),
-      },
+  const report = await prisma.$transaction(
+    async (tx) => {
+      return tx.boardReport.create({
+        data: {
+          companyId,
+          fiscalYear,
+          month,
+          title: `${fiscalYear}年度 ${month}月 取締役会報告資料`,
+          status: 'DRAFT',
+          generatedAt: new Date(),
+          sections: {
+            create: sections.map((s) => ({
+              sectionType: s.sectionType,
+              title: s.title,
+              content: s.content,
+              data: s.data,
+              sortOrder: s.sortOrder,
+            })),
+          },
+        },
+        include: {
+          sections: {
+            orderBy: { sortOrder: 'asc' },
+          },
+        },
+      })
     },
-    include: {
-      sections: {
-        orderBy: { sortOrder: 'asc' },
-      },
-    },
-  })
+    { maxWait: 5000, timeout: DB_TIMEOUT_MS }
+  )
 
   return {
     id: report.id,
@@ -399,15 +416,20 @@ function extractSignificantVariances(budget: DetailedActualVsBudget): VarianceIt
 }
 
 async function getUpcomingPayments(companyId: string): Promise<UpcomingPayment[]> {
-  const debts = await prisma.debt.findMany({
-    where: {
-      companyId,
-      status: 'PENDING',
-      dueDate: { gte: new Date() },
+  const debts = await prisma.$transaction(
+    async (tx) => {
+      return tx.debt.findMany({
+        where: {
+          companyId,
+          status: 'PENDING',
+          dueDate: { gte: new Date() },
+        },
+        orderBy: { dueDate: 'asc' },
+        take: 10,
+      })
     },
-    orderBy: { dueDate: 'asc' },
-    take: 10,
-  })
+    { maxWait: 5000, timeout: DB_TIMEOUT_MS }
+  )
 
   return debts.map((d) => ({
     description: d.description || d.category,
@@ -692,15 +714,20 @@ export async function updateBoardReport(
   }
   if (data.presentedAt !== undefined) updateData.presentedAt = data.presentedAt
 
-  const report = await prisma.boardReport.update({
-    where: { id },
-    data: updateData,
-    include: {
-      sections: {
-        orderBy: { sortOrder: 'asc' },
-      },
+  const report = await prisma.$transaction(
+    async (tx) => {
+      return tx.boardReport.update({
+        where: { id },
+        data: updateData,
+        include: {
+          sections: {
+            orderBy: { sortOrder: 'asc' },
+          },
+        },
+      })
     },
-  })
+    { maxWait: 5000, timeout: DB_TIMEOUT_MS }
+  )
 
   return {
     id: report.id,
@@ -731,14 +758,24 @@ export async function updateBoardReportSection(
     content: string
   }>
 ): Promise<void> {
-  await prisma.boardReportSection.update({
-    where: { id: sectionId },
-    data,
-  })
+  await prisma.$transaction(
+    async (tx) => {
+      await tx.boardReportSection.update({
+        where: { id: sectionId },
+        data,
+      })
+    },
+    { maxWait: 5000, timeout: DB_TIMEOUT_MS }
+  )
 }
 
 export async function deleteBoardReport(id: string): Promise<void> {
-  await prisma.boardReport.delete({
-    where: { id },
-  })
+  await prisma.$transaction(
+    async (tx) => {
+      await tx.boardReport.delete({
+        where: { id },
+      })
+    },
+    { maxWait: 5000, timeout: DB_TIMEOUT_MS }
+  )
 }

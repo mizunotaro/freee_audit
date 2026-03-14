@@ -3,89 +3,10 @@
 import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import { KPIGauge, KPIBar, KPICard } from '@/components/charts/KPIGauge'
+import { fetchWithTimeout, FetchTimeoutError } from '@/lib/api/fetch-with-timeout'
+import type { KPIReportData } from '@/types/reports'
 
-interface KPIData {
-  kpis: {
-    profitability: {
-      roe: number
-      roa: number
-      ros: number
-      grossProfitMargin: number
-      operatingMargin: number
-      ebitdaMargin: number
-    }
-    efficiency: {
-      assetTurnover: number
-      inventoryTurnover: number
-      receivablesTurnover: number
-      payablesTurnover: number
-    }
-    safety: {
-      currentRatio: number
-      quickRatio: number
-      debtToEquity: number
-      equityRatio: number
-    }
-    growth: {
-      revenueGrowth: number
-      profitGrowth: number
-    }
-    cashFlow: {
-      fcf: number
-      fcfMargin: number
-    }
-    startup?: {
-      burnRate: number
-      runwayMonths: number
-      cac: number | null
-      ltv: number | null
-      ltvCacRatio: number | null
-      mrr: number
-      arr: number
-      churnRate: number | null
-    }
-    vc?: {
-      revenueMultiple: number | null
-      growthRate: number
-      grossMargin: number
-      nrr: number | null
-      magicNumber: number | null
-      ruleOf40: number
-    }
-    bank?: {
-      dscr: number
-      interestCoverageRatio: number
-      fixedChargeCoverageRatio: number
-      debtToEquityRatio: number
-      debtServiceRatio: number
-    }
-  }
-  benchmarks: {
-    kpi: string
-    value: number
-    benchmark: number
-    status: 'good' | 'warning' | 'bad'
-    description: string
-  }[]
-  advice?: {
-    category: string
-    kpiName: string
-    currentValue: number
-    targetValue: number | string
-    status: 'good' | 'warning' | 'critical'
-    advice: string
-    actionItems: string[]
-  }[]
-  yearlyKPIs: {
-    month: number
-    roe: number
-    roa: number
-    grossProfitMargin: number
-    operatingMargin: number
-    currentRatio: number
-    equityRatio: number
-  }[]
-}
+type KPIData = KPIReportData
 
 export default function KPIPage() {
   const [data, setData] = useState<KPIData | null>(null)
@@ -96,11 +17,17 @@ export default function KPIPage() {
   const fetchData = useCallback(async () => {
     setLoading(true)
     try {
-      const res = await fetch(`/api/reports/kpi?fiscalYear=${fiscalYear}&month=${month}`)
+      const res = await fetchWithTimeout(
+        `/api/reports/kpi?fiscalYear=${fiscalYear}&month=${month}`,
+        { timeout: 30000 }
+      )
       const kpiData = await res.json()
       setData(kpiData)
     } catch (error) {
       console.error('Failed to fetch KPIs:', error)
+      if (error instanceof FetchTimeoutError) {
+        console.error('Request timed out')
+      }
     } finally {
       setLoading(false)
     }

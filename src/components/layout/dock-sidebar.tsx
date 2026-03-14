@@ -19,6 +19,8 @@ import {
   Users,
   FileText,
   Sparkles,
+  ArrowLeftRight,
+  SearchCheck,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
@@ -51,6 +53,9 @@ interface DockSidebarProps {
 const navItems: NavItem[] = [
   { key: 'dashboard', href: '/dashboard', icon: LayoutDashboard },
   { key: 'audit', href: '/audit/journals', icon: FileCheck },
+  { key: 'conversion', href: '/conversion/projects', icon: ArrowLeftRight },
+  { key: 'valuation', href: '/valuation', icon: TrendingUp },
+  { key: 'financialDD', href: '/financial-dd', icon: SearchCheck },
   { key: 'journalProposal', href: '/journal-proposal', icon: Sparkles, requiredRole: 'ACCOUNTANT' },
   { key: 'reports', href: '/reports', icon: BarChart3 },
   { key: 'periodicReports', href: '/reports/periodic', icon: TrendingUp },
@@ -124,7 +129,10 @@ export function DockSidebar({ user, locale }: DockSidebarProps) {
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
       >
-        <div className="flex h-14 items-center justify-center border-b px-2">
+        <Link
+          href={`/${locale}/dashboard`}
+          className="flex h-14 items-center justify-center border-b px-2 transition-colors hover:bg-accent"
+        >
           <span
             className={cn(
               'font-bold transition-opacity duration-200',
@@ -134,7 +142,7 @@ export function DockSidebar({ user, locale }: DockSidebarProps) {
             freee_audit
           </span>
           {!isExpanded && <span className="text-xl font-bold">F</span>}
-        </div>
+        </Link>
 
         <nav className="flex-1 overflow-y-auto py-2">
           {filteredNavItems.map((item) => {

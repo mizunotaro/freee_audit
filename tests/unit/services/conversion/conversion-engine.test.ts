@@ -17,6 +17,7 @@ import {
   type ComparisonReport,
 } from '@/services/conversion/financial-statement-converter'
 import { prisma } from '@/lib/db'
+import { isSuccess, isFailure } from '@/types/result'
 import type {
   AccountMapping,
   JournalConversion,
@@ -229,8 +230,11 @@ describe('ConversionEngine', () => {
 
       const result = await engine.execute('project-1')
 
-      expect(result.projectId).toBe('project-1')
-      expect(result.journalConversions).toBeDefined()
+      expect(isSuccess(result)).toBe(true)
+      if (isSuccess(result)) {
+        expect(result.data.projectId).toBe('project-1')
+        expect(result.data.journalConversions).toBeDefined()
+      }
       expect(prisma.conversionProject.update).toHaveBeenCalled()
     })
 
@@ -260,7 +264,10 @@ describe('ConversionEngine', () => {
 
       const result = await engine.execute('project-1', { skipValidation: true })
 
-      expect(result.journalConversions).toBeDefined()
+      expect(isSuccess(result)).toBe(true)
+      if (isSuccess(result)) {
+        expect(result.data.journalConversions).toBeDefined()
+      }
     })
 
     it('should track progress', async () => {
@@ -273,10 +280,13 @@ describe('ConversionEngine', () => {
 
       const progress = await engine.getProgress('project-1')
 
-      expect(progress.status).toBe('draft')
-      expect(progress.progress).toBe(50)
-      expect(progress.totalJournals).toBe(100)
-      expect(progress.processedJournals).toBe(50)
+      expect(isSuccess(progress)).toBe(true)
+      if (isSuccess(progress)) {
+        expect(progress.data.status).toBe('draft')
+        expect(progress.data.progress).toBe(50)
+        expect(progress.data.totalJournals).toBe(100)
+        expect(progress.data.processedJournals).toBe(50)
+      }
     })
 
     it('should be abortable', async () => {
@@ -313,8 +323,11 @@ describe('ConversionEngine', () => {
 
       const result = await engine.dryRun('project-1')
 
-      expect(result.wouldCreate.journalConversions).toBe(100)
-      expect(result.estimatedDurationMs).toBeGreaterThan(0)
+      expect(isSuccess(result)).toBe(true)
+      if (isSuccess(result)) {
+        expect(result.data.wouldCreate.journalConversions).toBe(100)
+        expect(result.data.estimatedDurationMs).toBeGreaterThan(0)
+      }
       expect(prisma.conversionResult.create).not.toHaveBeenCalled()
     })
 
@@ -338,7 +351,10 @@ describe('ConversionEngine', () => {
 
       const result = await engine.dryRun('project-1')
 
-      expect(result.warnings.some((w) => w.code === 'UNMAPPED_ACCOUNTS')).toBe(true)
+      expect(isSuccess(result)).toBe(true)
+      if (isSuccess(result)) {
+        expect(result.data.warnings.some((w) => w.code === 'UNMAPPED_ACCOUNTS')).toBe(true)
+      }
     })
   })
 
@@ -405,16 +421,20 @@ describe('ConversionEngine', () => {
 
       const result = await engine.resume('project-1')
 
-      expect(result.projectId).toBe('project-1')
+      expect(isSuccess(result)).toBe(true)
+      if (isSuccess(result)) {
+        expect(result.data.projectId).toBe('project-1')
+      }
     })
 
-    it('should throw error for non-failed project', async () => {
+    it('should return error for non-failed project', async () => {
       vi.mocked(prisma.conversionProject.findUnique).mockResolvedValue({
         ...mockProject,
         status: 'completed',
       } as any)
 
-      await expect(engine.resume('project-1')).rejects.toThrow('Cannot resume project')
+      const result = await engine.resume('project-1')
+      expect(isFailure(result)).toBe(true)
     })
   })
 

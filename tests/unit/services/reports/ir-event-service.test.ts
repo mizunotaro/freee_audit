@@ -226,10 +226,10 @@ describe('IREventService', () => {
     companyId: mockCompanyId,
     eventType: 'earnings_release',
     title: '2024年度 第3四半期 決算発表',
-    description: '第3四半期の決算説明会を行います',
+    titleEn: 'Q3 2024 Earnings Release',
+    description: '決算発表の説明',
+    descriptionEn: 'Q3 2024 Earnings Release Description',
     scheduledDate: new Date('2024-11-15'),
-    venue: 'オンライン',
-    url: 'https://example.com/ir',
     status: 'scheduled',
     createdAt: new Date(),
     updatedAt: new Date(),
@@ -240,12 +240,8 @@ describe('IREventService', () => {
     companyId: mockCompanyId,
     eventType: 'earnings_release',
     title: '2024年度 第3四半期 決算発表',
-    titleEn: 'Q3 2024 Earnings Release',
-    description: '決算発表の説明',
     scheduledDate: new Date('2024-11-15'),
     status: 'scheduled',
-    createdAt: new Date(),
-    updatedAt: new Date(),
   }
 
   beforeEach(() => {
@@ -367,7 +363,7 @@ describe('IREventService', () => {
       expect(result.success).toBe(true)
       if (result.success) {
         expect(result.data.id).toBe(mockEventId)
-        expect(result.data.venue).toBe('オンライン')
+        expect(result.data.description).toBe('決算発表の説明')
       }
     })
 
@@ -457,35 +453,7 @@ describe('IREventService', () => {
       }
     })
 
-    it('should return failure when URL is invalid', async () => {
-      const result = await createIREvent({ ...createData, url: 'invalid-url' })
-
-      expect(result.success).toBe(false)
-      if (!result.success) {
-        expect(result.error.code).toBe('VALIDATION_ERROR')
-        expect(result.error.message).toBe('Invalid URL format')
-      }
-    })
-
-    it('should create event with valid URL', async () => {
-      vi.mocked(prisma.$transaction).mockImplementation(async (fn: any) => {
-        const tx = {
-          iREvent: {
-            create: vi.fn().mockResolvedValue(mockEvent),
-          },
-        }
-        return fn(tx)
-      })
-
-      const result = await createIREvent({
-        ...createData,
-        url: 'https://example.com/ir',
-      })
-
-      expect(result.success).toBe(true)
-    })
-
-    it('should create event with all optional fields', async () => {
+    it('should create event with description', async () => {
       vi.mocked(prisma.$transaction).mockImplementation(async (fn: any) => {
         const tx = {
           iREvent: {
@@ -498,8 +466,6 @@ describe('IREventService', () => {
       const result = await createIREvent({
         ...createData,
         description: 'Description',
-        venue: 'Tokyo',
-        url: 'https://example.com',
       })
 
       expect(result.success).toBe(true)
@@ -546,15 +512,6 @@ describe('IREventService', () => {
       if (!result.success) {
         expect(result.error.code).toBe('VALIDATION_ERROR')
         expect(result.error.message).toBe('No update data provided')
-      }
-    })
-
-    it('should return failure when URL is invalid', async () => {
-      const result = await updateIREvent(mockEventId, { url: 'invalid' })
-
-      expect(result.success).toBe(false)
-      if (!result.success) {
-        expect(result.error.code).toBe('VALIDATION_ERROR')
       }
     })
 

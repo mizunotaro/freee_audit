@@ -797,22 +797,15 @@ export interface RiskAssessment {
  * AI conversion analysis
  */
 export interface AIConversionAnalysis {
-  /** ID */
   id: string
-  /** プロジェクトID */
   projectId: string
-  /** マッピング推論一覧 */
   mappingSuggestions: MappingSuggestion[]
-  /** 調整推奨一覧 */
   adjustmentRecommendations: AdjustmentRecommendation[]
-  /** リスク評価一覧 */
   riskAssessments: RiskAssessment[]
-  /** 品質スコア（0-100） */
   qualityScore: number
-  /** 生成日時 */
   generatedAt: Date
-  /** 使用モデル */
   modelUsed: string
+  temperature: number
 }
 
 /**
@@ -820,32 +813,20 @@ export interface AIConversionAnalysis {
  * Conversion result
  */
 export interface ConversionResult {
-  /** ID */
   id: string
-  /** プロジェクトID */
   projectId: string
-  /** 仕訳変換結果 */
   journalConversions?: JournalConversion[]
-  /** 変換済み貸借対照表 */
   balanceSheet?: ConvertedBalanceSheet
-  /** 変換済み損益計算書 */
   profitLoss?: ConvertedProfitLoss
-  /** 変換済みキャッシュフロー計算書 */
   cashFlow?: ConvertedCashFlow
-  /** 調整仕訳一覧 */
   adjustingEntries?: AdjustingEntry[]
-  /** 開示注記一覧 */
   disclosures?: DisclosureNote[]
-  /** AI分析 */
   aiAnalysis?: AIConversionAnalysis
-  /** 変換日時 */
   conversionDate: Date
-  /** 変換所要時間（ミリ秒） */
   conversionDurationMs: number
-  /** 警告一覧 */
   warnings: ConversionWarning[]
-  /** エラー一覧 */
   errors: ConversionError[]
+  configVersion?: string
 }
 
 /**

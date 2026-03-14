@@ -1,6 +1,6 @@
 import type { ActualVsBudget, BudgetItem, ProfitLoss } from '@/types'
 import { safeDivide } from '@/lib/utils'
-import { getBudgetsByMonth } from './budget-service'
+import { getBudgetsByMonth, getBudgetsByFiscalYear } from './budget-service'
 
 export async function calculateActualVsBudget(
   companyId: string,
@@ -197,11 +197,18 @@ export async function getMonthlyBudgetTrend(
   fiscalYear: number,
   monthlyActuals: Map<number, ProfitLoss>
 ): Promise<MonthlyBudgetTrend[]> {
+  const allBudgets = await getBudgetsByFiscalYear(companyId, fiscalYear)
+
+  const budgetByMonth = new Map<number, number>()
+  for (const budget of allBudgets) {
+    const current = budgetByMonth.get(budget.month) || 0
+    budgetByMonth.set(budget.month, current + budget.amount)
+  }
+
   const trends: MonthlyBudgetTrend[] = []
 
   for (let month = 1; month <= 12; month++) {
-    const budgets = await getBudgetsByMonth(companyId, fiscalYear, month)
-    const totalBudget = budgets.reduce((sum, b) => sum + b.amount, 0)
+    const totalBudget = budgetByMonth.get(month) || 0
 
     const actual = monthlyActuals.get(month)
     const totalActual = actual ? actual.netIncome : 0

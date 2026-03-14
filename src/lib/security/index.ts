@@ -28,3 +28,12 @@ export {
   createRateLimiter,
   type RateLimitConfig,
 } from './rate-limit-middleware'
+
+export {
+  encrypt,
+  decrypt,
+  SecureStorage,
+  secureStorage,
+  type SecureStorageOptions,
+  type EncryptedData,
+} from './secure-storage'

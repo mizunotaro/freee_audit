@@ -25,6 +25,10 @@ export abstract class BasePersona {
     return this.config.name
   }
 
+  get temperature(): number {
+    return this.config.temperatureRange.recommended
+  }
+
   abstract buildPrompt(context: PersonaBuildContext): PersonaResult<CompiledPrompt>
 
   validateResponse(response: unknown): PersonaResult<PersonaResponse> {

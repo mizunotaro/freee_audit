@@ -4,6 +4,7 @@ import { accountMappingService } from '@/services/conversion/account-mapping-ser
 import { conversionEngine } from '@/services/conversion/conversion-engine'
 import { conversionExportService } from '@/services/conversion/conversion-export-service'
 import { prisma } from '@/lib/db'
+import { isSuccess } from '@/types/result'
 
 vi.mock('@/lib/db', () => ({
   prisma: {
@@ -376,7 +377,10 @@ describe('Full Conversion Flow E2E', () => {
         isManualReview: false,
       })
 
-      expect(mapping.mappingType).toBe('1to1')
+      expect(isSuccess(mapping)).toBe(true)
+      if (isSuccess(mapping)) {
+        expect(mapping.data.mappingType).toBe('1to1')
+      }
     })
 
     it('should execute conversion', async () => {
@@ -459,7 +463,10 @@ describe('Full Conversion Flow E2E', () => {
 
       const result = await conversionEngine.execute('project-1')
 
-      expect(result.projectId).toBe('project-1')
+      expect(isSuccess(result)).toBe(true)
+      if (isSuccess(result)) {
+        expect(result.data.projectId).toBe('project-1')
+      }
       expect(prisma.conversionResult.create).toHaveBeenCalled()
     })
 
@@ -581,7 +588,10 @@ describe('Full Conversion Flow E2E', () => {
 
       const result = await conversionEngine.execute('project-1', { skipValidation: true })
 
-      expect(result.warnings).toBeDefined()
+      expect(isSuccess(result)).toBe(true)
+      if (isSuccess(result)) {
+        expect(result.data.warnings).toBeDefined()
+      }
     })
 
     it('should prevent export of incomplete conversion', async () => {
@@ -635,8 +645,11 @@ describe('Full Conversion Flow E2E', () => {
 
       const progress = await conversionEngine.getProgress('project-1')
 
-      expect(progress.status).toBe('converting')
-      expect(progress.progress).toBe(50)
+      expect(isSuccess(progress)).toBe(true)
+      if (isSuccess(progress)) {
+        expect(progress.data.status).toBe('converting')
+        expect(progress.data.progress).toBe(50)
+      }
     })
   })
 

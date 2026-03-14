@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { use, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { Button } from '@/components/ui/button'
@@ -9,7 +9,8 @@ import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 
-export default function LoginPage({ params: { locale } }: { params: { locale: string } }) {
+export default function LoginPage({ params }: { params: Promise<{ locale: string }> }) {
+  const { locale } = use(params)
   const router = useRouter()
   const t = useTranslations('common')
   const [email, setEmail] = useState('')

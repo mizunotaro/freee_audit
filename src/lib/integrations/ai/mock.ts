@@ -4,6 +4,8 @@ import {
   AIProviderType,
   DocumentAnalysisRequest,
   EntryValidationRequest,
+  GenerateOptions,
+  GenerateResult,
 } from './provider'
 import { DocumentAnalysisResult, EntryValidationResult, ValidationIssue } from '@/types/audit'
 
@@ -107,6 +109,38 @@ export class MockAIProvider extends BaseAIProvider {
       isValid: issues.filter((i) => i.severity === 'error').length === 0,
       issues,
       suggestions,
+    }
+  }
+
+  async generate(options: GenerateOptions): Promise<GenerateResult> {
+    await this.simulateDelay(100, 300)
+
+    const lastUserMessage = [...options.messages].reverse().find((m) => m.role === 'user')
+    const queryPreview = lastUserMessage?.content.slice(0, 100) || ''
+
+    const mockContent = JSON.stringify({
+      persona: 'mock',
+      conclusion: `[MOCK] Analysis response for: ${queryPreview}`,
+      confidence: 0.85,
+      reasoning: [
+        {
+          point: 'Mock analysis point',
+          analysis: 'This is a mock analysis for development purposes',
+          evidence: 'Mock evidence data',
+          confidence: 0.9,
+        },
+      ],
+      risks: [],
+    })
+
+    return {
+      content: mockContent,
+      model: options.model || 'mock-model',
+      usage: {
+        promptTokens: 100,
+        completionTokens: 200,
+        totalTokens: 300,
+      },
     }
   }
 

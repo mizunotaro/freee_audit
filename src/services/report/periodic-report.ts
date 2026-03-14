@@ -1,5 +1,7 @@
 import { prisma } from '@/lib/db'
 
+const DB_TIMEOUT_MS = 30000
+
 export interface PeriodicReportConfig {
   companyId: string
   fiscalYearEndMonth: number
@@ -84,14 +86,9 @@ export async function generatePeriodicReport(
     includePreviousYear
   )
 
-  const periodData: PeriodData[] = []
-
-  for (const period of periods) {
-    const data = await getPeriodData(companyId, period)
-    if (data) {
-      periodData.push(data)
-    }
-  }
+  const periodDataPromises = periods.map((period) => getPeriodData(companyId, period))
+  const periodDataResults = await Promise.all(periodDataPromises)
+  const periodData = periodDataResults.filter((data): data is PeriodData => data !== null)
 
   const summary = generateSummary(periodData)
 
@@ -154,13 +151,18 @@ async function getPeriodData(
   companyId: string,
   period: { label: string; fiscalYear: number; startMonth: number; endMonth: number }
 ): Promise<PeriodData | null> {
-  const balances = await prisma.monthlyBalance.findMany({
-    where: {
-      companyId,
-      fiscalYear: period.fiscalYear,
-      month: period.endMonth,
+  const balances = await prisma.$transaction(
+    async (tx) => {
+      return tx.monthlyBalance.findMany({
+        where: {
+          companyId,
+          fiscalYear: period.fiscalYear,
+          month: period.endMonth,
+        },
+      })
     },
-  })
+    { maxWait: 5000, timeout: DB_TIMEOUT_MS }
+  )
 
   if (balances.length === 0) {
     return generateSamplePeriodData(period)
@@ -220,13 +222,18 @@ async function calculatePeriodPL(
   fiscalYear: number,
   month: number
 ): Promise<PeriodPL> {
-  const balances = await prisma.monthlyBalance.findMany({
-    where: {
-      companyId,
-      fiscalYear,
-      month,
+  const balances = await prisma.$transaction(
+    async (tx) => {
+      return tx.monthlyBalance.findMany({
+        where: {
+          companyId,
+          fiscalYear,
+          month,
+        },
+      })
     },
-  })
+    { maxWait: 5000, timeout: DB_TIMEOUT_MS }
+  )
 
   const revenue = balances
     .filter((b) => b.category === 'sales')
@@ -283,13 +290,18 @@ async function getPreviousMonthBS(
     prevYear -= 1
   }
 
-  const balances = await prisma.monthlyBalance.findMany({
-    where: {
-      companyId,
-      fiscalYear: prevYear,
-      month: prevMonth,
+  const balances = await prisma.$transaction(
+    async (tx) => {
+      return tx.monthlyBalance.findMany({
+        where: {
+          companyId,
+          fiscalYear: prevYear,
+          month: prevMonth,
+        },
+      })
     },
-  })
+    { maxWait: 5000, timeout: DB_TIMEOUT_MS }
+  )
 
   if (balances.length === 0) {
     return null

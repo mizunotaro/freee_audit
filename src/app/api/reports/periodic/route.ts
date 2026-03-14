@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { validateSession } from '@/lib/auth'
+import { getAuthUser } from '@/lib/api/auth-helpers'
 import { withRateLimit } from '@/lib/security'
 import {
   generatePeriodicReport,
@@ -8,15 +8,9 @@ import {
 } from '@/services/report/periodic-report'
 
 async function handler(request: NextRequest) {
-  const token = request.headers.get('authorization')?.replace('Bearer ', '')
-
-  if (!token) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
-
-  const user = await validateSession(token)
+  const user = await getAuthUser(request)
   if (!user || !user.companyId) {
-    return NextResponse.json({ error: 'Invalid session' }, { status: 401 })
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
   if (request.method !== 'GET') {

@@ -11,18 +11,19 @@ const PERSONA_NAMES: Record<PersonaType, string> = {
   tax_accountant: '税理士',
   cfo: 'CFO',
   financial_analyst: '財務アナリスト',
+  big4_auditor: 'Big4監査法人',
 }
 
 const PERSONA_PRIORITIES: Record<string, Record<PersonaType, number>> = {
-  financial_analysis: { cpa: 3, financial_analyst: 2, cfo: 2, tax_accountant: 1 },
-  tax_inquiry: { tax_accountant: 3, cpa: 2, cfo: 1, financial_analyst: 1 },
-  strategic_planning: { cfo: 3, financial_analyst: 2, cpa: 1, tax_accountant: 1 },
-  compliance_check: { cpa: 3, tax_accountant: 2, cfo: 1, financial_analyst: 1 },
-  ratio_analysis: { financial_analyst: 3, cpa: 2, cfo: 2, tax_accountant: 1 },
-  cashflow_analysis: { cfo: 3, financial_analyst: 2, cpa: 2, tax_accountant: 1 },
-  budget_inquiry: { cfo: 3, financial_analyst: 2, cpa: 1, tax_accountant: 1 },
-  forecast_request: { financial_analyst: 3, cfo: 2, cpa: 1, tax_accountant: 1 },
-  general_inquiry: { cpa: 2, cfo: 2, financial_analyst: 2, tax_accountant: 2 },
+  financial_analysis: { cpa: 3, financial_analyst: 2, cfo: 2, big4_auditor: 2, tax_accountant: 1 },
+  tax_inquiry: { tax_accountant: 3, cpa: 2, cfo: 1, financial_analyst: 1, big4_auditor: 1 },
+  strategic_planning: { cfo: 3, financial_analyst: 2, cpa: 1, tax_accountant: 1, big4_auditor: 1 },
+  compliance_check: { cpa: 3, tax_accountant: 2, big4_auditor: 2, cfo: 1, financial_analyst: 1 },
+  ratio_analysis: { financial_analyst: 3, cpa: 2, cfo: 2, big4_auditor: 1, tax_accountant: 1 },
+  cashflow_analysis: { cfo: 3, financial_analyst: 2, cpa: 2, big4_auditor: 1, tax_accountant: 1 },
+  budget_inquiry: { cfo: 3, financial_analyst: 2, cpa: 1, tax_accountant: 1, big4_auditor: 1 },
+  forecast_request: { financial_analyst: 3, cfo: 2, cpa: 1, tax_accountant: 1, big4_auditor: 1 },
+  general_inquiry: { cpa: 2, cfo: 2, financial_analyst: 2, tax_accountant: 2, big4_auditor: 2 },
 }
 
 export function synthesizeResponses(

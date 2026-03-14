@@ -120,6 +120,7 @@ describe('JSONExporter', () => {
       qualityScore: 85,
       generatedAt: new Date(),
       modelUsed: 'gpt-4',
+      temperature: 0.1,
     },
   }
 

@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/db'
 import { MappingRuleEngine } from './mapping-rule-engine'
+import { type Result as _Result, type AppError as _AppError, isSuccess } from '@/types/result'
 import type {
   AccountMapping,
   ConversionSettings,
@@ -483,18 +484,16 @@ export class JournalConverter {
           calculatedDebit = Math.round(debitAmount * (rule.percentage / 100))
           calculatedCredit = Math.round(creditAmount * (rule.percentage / 100))
         } else if (rule.type === 'formula' && rule.formula) {
-          try {
-            const contextAmount = amount
-            const calculated = this.ruleEngine.calculateAmount(rule, amount, {
-              amount: contextAmount,
-              date: journal.entryDate,
-            })
-            calculatedDebit = debitAmount > 0 ? calculated : 0
-            calculatedCredit = creditAmount > 0 ? calculated : 0
-          } catch (error) {
-            warnings.push(
-              `Formula evaluation failed: ${error instanceof Error ? error.message : 'Unknown error'}`
-            )
+          const contextAmount = amount
+          const calcResult = this.ruleEngine.calculateAmount(rule, amount, {
+            amount: contextAmount,
+            date: journal.entryDate,
+          })
+          if (isSuccess(calcResult)) {
+            calculatedDebit = debitAmount > 0 ? calcResult.data : 0
+            calculatedCredit = creditAmount > 0 ? calcResult.data : 0
+          } else {
+            warnings.push(`Formula evaluation failed: ${calcResult.error.message}`)
           }
         }
 

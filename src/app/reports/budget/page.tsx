@@ -21,73 +21,8 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import { formatCurrency, formatPercent } from '@/lib/utils'
-
-interface BudgetItem {
-  accountCode: string
-  accountName: string
-  budgetAmount: number
-  actualAmount: number
-  variance: number
-  achievementRate: number
-}
-
-interface BudgetRecord {
-  id: string
-  fiscalYear: number
-  month: number
-  accountCode: string
-  accountName: string
-  amount: number
-  departmentId?: string | null
-}
-
-interface BudgetVsActual {
-  fiscalYear: number
-  month: number
-  items: BudgetItem[]
-  totals: {
-    revenue: { budget: number; actual: number; variance: number; rate: number }
-    expenses: { budget: number; actual: number; variance: number; rate: number }
-    operatingIncome: { budget: number; actual: number; variance: number; rate: number }
-  }
-}
-
-interface StageLevelItem {
-  stage: string
-  budget: number
-  actual: number
-  variance: number
-  rate: number
-  status: 'good' | 'warning' | 'bad'
-}
-
-interface AccountLevelItem {
-  code: string
-  name: string
-  category: string
-  budget: number
-  actual: number
-  variance: number
-  rate: number
-  status: 'good' | 'warning' | 'bad'
-}
-
-interface DetailedBudget {
-  stageLevel: StageLevelItem[]
-  accountLevel: AccountLevelItem[]
-}
-
-interface VarianceItem {
-  accountName: string
-  budget: number
-  actual: number
-  variancePercent: number
-  type: 'over' | 'under'
-}
-
-interface VarianceData {
-  significantVariances: VarianceItem[]
-}
+import { fetchWithTimeout, FetchTimeoutError } from '@/lib/api/fetch-with-timeout'
+import type { BudgetRecord, BudgetVsActual, DetailedBudget, VarianceData } from '@/types/reports'
 
 export default function BudgetPage() {
   const [budgetVsActual, setBudgetVsActual] = useState<BudgetVsActual | null>(null)
@@ -106,19 +41,53 @@ export default function BudgetPage() {
   const fetchData = useCallback(async () => {
     setLoading(true)
     try {
-      const [varianceRes, budgetsRes, detailedRes] = await Promise.all([
-        fetch(`/api/reports/budget?action=variance&fiscalYear=${fiscalYear}&month=${month}`),
-        fetch(`/api/reports/budget?fiscalYear=${fiscalYear}&month=${month}`),
-        fetch(`/api/reports/budget?action=detailed&fiscalYear=${fiscalYear}&month=${month}`),
+      const [varianceResult, budgetsResult, detailedResult] = await Promise.allSettled([
+        fetchWithTimeout(
+          `/api/reports/budget?action=variance&fiscalYear=${fiscalYear}&month=${month}`,
+          { timeout: 30000 }
+        ),
+        fetchWithTimeout(`/api/reports/budget?fiscalYear=${fiscalYear}&month=${month}`, {
+          timeout: 30000,
+        }),
+        fetchWithTimeout(
+          `/api/reports/budget?action=detailed&fiscalYear=${fiscalYear}&month=${month}`,
+          { timeout: 30000 }
+        ),
       ])
-      const varianceData = await varianceRes.json()
-      const budgetsData = await budgetsRes.json()
-      const detailedData = await detailedRes.json()
 
-      setBudgetVsActual(varianceData.budgetVsActual)
-      setVariance(varianceData.variance)
-      setBudgets(budgetsData.budgets || [])
-      setDetailedBudget(detailedData)
+      if (varianceResult.status === 'fulfilled') {
+        const varianceData = await varianceResult.value.json()
+        setBudgetVsActual(varianceData.budgetVsActual)
+        setVariance(varianceData.variance)
+      } else {
+        if (varianceResult.reason instanceof FetchTimeoutError) {
+          toast.error('差異データの取得がタイムアウトしました')
+        } else {
+          console.error('Failed to fetch variance:', varianceResult.reason)
+        }
+      }
+
+      if (budgetsResult.status === 'fulfilled') {
+        const budgetsData = await budgetsResult.value.json()
+        setBudgets(budgetsData.budgets || [])
+      } else {
+        if (budgetsResult.reason instanceof FetchTimeoutError) {
+          toast.error('予算一覧の取得がタイムアウトしました')
+        } else {
+          console.error('Failed to fetch budgets:', budgetsResult.reason)
+        }
+      }
+
+      if (detailedResult.status === 'fulfilled') {
+        const detailedData = await detailedResult.value.json()
+        setDetailedBudget(detailedData)
+      } else {
+        if (detailedResult.reason instanceof FetchTimeoutError) {
+          toast.error('詳細データの取得がタイムアウトしました')
+        } else {
+          console.error('Failed to fetch detailed budget:', detailedResult.reason)
+        }
+      }
     } catch (error) {
       console.error('Failed to fetch budget:', error)
     } finally {
@@ -144,15 +113,20 @@ export default function BudgetPage() {
     if (!deleteTarget) return
 
     try {
-      const res = await fetch(`/api/reports/budget?id=${deleteTarget.id}`, {
+      const res = await fetchWithTimeout(`/api/reports/budget?id=${deleteTarget.id}`, {
         method: 'DELETE',
+        timeout: 30000,
       })
       if (!res.ok) throw new Error('削除に失敗しました')
       toast.success('予算を削除しました')
       fetchData()
     } catch (error) {
       console.error('Failed to delete budget:', error)
-      toast.error('削除に失敗しました')
+      if (error instanceof FetchTimeoutError) {
+        toast.error('リクエストがタイムアウトしました')
+      } else {
+        toast.error('削除に失敗しました')
+      }
     } finally {
       setDeleteTarget(null)
     }

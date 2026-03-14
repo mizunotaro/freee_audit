@@ -15,6 +15,7 @@ import {
   validateAdjustingEntry,
   calculatePresentValue,
 } from '@/services/conversion/adjustments/types'
+import { isSuccess, isFailure } from '@/types/result'
 import type { AdjustmentType } from '@/types/conversion'
 
 const createMockSourceData = (
@@ -180,10 +181,13 @@ describe('AdjustmentCalculator', () => {
           },
         },
       })
-      const entry = await calculator.calculate('project-1', 'deferred_tax', sourceData, 'IFRS')
+      const result = await calculator.calculate('project-1', 'deferred_tax', sourceData, 'IFRS')
 
-      expect(entry).not.toBeNull()
-      expect(entry?.type).toBe('deferred_tax')
+      expect(isSuccess(result)).toBe(true)
+      if (isSuccess(result)) {
+        expect(result.data).not.toBeNull()
+        expect(result.data?.type).toBe('deferred_tax')
+      }
     })
 
     it('should return null for inapplicable adjustment', async () => {
@@ -211,17 +215,27 @@ describe('AdjustmentCalculator', () => {
         debts: [],
       })
 
-      const entry = await calculator.calculate('project-1', 'deferred_tax', sourceData, 'IFRS')
+      const result = await calculator.calculate('project-1', 'deferred_tax', sourceData, 'IFRS')
 
-      expect(entry).toBeNull()
+      expect(isSuccess(result)).toBe(true)
+      if (isSuccess(result)) {
+        expect(result.data).toBeNull()
+      }
     })
 
-    it('should throw error for unknown adjustment type', async () => {
+    it('should return error for unknown adjustment type', async () => {
       const sourceData = createMockSourceData()
 
-      await expect(
-        calculator.calculate('project-1', 'unknown_type' as AdjustmentType, sourceData, 'IFRS')
-      ).rejects.toThrow('Unknown adjustment type')
+      const result = await calculator.calculate(
+        'project-1',
+        'unknown_type' as AdjustmentType,
+        sourceData,
+        'IFRS'
+      )
+      expect(isFailure(result)).toBe(true)
+      if (isFailure(result)) {
+        expect(result.error.message).toContain('Unknown adjustment type')
+      }
     })
   })
 

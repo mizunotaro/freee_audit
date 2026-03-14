@@ -1,4 +1,4 @@
-export type PersonaType = 'cpa' | 'tax_accountant' | 'cfo' | 'financial_analyst'
+export type PersonaType = 'cpa' | 'tax_accountant' | 'cfo' | 'financial_analyst' | 'big4_auditor'
 
 export type AnalysisCategory =
   | 'liquidity'
@@ -9,6 +9,10 @@ export type AnalysisCategory =
   | 'tax'
   | 'compliance'
   | 'strategy'
+  | 'audit_risk'
+  | 'valuation'
+  | 'governance'
+  | 'documentation'
 
 export type ModelComplexity =
   | 'complex_reasoning'
@@ -136,4 +140,4 @@ export interface JournalProposalResponse {
   warnings: readonly string[]
 }
 
-export type PersonaRole = 'cpa' | 'tax_accountant' | 'cfo' | 'financial_analyst'
+export type PersonaRole = 'cpa' | 'tax_accountant' | 'cfo' | 'financial_analyst' | 'big4_auditor'

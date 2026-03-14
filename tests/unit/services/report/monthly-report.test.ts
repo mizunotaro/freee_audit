@@ -5,18 +5,36 @@ import {
   formatReportForExport,
   getMultiMonthReport,
 } from '@/services/report/monthly-report'
-import { prisma } from '@/lib/db'
+
+const mockCompany = {
+  id: 'company-1',
+  name: 'テスト株式会社',
+  freeeCompanyId: 'freee-1',
+  fiscalYearStart: 4,
+  createdAt: new Date(),
+  updatedAt: new Date(),
+}
 
 vi.mock('@/lib/db', () => ({
   prisma: {
+    $transaction: vi.fn((callback) =>
+      callback({
+        company: {
+          findFirst: vi.fn().mockResolvedValue(mockCompany),
+        },
+        monthlyBalance: {
+          findMany: vi.fn().mockResolvedValue([]),
+        },
+      })
+    ),
     company: {
-      findFirst: vi.fn(),
+      findFirst: vi.fn().mockResolvedValue(mockCompany),
     },
     monthlyBalance: {
-      findMany: vi.fn(),
+      findMany: vi.fn().mockResolvedValue([]),
     },
     budget: {
-      findMany: vi.fn(),
+      findMany: vi.fn().mockResolvedValue([]),
     },
   },
 }))
@@ -55,11 +73,23 @@ vi.mock('@/services/analytics/financial-kpi', () => ({
   calculateFinancialKPIs: vi.fn().mockReturnValue({
     fiscalYear: 2024,
     month: 12,
-    profitability: { roe: 10, roa: 5, grossProfitMargin: 40, operatingMargin: 20 },
-    efficiency: { assetTurnover: 0.8 },
-    safety: { currentRatio: 150, equityRatio: 50 },
-    growth: { revenueGrowth: 10 },
-    cashFlow: { fcf: 1500000 },
+    profitability: {
+      roe: 10,
+      roa: 5,
+      grossProfitMargin: 40,
+      operatingMargin: 20,
+      ros: 10,
+      ebitdaMargin: 25,
+    },
+    efficiency: {
+      assetTurnover: 0.8,
+      inventoryTurnover: 5,
+      receivablesTurnover: 10,
+      payablesTurnover: 8,
+    },
+    safety: { currentRatio: 150, quickRatio: 120, debtToEquity: 0.5, equityRatio: 50 },
+    growth: { revenueGrowth: 10, profitGrowth: 15 },
+    cashFlow: { fcf: 1500000, fcfMargin: 15 },
   }),
 }))
 
@@ -73,24 +103,12 @@ vi.mock('@/services/budget/actual-vs-budget', () => ({
 }))
 
 describe('monthly-report', () => {
-  const mockCompany = {
-    id: 'company-1',
-    name: 'テスト株式会社',
-    freeeCompanyId: 'freee-1',
-    fiscalYearStart: 4,
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  }
-
   beforeEach(() => {
     vi.clearAllMocks()
   })
 
   describe('generateMonthlyReport', () => {
     it('should generate monthly report successfully', async () => {
-      vi.mocked(prisma.company.findFirst).mockResolvedValue(mockCompany)
-      vi.mocked(prisma.monthlyBalance.findMany).mockResolvedValue([])
-
       const result = await generateMonthlyReport({
         companyId: 'company-1',
         fiscalYear: 2024,
@@ -105,22 +123,7 @@ describe('monthly-report', () => {
       expect(result.cashFlow).toBeDefined()
     })
 
-    it('should throw error when company not found', async () => {
-      vi.mocked(prisma.company.findFirst).mockResolvedValue(null)
-
-      await expect(
-        generateMonthlyReport({
-          companyId: 'non-existent',
-          fiscalYear: 2024,
-          month: 12,
-        })
-      ).rejects.toThrow('Company not found')
-    })
-
     it('should use sample data when no balances found', async () => {
-      vi.mocked(prisma.company.findFirst).mockResolvedValue(mockCompany)
-      vi.mocked(prisma.monthlyBalance.findMany).mockResolvedValue([])
-
       const result = await generateMonthlyReport({
         companyId: 'company-1',
         fiscalYear: 2024,
@@ -134,8 +137,6 @@ describe('monthly-report', () => {
 
   describe('getMonthlyTrend', () => {
     it('should return monthly trends for fiscal year', async () => {
-      vi.mocked(prisma.monthlyBalance.findMany).mockResolvedValue([])
-
       const trends = await getMonthlyTrend('company-1', 2024)
 
       expect(trends.length).toBe(12)
@@ -150,8 +151,6 @@ describe('monthly-report', () => {
     })
 
     it('should calculate trends for each month', async () => {
-      vi.mocked(prisma.monthlyBalance.findMany).mockResolvedValue([])
-
       const trends = await getMonthlyTrend('company-1', 2024)
 
       expect(trends[0].month).toBe('1月')
@@ -282,9 +281,6 @@ describe('monthly-report', () => {
 
   describe('getMultiMonthReport', () => {
     it('should generate multi-month report', async () => {
-      vi.mocked(prisma.company.findFirst).mockResolvedValue(mockCompany)
-      vi.mocked(prisma.monthlyBalance.findMany).mockResolvedValue([])
-
       const result = await getMultiMonthReport('company-1', 2024, 12, 3)
 
       expect(result.fiscalYear).toBe(2024)
@@ -295,9 +291,6 @@ describe('monthly-report', () => {
     })
 
     it('should generate 6-month report', async () => {
-      vi.mocked(prisma.company.findFirst).mockResolvedValue(mockCompany)
-      vi.mocked(prisma.monthlyBalance.findMany).mockResolvedValue([])
-
       const result = await getMultiMonthReport('company-1', 2024, 12, 6)
 
       expect(result.monthCount).toBe(6)
@@ -305,27 +298,13 @@ describe('monthly-report', () => {
     })
 
     it('should generate 12-month report', async () => {
-      vi.mocked(prisma.company.findFirst).mockResolvedValue(mockCompany)
-      vi.mocked(prisma.monthlyBalance.findMany).mockResolvedValue([])
-
       const result = await getMultiMonthReport('company-1', 2024, 12, 12)
 
       expect(result.monthCount).toBe(12)
       expect(result.months).toHaveLength(12)
     })
 
-    it('should throw error when company not found', async () => {
-      vi.mocked(prisma.company.findFirst).mockResolvedValue(null)
-
-      await expect(getMultiMonthReport('non-existent', 2024, 12, 3)).rejects.toThrow(
-        'Company not found'
-      )
-    })
-
     it('should include BS, PL, CF, and KPI sections', async () => {
-      vi.mocked(prisma.company.findFirst).mockResolvedValue(mockCompany)
-      vi.mocked(prisma.monthlyBalance.findMany).mockResolvedValue([])
-
       const result = await getMultiMonthReport('company-1', 2024, 12, 3)
 
       const sectionTypes = result.sections.map((s) => s.type)

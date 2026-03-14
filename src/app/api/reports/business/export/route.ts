@@ -1,11 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { validateSession } from '@/lib/auth'
-
-async function getAuthUser(request: NextRequest) {
-  const token = request.cookies.get('session')?.value
-  if (!token) return null
-  return validateSession(token)
-}
+import { getAuthUser } from '@/lib/api/auth-helpers'
+import { sanitizeHtml, sanitizePlainText } from '@/lib/utils/html-sanitize'
 
 export async function POST(request: NextRequest) {
   try {
@@ -27,6 +22,7 @@ export async function POST(request: NextRequest) {
       corporateGovernance,
     } = body
 
+    const safeFiscalYear = sanitizePlainText(String(fiscalYear))
     const html = generateHTML({
       fiscalYear,
       companyName,
@@ -42,7 +38,7 @@ export async function POST(request: NextRequest) {
     return new NextResponse(html, {
       headers: {
         'Content-Type': 'text/html; charset=utf-8',
-        'Content-Disposition': `attachment; filename="business_report_${fiscalYear}.html"`,
+        'Content-Disposition': `attachment; filename="business_report_${safeFiscalYear}.html"`,
       },
     })
   } catch (error) {
@@ -62,13 +58,23 @@ function generateHTML(data: {
   researchAndDevelopment: string
   corporateGovernance: string
 }): string {
+  const safeCompanyName = sanitizeHtml(data.companyName)
+  const safeFiscalYear = String(data.fiscalYear)
+  const safeBusinessOverview = sanitizeHtml(data.businessOverview)
+  const safeBusinessEnvironment = sanitizeHtml(data.businessEnvironment)
+  const safeManagementPolicy = sanitizeHtml(data.managementPolicy)
+  const safeIssuesAndRisks = sanitizeHtml(data.issuesAndRisks)
+  const safeFinancialHighlights = sanitizeHtml(data.financialHighlights)
+  const safeResearchAndDevelopment = sanitizeHtml(data.researchAndDevelopment)
+  const safeCorporateGovernance = sanitizeHtml(data.corporateGovernance)
+
   return `
 <!DOCTYPE html>
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${data.companyName} 事業報告書 ${data.fiscalYear}年度</title>
+  <title>${safeCompanyName} 事業報告書 ${safeFiscalYear}年度</title>
   <style>
     body {
       font-family: "游ゴシック", "Yu Gothic", sans-serif;
@@ -106,41 +112,41 @@ function generateHTML(data: {
   </style>
 </head>
 <body>
-  <h1>${data.companyName}<br>事業報告書<br>${data.fiscalYear}年度</h1>
+  <h1>${safeCompanyName}<br>事業報告書<br>${safeFiscalYear}年度</h1>
 
   <div class="section">
     <h2>1. 事業の概要</h2>
-    <p>${data.businessOverview}</p>
+    <p>${safeBusinessOverview}</p>
   </div>
 
   <div class="section">
     <h2>2. 経営環境</h2>
-    <p>${data.businessEnvironment}</p>
+    <p>${safeBusinessEnvironment}</p>
   </div>
 
   <div class="section">
     <h2>3. 経営方針</h2>
-    <p>${data.managementPolicy}</p>
+    <p>${safeManagementPolicy}</p>
   </div>
 
   <div class="section">
     <h2>4. 課題とリスク</h2>
-    <p>${data.issuesAndRisks}</p>
+    <p>${safeIssuesAndRisks}</p>
   </div>
 
   <div class="section">
     <h2>5. 財務ハイライト</h2>
-    <p>${data.financialHighlights}</p>
+    <p>${safeFinancialHighlights}</p>
   </div>
 
   <div class="section">
     <h2>6. 研究開発活動</h2>
-    <p>${data.researchAndDevelopment}</p>
+    <p>${safeResearchAndDevelopment}</p>
   </div>
 
   <div class="section">
     <h2>7. 企業統治</h2>
-    <p>${data.corporateGovernance}</p>
+    <p>${safeCorporateGovernance}</p>
   </div>
 </body>
 </html>

@@ -1,4 +1,12 @@
 import type { ConversionRule, MappingCondition } from '@/types/conversion'
+import {
+  type Result,
+  type AppError,
+  success,
+  failure,
+  createAppError,
+  ERROR_CODES,
+} from '@/types/result'
 
 export interface MappingContext {
   date?: Date
@@ -28,25 +36,39 @@ export interface ValidationError {
 }
 
 export class MappingRuleEngine {
-  calculateAmount(rule: ConversionRule, sourceAmount: number, context?: MappingContext): number {
+  calculateAmount(
+    rule: ConversionRule,
+    sourceAmount: number,
+    context?: MappingContext
+  ): Result<number, AppError> {
     switch (rule.type) {
       case 'direct':
-        return sourceAmount
+        return success(sourceAmount)
 
       case 'percentage':
         if (rule.percentage === undefined) {
-          throw new Error('Percentage rule requires percentage value')
+          return failure(
+            createAppError(
+              ERROR_CODES.VALIDATION_ERROR,
+              'Percentage rule requires percentage value'
+            )
+          )
         }
-        return Math.round(sourceAmount * (rule.percentage / 100))
+        return success(Math.round(sourceAmount * (rule.percentage / 100)))
 
       case 'formula':
         return this.evaluateFormula(rule.formula ?? 'amount', sourceAmount, context)
 
       case 'ai_suggested':
-        return sourceAmount
+        return success(sourceAmount)
 
       default:
-        throw new Error(`Unknown rule type: ${(rule as { type: string }).type}`)
+        return failure(
+          createAppError(
+            ERROR_CODES.VALIDATION_ERROR,
+            `Unknown rule type: ${(rule as { type: string }).type}`
+          )
+        )
     }
   }
 
@@ -162,7 +184,11 @@ export class MappingRuleEngine {
     return fieldMap[field]
   }
 
-  private evaluateFormula(formula: string, amount: number, context?: MappingContext): number {
+  private evaluateFormula(
+    formula: string,
+    amount: number,
+    context?: MappingContext
+  ): Result<number, AppError> {
     try {
       const sanitizedFormula = this.sanitizeFormula(formula)
 
@@ -191,18 +217,28 @@ export class MappingRuleEngine {
       }
 
       if (!/^[\d\s+\-*/().]+$/.test(result)) {
-        throw new Error('Invalid formula: contains disallowed characters')
+        return failure(
+          createAppError(
+            ERROR_CODES.VALIDATION_ERROR,
+            'Invalid formula: contains disallowed characters'
+          )
+        )
       }
 
       const evalResult = Function(`"use strict"; return (${result})`)()
       if (typeof evalResult !== 'number' || !isFinite(evalResult)) {
-        throw new Error('Formula did not evaluate to a valid number')
+        return failure(
+          createAppError(ERROR_CODES.VALIDATION_ERROR, 'Formula did not evaluate to a valid number')
+        )
       }
 
-      return Math.round(evalResult)
+      return success(Math.round(evalResult))
     } catch (error) {
-      throw new Error(
-        `Formula evaluation failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+      return failure(
+        createAppError(
+          ERROR_CODES.VALIDATION_ERROR,
+          `Formula evaluation failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+        )
       )
     }
   }

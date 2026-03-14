@@ -49,15 +49,35 @@ export interface FreeeJournalEntry {
   walletable_id?: number
   walletable_name?: string
   tag_names?: string[]
+  entry_side?: 'debit' | 'credit'
+  vat?: number | null
+  vat_name?: string | null
+  receipt_id?: number | null
+}
+
+export interface FreeeJournalDetail {
+  id: number
+  account_item_id: number
+  account_item_name: string
+  amount: number
+  vat?: number | null
+  vat_name?: string | null
+  entry_side: 'debit' | 'credit'
+  description?: string
+  receipt_id?: number | null
+  tag_ids?: number[]
+  segment_1_id?: number | null
+  segment_2_id?: number | null
+  segment_3_id?: number | null
 }
 
 export interface FreeeJournal {
   id: number
   issue_date: string
-  entry_side: 'debit' | 'credit'
-  amount: number
-  account_item_id: number
-  account_item_name: string
+  entry_side?: 'debit' | 'credit'
+  amount?: number
+  account_item_id?: number
+  account_item_name?: string
   partner_id?: number
   partner_name?: string
   description?: string
@@ -66,17 +86,10 @@ export interface FreeeJournal {
   walletable_id?: number
   walletable_name?: string
   details?: FreeeJournalDetail[]
-}
-
-export interface FreeeJournalDetail {
-  id: number
-  account_item_id: number
-  account_item_name: string
-  amount: number
-  vat: number | null
-  vat_name: string | null
-  entry_side: 'debit' | 'credit'
-  description: string
+  deal_id?: number
+  deal_type?: 'expense' | 'income' | 'transfer' | 'transfers'
+  document_ids?: number[]
+  receipt_ids?: number[]
 }
 
 export interface FreeeDocument {
@@ -367,3 +380,165 @@ export interface DailyUsageInfo {
   remaining: number
   resetAt: Date
 }
+
+export interface FreeeDeal {
+  id: number
+  company_id: number
+  issue_date: string
+  due_date: string | null
+  partner_id: number | null
+  partner?: {
+    id: number
+    name: string
+    shortcut: string
+  } | null
+  details: FreeeDealDetail[]
+  payments?: FreeeDealPayment[]
+  receipts?: FreeeDealReceipt[]
+  amount: number
+  due_amount: number
+  status: 'unsettled' | 'settled'
+  type: 'expense' | 'income' | 'transfer' | 'transfers'
+  documents?: FreeeDealDocument[]
+}
+
+export interface FreeeDealDetail {
+  id: number
+  account_item_id: number
+  account_item_name: string
+  amount: number
+  vat_id: number | null
+  vat_name: string | null
+  entry_side: 'debit' | 'credit'
+  description: string
+  receipt_id: number | null
+  tag_ids: number[]
+  segment_1_id?: number | null
+  segment_2_id?: number | null
+  segment_3_id?: number | null
+}
+
+export interface FreeeDealPayment {
+  date: string
+  from_walletable_id: number
+  from_walletable_name: string
+  amount: number
+}
+
+export interface FreeeDealReceipt {
+  id: number
+  status: string
+  description: string
+  mime_type: string
+}
+
+export interface FreeeDealDocument {
+  id: number
+  name: string
+}
+
+export interface FreeeDealsResponse {
+  deals: FreeeDeal[]
+  meta: {
+    total_count: number
+    limit: number
+    offset: number
+  }
+}
+
+export interface FreeeDealParams {
+  company_id: number
+  start_issue_date?: string
+  end_issue_date?: string
+  partner_id?: number
+  status?: 'unsettled' | 'settled' | 'all'
+  type?: 'expense' | 'income' | 'transfer' | 'transfers' | 'all'
+  offset?: number
+  limit?: number
+}
+
+export interface JournalDocumentMapping {
+  journalId: string
+  dealId: number | null
+  documentIds: number[]
+  receiptIds: number[]
+  syncedAt: Date
+  matchConfidence: 'high' | 'medium' | 'low'
+}
+
+export interface MappingSyncResult {
+  totalJournals: number
+  totalDeals: number
+  totalMappings: number
+  newMappings: number
+  errors: Array<{
+    journalId?: string
+    dealId?: number
+    error: string
+    code?: string
+  }>
+  syncedAt: Date
+}
+
+export interface FreeeDocumentDownloadResult {
+  buffer: Buffer
+  contentType: string
+  fileName: string
+}
+
+export type FreeeApiVersion = '1' | '2'
+
+export interface FreeeApiEndpointConfig {
+  path: string
+  method: 'GET' | 'POST' | 'PUT' | 'DELETE'
+  version: FreeeApiVersion
+  rateLimitType: 'data' | 'report' | 'download'
+  timeout?: number
+}
+
+export const FREEE_API_ENDPOINTS: Record<string, FreeeApiEndpointConfig> = {
+  deals: {
+    path: '/api/1/deals',
+    method: 'GET',
+    version: '1',
+    rateLimitType: 'data',
+  },
+  dealDetail: {
+    path: '/api/1/deals/{id}',
+    method: 'GET',
+    version: '1',
+    rateLimitType: 'data',
+  },
+  documents: {
+    path: '/api/1/documents',
+    method: 'GET',
+    version: '1',
+    rateLimitType: 'data',
+  },
+  documentDownload: {
+    path: '/api/1/documents/{id}/download',
+    method: 'GET',
+    version: '1',
+    rateLimitType: 'download',
+    timeout: 60000,
+  },
+  receipts: {
+    path: '/api/1/receipts',
+    method: 'GET',
+    version: '1',
+    rateLimitType: 'data',
+  },
+  receiptDetail: {
+    path: '/api/1/receipts/{id}',
+    method: 'GET',
+    version: '1',
+    rateLimitType: 'data',
+  },
+  receiptDownload: {
+    path: '/api/1/receipts/{id}/download',
+    method: 'GET',
+    version: '1',
+    rateLimitType: 'download',
+    timeout: 60000,
+  },
+} as const
