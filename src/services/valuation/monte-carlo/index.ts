@@ -273,8 +273,17 @@ export function runMonteCarloSimulation(inputs: MonteCarloInputs): Result<MonteC
     return validation
   }
 
+  if (!inputs.variables || !inputs.formula) {
+    return {
+      success: false,
+      error: createError('invalid_input', 'Variables and formula are required'),
+    }
+  }
+
   const startTime = performance.now()
-  const { variables, formula, iterations, seed } = inputs
+  const { iterations, seed } = inputs
+  const variables = inputs.variables
+  const formula = inputs.formula
 
   const rng =
     seed !== undefined ? new SeededRandom(seed).next.bind(new SeededRandom(seed)) : Math.random
@@ -473,6 +482,13 @@ export function sensitivityAnalysis(
   variationRange: number,
   steps: number
 ): Result<{ values: number[]; results: MonteCarloResult[] }> {
+  if (!baseInputs.variables || baseInputs.variables.length === 0) {
+    return {
+      success: false,
+      error: createError('invalid_input', 'Base inputs must have at least one variable'),
+    }
+  }
+
   const variable = baseInputs.variables.find((v) => v.name === variableName)
   if (!variable) {
     return {
@@ -491,6 +507,7 @@ export function sensitivityAnalysis(
 
   const values: number[] = []
   const results: MonteCarloResult[] = []
+  const variables = baseInputs.variables
 
   for (let i = 0; i < steps; i++) {
     const factor = 1 - variationRange + (2 * variationRange * i) / (steps - 1)
@@ -498,7 +515,7 @@ export function sensitivityAnalysis(
 
     const modifiedInputs: MonteCarloInputs = {
       ...baseInputs,
-      variables: baseInputs.variables.map((v) =>
+      variables: variables.map((v) =>
         v.name === variableName
           ? {
               ...v,

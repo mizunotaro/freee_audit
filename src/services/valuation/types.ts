@@ -24,6 +24,7 @@ export interface CalculationStep {
   formulaWithValues: string
   inputs: Record<string, number>
   output: number
+  result?: number
   unit: string
   children?: CalculationStep[]
 }
@@ -60,6 +61,8 @@ export interface DCFInputs {
 }
 
 export interface DCFResult extends ValuationResult {
+  terminalValue: number
+  terminalPV: number
   metadata: ValuationResult['metadata'] & {
     method: 'dcf'
     presentValues: number[]
@@ -69,8 +72,9 @@ export interface DCFResult extends ValuationResult {
 }
 
 export interface WACCInputs {
-  mode: 'simple' | 'detailed'
+  mode?: 'simple' | 'detailed'
   simpleWACC?: number
+  wacc?: number
   detailed?: {
     riskFreeRate: number
     marketRiskPremium: number
@@ -80,12 +84,29 @@ export interface WACCInputs {
     debtRatio: number
     equityRatio: number
   }
+  riskFreeRate?: number
+  marketRiskPremium?: number
+  beta?: number
+  costOfDebt?: number
+  taxRate?: number
+  debtRatio?: number
+}
+
+export type WACCDetailedInputs = WACCInputs & {
+  riskFreeRate: number
+  marketRiskPremium: number
+  beta: number
+  costOfDebt: number
+  taxRate: number
+  debtRatio: number
 }
 
 export interface WACCResult {
   wacc: number
   mode: 'simple' | 'detailed'
   steps: CalculationStep[]
+  costOfEquity?: number
+  costOfDebtAfterTax?: number
   components?: {
     costOfEquity: number
     costOfDebt: number
@@ -124,7 +145,14 @@ export interface ComparableCompany {
   psr: number
 }
 
+export interface ComparableValuation {
+  multiple: MultipleType
+  value: number
+  multipleUsed: number
+}
+
 export interface ComparableResult extends ValuationResult {
+  valuations: ComparableValuation[]
   metadata: ValuationResult['metadata'] & {
     method: 'comparable'
     multiples: Record<MultipleType, { multiple: number; value: number }>
@@ -202,14 +230,18 @@ export interface MonteCarloVariable {
 }
 
 export interface MonteCarloInputs {
-  variables: MonteCarloVariable[]
-  formula: string
+  variables?: MonteCarloVariable[]
+  formula?: string
   iterations: number
   seed?: number
   correlationMatrix?: number[][]
+  baseInputs?: DCFInputs
+  distributions?: Record<string, DistributionConfig>
 }
 
 export interface MonteCarloResult {
+  results?: number[]
+  percentiles?: { p5: number; p25: number; p50: number; p75: number; p95: number }
   statistics: {
     mean: number
     median: number
@@ -302,6 +334,8 @@ export interface WACCAdviceRequest {
 }
 
 export interface WACCAdviceItem {
+  parameter?: string
+  reason?: string
   suggested: number
   range: { min: number; max: number }
   rationale: string
@@ -309,6 +343,18 @@ export interface WACCAdviceItem {
 }
 
 export interface WACCAdviceResponse {
+  industry: string
+  confidence: 'high' | 'medium' | 'low'
+  advice: WACCAdviceItem[]
+  warnings: string[]
+  recommendedValues: {
+    riskFreeRate: number
+    marketRiskPremium: number
+    beta: number
+    costOfDebt: number
+    taxRate: number
+    debtRatio: number
+  }
   riskFreeRate: WACCAdviceItem
   marketRiskPremium: WACCAdviceItem
   beta: WACCAdviceItem & {
@@ -327,7 +373,6 @@ export interface WACCAdviceResponse {
     industryAverage: number
     rationale: string
   }
-  confidence: 'high' | 'medium' | 'low'
   lastUpdated: string
 }
 

@@ -23,29 +23,30 @@ function formatNumber(num: number, decimals: number = 4): string {
 }
 
 export function calculateWACC(inputs: WACCInputs): Result<WACCResult> {
-  if (inputs.mode === 'simple') {
-    return calculateSimpleWACC(inputs)
-  } else {
+  if (inputs.mode === 'detailed' || inputs.detailed) {
     return calculateDetailedWACC(inputs)
   }
+  return calculateSimpleWACC(inputs)
 }
 
 function calculateSimpleWACC(inputs: WACCInputs): Result<WACCResult> {
-  if (typeof inputs.simpleWACC !== 'number') {
+  const waccInput = inputs.simpleWACC ?? inputs.wacc
+
+  if (typeof waccInput !== 'number') {
     return {
       success: false,
-      error: createError('invalid_input', 'simpleWACC is required for simple mode'),
+      error: createError('invalid_input', 'simpleWACC or wacc is required for simple mode'),
     }
   }
 
-  if (inputs.simpleWACC <= 0 || inputs.simpleWACC > 100) {
+  if (waccInput <= 0 || waccInput > 100) {
     return {
       success: false,
       error: createError('invalid_input', 'WACC must be between 0 and 100 percent'),
     }
   }
 
-  const wacc = inputs.simpleWACC / 100
+  const wacc = waccInput / 100
 
   const steps: CalculationStep[] = [
     {
@@ -53,8 +54,8 @@ function calculateSimpleWACC(inputs: WACCInputs): Result<WACCResult> {
       name: 'WACC (Direct Input)',
       description: 'Weighted Average Cost of Capital - Direct input mode',
       formula: 'WACC = Input Value',
-      formulaWithValues: `WACC = ${inputs.simpleWACC}%`,
-      inputs: { wacc: inputs.simpleWACC },
+      formulaWithValues: `WACC = ${waccInput}%`,
+      inputs: { wacc: waccInput },
       output: wacc,
       unit: 'decimal',
     },
@@ -71,13 +72,14 @@ function calculateSimpleWACC(inputs: WACCInputs): Result<WACCResult> {
 }
 
 function calculateDetailedWACC(inputs: WACCInputs): Result<WACCResult> {
-  const { detailed } = inputs
-
-  if (!detailed) {
-    return {
-      success: false,
-      error: createError('invalid_input', 'Detailed inputs are required for detailed mode'),
-    }
+  const detailed = inputs.detailed || {
+    riskFreeRate: inputs.riskFreeRate ?? 1.5,
+    marketRiskPremium: inputs.marketRiskPremium ?? 6.0,
+    beta: inputs.beta ?? 1.0,
+    costOfDebt: inputs.costOfDebt ?? 3.0,
+    taxRate: inputs.taxRate ?? 30.0,
+    debtRatio: inputs.debtRatio ?? 30.0,
+    equityRatio: 100 - (inputs.debtRatio ?? 30.0),
   }
 
   const { riskFreeRate, marketRiskPremium, beta, costOfDebt, taxRate, debtRatio, equityRatio } =
@@ -186,6 +188,8 @@ function calculateDetailedWACC(inputs: WACCInputs): Result<WACCResult> {
     wacc,
     mode: 'detailed',
     steps,
+    costOfEquity,
+    costOfDebtAfterTax: afterTaxCostOfDebt,
     components: {
       costOfEquity,
       costOfDebt: Rd,

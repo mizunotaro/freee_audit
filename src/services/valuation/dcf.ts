@@ -179,6 +179,8 @@ export function calculateDCF(inputs: DCFInputs): Result<DCFResult> {
 
     const result: DCFResult = {
       enterpriseValue: Math.round(enterpriseValue),
+      terminalValue: Math.round(terminalValue),
+      terminalPV: Math.round(terminalPV),
       currency: inputs.currency || 'JPY',
       unit: inputs.unit || 'million',
       steps,

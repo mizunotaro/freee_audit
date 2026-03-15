@@ -1,31 +1,34 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useCallback } from 'react'
 import { useTranslations } from 'next-intl'
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Play, RefreshCw, AlertCircle, CheckCircle2, Calculator, Sparkles } from 'lucide-react'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { Switch } from '@/components/ui/switch'
 import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
+import { Separator } from '@/components/ui/separator'
+import { ValuationFormulaDisplay } from '@/components/valuation/valuation-formula-display'
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
-import {
-  Calculator,
-  Building2,
-  BarChart3,
-} from 'lucide-react'
+  calculateDCF,
+  calculateWACC,
+  runMonteCarloSimulation,
+  type DCFInputs,
+  type DCFResult,
+  type WACCInputs,
+  type WACCResult,
+  type MonteCarloInputs,
+  type MonteCarloResult,
+  type CalculationStep,
+} from '@/services/valuation'
 
-interface DCFInputs {
+type WACCMode = 'simple' | 'detailed'
+
+interface DCFInputState {
   freeCashFlow: number
   growthRate: number
   terminalGrowthRate: number
@@ -33,376 +36,623 @@ interface DCFInputs {
   projectionYears: number
 }
 
-interface ComparableData {
-  companyName: string
-  marketCap: number
-  ev: number
-  revenue: number
-  ebitda: number
-  per: number
-  evEbitda: number
-  psr: number
+interface WACCSimpleInputState {
+  waccValue: number
 }
 
-const lifeScienceComparables: ComparableData[] = [
-  { companyName: 'Helios Corp', marketCap: 45000, ev: 48000, revenue: 12000, ebitda: 2400, per: 18.8, evEbitda: 20.0, psr: 3.75 },
-  { companyName: 'BioSignal Labs', marketCap: 28000, ev: 32000, revenue: 8500, ebitda: 1700, per: 16.5, evEbitda: 18.8, psr: 3.29 },
-  { companyName: 'GenomeTech', marketCap: 62000, ev: 68000, revenue: 18000, ebitda: 3600, per: 17.2, evEbitda: 18.9, psr: 3.44 },
-  { companyName: 'CellMedicine', marketCap: 35000, ev: 38000, revenue: 9500, ebitda: 1900, per: 18.4, evEbitda: 20.0, psr: 3.68 },
-  { companyName: 'ProteinEng', marketCap: 52000, ev: 56000, revenue: 15000, ebitda: 3000, per: 17.3, evEbitda: 18.7, psr: 3.47 },
-]
-
-function calculateDCF(inputs: DCFInputs): { enterpriseValue: number; presentValues: number[] } {
-  const { freeCashFlow, growthRate, terminalGrowthRate, discountRate, projectionYears } = inputs
-  const presentValues: number[] = []
-  let enterpriseValue = 0
-
-  for (let year = 1; year <= projectionYears; year++) {
-    const fcf = freeCashFlow * Math.pow(1 + growthRate / 100, year)
-    const pv = fcf / Math.pow(1 + discountRate / 100, year)
-    presentValues.push(pv)
-    enterpriseValue += pv
-  }
-
-  const terminalFcf = freeCashFlow * Math.pow(1 + growthRate / 100, projectionYears) * (1 + terminalGrowthRate / 100)
-  const terminalValue = terminalFcf / (discountRate / 100 - terminalGrowthRate / 100)
-  const terminalPV = terminalValue / Math.pow(1 + discountRate / 100, projectionYears)
-  enterpriseValue += terminalPV
-
-  return { enterpriseValue, presentValues }
+interface WACCDetailedInputState {
+  riskFreeRate: number
+  marketRiskPremium: number
+  beta: number
+  costOfDebt: number
+  taxRate: number
+  debtRatio: number
 }
 
 export default function ValuationPage() {
-  const t = useTranslations('navigation')
-  const [dcfInputs, setDcfInputs] = useState<DCFInputs>({
-    freeCashFlow: 2000,
-    growthRate: 15,
-    terminalGrowthRate: 3,
-    discountRate: 12,
+  const t = useTranslations('valuation')
+
+  const [dcfInputs, setDcfInputs] = useState<DCFInputState>({
+    freeCashFlow: 1000,
+    growthRate: 5,
+    terminalGrowthRate: 2,
+    discountRate: 10,
     projectionYears: 5,
   })
 
-  const [selectedComparable, setSelectedComparable] = useState<string>('average')
-  const [targetRevenue, setTargetRevenue] = useState<number>(10000)
-  const [targetEbitda, setTargetEbitda] = useState<number>(2000)
+  const [waccMode, setWaccMode] = useState<WACCMode>('simple')
+  const [waccSimpleInputs, setWaccSimpleInputs] = useState<WACCSimpleInputState>({
+    waccValue: 10,
+  })
+  const [waccDetailedInputs, setWaccDetailedInputs] = useState<WACCDetailedInputState>({
+    riskFreeRate: 1.0,
+    marketRiskPremium: 6.0,
+    beta: 1.0,
+    costOfDebt: 3.0,
+    taxRate: 30.0,
+    debtRatio: 30.0,
+  })
 
-  const dcfResult = calculateDCF(dcfInputs)
+  const [dcfResult, setDcfResult] = useState<DCFResult | null>(null)
+  const [waccResult, setWaccResult] = useState<WACCResult | null>(null)
+  const [monteCarloResult, setMonteCarloResult] = useState<MonteCarloResult | null>(null)
+  const [calculationSteps, setCalculationSteps] = useState<CalculationStep[]>([])
 
-  const getComparableMultiples = () => {
-    if (selectedComparable === 'average') {
-      const avgPer = lifeScienceComparables.reduce((sum, c) => sum + c.per, 0) / lifeScienceComparables.length
-      const avgEvEbitda = lifeScienceComparables.reduce((sum, c) => sum + c.evEbitda, 0) / lifeScienceComparables.length
-      const avgPsr = lifeScienceComparables.reduce((sum, c) => sum + c.psr, 0) / lifeScienceComparables.length
-      return { per: avgPer, evEbitda: avgEvEbitda, psr: avgPsr }
+  const [isCalculating, setIsCalculating] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const handleCalculateDCF = useCallback(async () => {
+    setIsCalculating(true)
+    setError(null)
+    setCalculationSteps([])
+
+    try {
+      const inputs: DCFInputs = {
+        freeCashFlow: dcfInputs.freeCashFlow,
+        growthRate: dcfInputs.growthRate / 100,
+        terminalGrowthRate: dcfInputs.terminalGrowthRate / 100,
+        discountRate: dcfInputs.discountRate / 100,
+        projectionYears: dcfInputs.projectionYears,
+        currency: 'JPY',
+        unit: 'million',
+      }
+
+      const result = calculateDCF(inputs)
+
+      if (result.success) {
+        setDcfResult(result.data)
+        setCalculationSteps(result.data.steps)
+      } else {
+        setError(result.error.message)
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An error occurred')
+    } finally {
+      setIsCalculating(false)
     }
-    const comp = lifeScienceComparables.find(c => c.companyName === selectedComparable)
-    return comp ? { per: comp.per, evEbitda: comp.evEbitda, psr: comp.psr } : { per: 0, evEbitda: 0, psr: 0 }
+  }, [dcfInputs])
+
+  const handleCalculateWACC = useCallback(async () => {
+    setIsCalculating(true)
+    setError(null)
+
+    try {
+      let inputs: WACCInputs
+
+      if (waccMode === 'simple') {
+        inputs = {
+          mode: 'simple',
+          simpleWACC: waccSimpleInputs.waccValue / 100,
+        }
+      } else {
+        inputs = {
+          mode: 'detailed',
+          riskFreeRate: waccDetailedInputs.riskFreeRate / 100,
+          marketRiskPremium: waccDetailedInputs.marketRiskPremium / 100,
+          beta: waccDetailedInputs.beta,
+          costOfDebt: waccDetailedInputs.costOfDebt / 100,
+          taxRate: waccDetailedInputs.taxRate / 100,
+          debtRatio: waccDetailedInputs.debtRatio / 100,
+        }
+      }
+
+      const result = calculateWACC(inputs)
+
+      if (result.success) {
+        setWaccResult(result.data)
+      } else {
+        setError(result.error.message)
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An error occurred')
+    } finally {
+      setIsCalculating(false)
+    }
+  }, [waccMode, waccSimpleInputs, waccDetailedInputs])
+
+  const handleRunMonteCarlo = useCallback(async () => {
+    setIsCalculating(true)
+    setError(null)
+
+    try {
+      const inputs: MonteCarloInputs = {
+        iterations: 1000,
+        baseInputs: {
+          freeCashFlow: dcfInputs.freeCashFlow,
+          growthRate: dcfInputs.growthRate / 100,
+          terminalGrowthRate: dcfInputs.terminalGrowthRate / 100,
+          discountRate: dcfInputs.discountRate / 100,
+          projectionYears: dcfInputs.projectionYears,
+          currency: 'JPY',
+          unit: 'million',
+        },
+        distributions: {
+          growthRate: {
+            type: 'normal',
+            params: { mean: dcfInputs.growthRate / 100, stdDev: 0.03 },
+          },
+          terminalGrowthRate: {
+            type: 'normal',
+            params: { mean: dcfInputs.terminalGrowthRate / 100, stdDev: 0.015 },
+          },
+          discountRate: {
+            type: 'normal',
+            params: { mean: dcfInputs.discountRate / 100, stdDev: 0.02 },
+          },
+        },
+      }
+
+      const result = runMonteCarloSimulation(inputs)
+
+      if (result.success) {
+        setMonteCarloResult(result.data)
+      } else {
+        setError(result.error.message)
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An error occurred')
+    } finally {
+      setIsCalculating(false)
+    }
+  }, [dcfInputs])
+
+  const formatCurrency = (value: number): string => {
+    return `${value.toLocaleString('en-US', { maximumFractionDigits: 2 })} MM JPY`
   }
 
-  const multiples = getComparableMultiples()
-  const comparableValuation = {
-    per: targetEbitda * 0.5 * multiples.per,
-    evEbitda: targetEbitda * multiples.evEbitda,
-    psr: targetRevenue * multiples.psr,
+  const formatPercent = (value: number): string => {
+    return `${(value * 100).toFixed(2)}%`
   }
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold">{t('valuation')}</h1>
-        <p className="text-muted-foreground">DCF & Comparable Company Analysis</p>
+    <div className="container mx-auto space-y-6 py-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">
+            {t('title') || 'Business Valuation'}
+          </h1>
+          <p className="text-muted-foreground">
+            {t('description') || 'Enterprise value estimation using multiple methodologies'}
+          </p>
+        </div>
+        <Badge variant="outline" className="text-sm">
+          <Calculator className="mr-2 h-4 w-4" />
+          v1.0.0
+        </Badge>
       </div>
 
+      {error && (
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Error</AlertTitle>
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
+
       <Tabs defaultValue="dcf" className="space-y-4">
-        <TabsList>
-          <TabsTrigger value="dcf">
-            <Calculator className="mr-2 h-4 w-4" />
-            DCF Method
-          </TabsTrigger>
-          <TabsTrigger value="comparable">
-            <Building2 className="mr-2 h-4 w-4" />
-            Comparable Companies
-          </TabsTrigger>
-          <TabsTrigger value="summary">
-            <BarChart3 className="mr-2 h-4 w-4" />
-            Summary
-          </TabsTrigger>
+        <TabsList className="grid w-full grid-cols-3">
+          <TabsTrigger value="dcf">DCF Analysis</TabsTrigger>
+          <TabsTrigger value="wacc">WACC Calculator</TabsTrigger>
+          <TabsTrigger value="monte-carlo">Monte Carlo</TabsTrigger>
         </TabsList>
 
         <TabsContent value="dcf" className="space-y-4">
-          <div className="grid gap-4 md:grid-cols-2">
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
             <Card>
               <CardHeader>
-                <CardTitle>DCF Parameters</CardTitle>
-                <CardDescription>Free Cash Flow Discount Model Inputs</CardDescription>
+                <CardTitle>DCF Inputs</CardTitle>
+                <CardDescription>
+                  Enter the parameters for discounted cash flow analysis
+                </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="fcf">Free Cash Flow (MM JPY)</Label>
-                  <Input
-                    id="fcf"
-                    type="number"
-                    value={dcfInputs.freeCashFlow}
-                    onChange={(e) => setDcfInputs({ ...dcfInputs, freeCashFlow: Number(e.target.value) })}
-                  />
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Free Cash Flow (MM JPY)</Label>
+                    <Input
+                      type="number"
+                      value={dcfInputs.freeCashFlow}
+                      onChange={(e) =>
+                        setDcfInputs({ ...dcfInputs, freeCashFlow: Number(e.target.value) })
+                      }
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Growth Rate (%)</Label>
+                    <Input
+                      type="number"
+                      value={dcfInputs.growthRate}
+                      onChange={(e) =>
+                        setDcfInputs({ ...dcfInputs, growthRate: Number(e.target.value) })
+                      }
+                      step="0.5"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Terminal Growth (%)</Label>
+                    <Input
+                      type="number"
+                      value={dcfInputs.terminalGrowthRate}
+                      onChange={(e) =>
+                        setDcfInputs({ ...dcfInputs, terminalGrowthRate: Number(e.target.value) })
+                      }
+                      step="0.5"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Discount Rate (%)</Label>
+                    <Input
+                      type="number"
+                      value={dcfInputs.discountRate}
+                      onChange={(e) =>
+                        setDcfInputs({ ...dcfInputs, discountRate: Number(e.target.value) })
+                      }
+                      step="0.5"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Projection Years</Label>
+                    <Input
+                      type="number"
+                      value={dcfInputs.projectionYears}
+                      onChange={(e) =>
+                        setDcfInputs({ ...dcfInputs, projectionYears: Number(e.target.value) })
+                      }
+                      min="1"
+                      max="20"
+                    />
+                  </div>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="growthRate">Growth Rate (%)</Label>
-                  <Input
-                    id="growthRate"
-                    type="number"
-                    value={dcfInputs.growthRate}
-                    onChange={(e) => setDcfInputs({ ...dcfInputs, growthRate: Number(e.target.value) })}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="terminalGrowth">Terminal Growth Rate (%)</Label>
-                  <Input
-                    id="terminalGrowth"
-                    type="number"
-                    value={dcfInputs.terminalGrowthRate}
-                    onChange={(e) => setDcfInputs({ ...dcfInputs, terminalGrowthRate: Number(e.target.value) })}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="discountRate">Discount Rate (WACC) (%)</Label>
-                  <Input
-                    id="discountRate"
-                    type="number"
-                    value={dcfInputs.discountRate}
-                    onChange={(e) => setDcfInputs({ ...dcfInputs, discountRate: Number(e.target.value) })}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="years">Projection Period (Years)</Label>
-                  <Input
-                    id="years"
-                    type="number"
-                    value={dcfInputs.projectionYears}
-                    onChange={(e) => setDcfInputs({ ...dcfInputs, projectionYears: Number(e.target.value) })}
-                  />
-                </div>
+
+                <Button onClick={handleCalculateDCF} disabled={isCalculating} className="w-full">
+                  {isCalculating ? (
+                    <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <Play className="mr-2 h-4 w-4" />
+                  )}
+                  Calculate DCF
+                </Button>
               </CardContent>
             </Card>
 
             <Card>
               <CardHeader>
-                <CardTitle>DCF Valuation Result</CardTitle>
-                <CardDescription>Enterprise Value Calculation</CardDescription>
+                <CardTitle>DCF Result</CardTitle>
+                <CardDescription>
+                  Enterprise value based on discounted future cash flows
+                </CardDescription>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="rounded-lg bg-primary/10 p-4">
-                  <div className="text-sm text-muted-foreground">Estimated Enterprise Value</div>
-                  <div className="text-3xl font-bold text-primary">
-                    {Math.round(dcfResult.enterpriseValue).toLocaleString()} MM JPY
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <div className="text-sm font-medium">Present Value by Period</div>
-                  {dcfResult.presentValues.map((pv, index) => (
-                    <div key={index} className="flex justify-between text-sm">
-                      <span>Year {index + 1}</span>
-                      <span>{Math.round(pv).toLocaleString()} MM JPY</span>
+              <CardContent>
+                {dcfResult ? (
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="rounded-lg border p-4">
+                        <div className="text-sm text-muted-foreground">Enterprise Value</div>
+                        <div className="text-2xl font-bold text-primary">
+                          {formatCurrency(dcfResult.enterpriseValue)}
+                        </div>
+                      </div>
+                      <div className="rounded-lg border p-4">
+                        <div className="text-sm text-muted-foreground">Terminal Value (PV)</div>
+                        <div className="text-2xl font-bold">
+                          {formatCurrency(dcfResult.terminalPV)}
+                        </div>
+                      </div>
                     </div>
-                  ))}
-                </div>
+                    <Separator />
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <CheckCircle2 className="h-4 w-4 text-green-500" />
+                      Calculated at {dcfResult.metadata.calculatedAt}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex h-32 items-center justify-center text-muted-foreground">
+                    Enter inputs and click Calculate
+                  </div>
+                )}
               </CardContent>
             </Card>
           </div>
+
+          {calculationSteps.length > 0 && (
+            <ValuationFormulaDisplay steps={calculationSteps} title="DCF Calculation Steps" />
+          )}
         </TabsContent>
 
-        <TabsContent value="comparable" className="space-y-4">
-          <div className="grid gap-4 md:grid-cols-2">
+        <TabsContent value="wacc" className="space-y-4">
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
             <Card>
               <CardHeader>
-                <CardTitle>Comparable Company Selection</CardTitle>
-                <CardDescription>Life Science Industry Listed Companies</CardDescription>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle>WACC Calculator</CardTitle>
+                    <CardDescription>Weighted Average Cost of Capital</CardDescription>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Label htmlFor="wacc-mode" className="text-sm">
+                      Detailed
+                    </Label>
+                    <Switch
+                      id="wacc-mode"
+                      checked={waccMode === 'detailed'}
+                      onCheckedChange={(checked) => setWaccMode(checked ? 'detailed' : 'simple')}
+                    />
+                  </div>
+                </div>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <Label>Comparison Target</Label>
-                  <Select value={selectedComparable} onValueChange={setSelectedComparable}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="average">Industry Average</SelectItem>
-                      {lifeScienceComparables.map((c) => (
-                        <SelectItem key={c.companyName} value={c.companyName}>
-                          {c.companyName}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="targetRevenue">Target Revenue (MM JPY)</Label>
-                  <Input
-                    id="targetRevenue"
-                    type="number"
-                    value={targetRevenue}
-                    onChange={(e) => setTargetRevenue(Number(e.target.value))}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="targetEbitda">Target EBITDA (MM JPY)</Label>
-                  <Input
-                    id="targetEbitda"
-                    type="number"
-                    value={targetEbitda}
-                    onChange={(e) => setTargetEbitda(Number(e.target.value))}
-                  />
-                </div>
+                {waccMode === 'simple' ? (
+                  <div className="space-y-2">
+                    <Label>WACC (%)</Label>
+                    <Input
+                      type="number"
+                      value={waccSimpleInputs.waccValue}
+                      onChange={(e) => setWaccSimpleInputs({ waccValue: Number(e.target.value) })}
+                      step="0.5"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Enter the discount rate directly for quick analysis
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    <div className="rounded-lg bg-muted/50 p-3">
+                      <div className="mb-2 flex items-center gap-2 text-sm font-medium">
+                        <Sparkles className="h-4 w-4 text-yellow-500" />
+                        CAPM-Based Calculation
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        Cost of Equity = Risk-Free Rate + Beta × Market Risk Premium
+                      </p>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label>Risk-Free Rate (%)</Label>
+                        <Input
+                          type="number"
+                          value={waccDetailedInputs.riskFreeRate}
+                          onChange={(e) =>
+                            setWaccDetailedInputs({
+                              ...waccDetailedInputs,
+                              riskFreeRate: Number(e.target.value),
+                            })
+                          }
+                          step="0.1"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Market Risk Premium (%)</Label>
+                        <Input
+                          type="number"
+                          value={waccDetailedInputs.marketRiskPremium}
+                          onChange={(e) =>
+                            setWaccDetailedInputs({
+                              ...waccDetailedInputs,
+                              marketRiskPremium: Number(e.target.value),
+                            })
+                          }
+                          step="0.1"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Beta (β)</Label>
+                        <Input
+                          type="number"
+                          value={waccDetailedInputs.beta}
+                          onChange={(e) =>
+                            setWaccDetailedInputs({
+                              ...waccDetailedInputs,
+                              beta: Number(e.target.value),
+                            })
+                          }
+                          step="0.1"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Cost of Debt (%)</Label>
+                        <Input
+                          type="number"
+                          value={waccDetailedInputs.costOfDebt}
+                          onChange={(e) =>
+                            setWaccDetailedInputs({
+                              ...waccDetailedInputs,
+                              costOfDebt: Number(e.target.value),
+                            })
+                          }
+                          step="0.1"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Tax Rate (%)</Label>
+                        <Input
+                          type="number"
+                          value={waccDetailedInputs.taxRate}
+                          onChange={(e) =>
+                            setWaccDetailedInputs({
+                              ...waccDetailedInputs,
+                              taxRate: Number(e.target.value),
+                            })
+                          }
+                          step="1"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Debt Ratio (%)</Label>
+                        <Input
+                          type="number"
+                          value={waccDetailedInputs.debtRatio}
+                          onChange={(e) =>
+                            setWaccDetailedInputs({
+                              ...waccDetailedInputs,
+                              debtRatio: Number(e.target.value),
+                            })
+                          }
+                          step="1"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                <Button onClick={handleCalculateWACC} disabled={isCalculating} className="w-full">
+                  {isCalculating ? (
+                    <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <Play className="mr-2 h-4 w-4" />
+                  )}
+                  Calculate WACC
+                </Button>
               </CardContent>
             </Card>
 
             <Card>
               <CardHeader>
-                <CardTitle>Multiples</CardTitle>
-                <CardDescription>Selected Comparable Company Metrics</CardDescription>
+                <CardTitle>WACC Result</CardTitle>
+                <CardDescription>Calculated weighted average cost of capital</CardDescription>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-3 gap-4">
-                  <div className="rounded-lg bg-muted p-3 text-center">
-                    <div className="text-xs text-muted-foreground">P/E</div>
-                    <div className="text-lg font-bold">{multiples.per.toFixed(1)}x</div>
+              <CardContent>
+                {waccResult ? (
+                  <div className="space-y-4">
+                    <div className="rounded-lg border p-4 text-center">
+                      <div className="text-sm text-muted-foreground">WACC</div>
+                      <div className="text-3xl font-bold text-primary">
+                        {formatPercent(waccResult.wacc)}
+                      </div>
+                    </div>
+                    {waccResult.components && (
+                      <div className="grid grid-cols-2 gap-2 text-sm">
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Cost of Equity:</span>
+                          <span>{formatPercent(waccResult.components.costOfEquity)}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">After-Tax Cost of Debt:</span>
+                          <span>{formatPercent(waccResult.components.afterTaxCostOfDebt)}</span>
+                        </div>
+                      </div>
+                    )}
+                    <Separator />
+                    <Badge variant="outline">
+                      Mode: {waccResult.mode === 'detailed' ? 'CAPM-Based' : 'Simple'}
+                    </Badge>
                   </div>
-                  <div className="rounded-lg bg-muted p-3 text-center">
-                    <div className="text-xs text-muted-foreground">EV/EBITDA</div>
-                    <div className="text-lg font-bold">{multiples.evEbitda.toFixed(1)}x</div>
+                ) : (
+                  <div className="flex h-32 items-center justify-center text-muted-foreground">
+                    Enter inputs and click Calculate
                   </div>
-                  <div className="rounded-lg bg-muted p-3 text-center">
-                    <div className="text-xs text-muted-foreground">P/S</div>
-                    <div className="text-lg font-bold">{multiples.psr.toFixed(2)}x</div>
-                  </div>
-                </div>
-                <div className="space-y-2 pt-4">
-                  <div className="flex justify-between text-sm">
-                    <span>P/E Valuation</span>
-                    <span className="font-medium">{Math.round(comparableValuation.per).toLocaleString()} MM JPY</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span>EV/EBITDA Valuation</span>
-                    <span className="font-medium">{Math.round(comparableValuation.evEbitda).toLocaleString()} MM JPY</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span>P/S Valuation</span>
-                    <span className="font-medium">{Math.round(comparableValuation.psr).toLocaleString()} MM JPY</span>
-                  </div>
-                </div>
+                )}
               </CardContent>
             </Card>
           </div>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Comparable Companies List</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b">
-                      <th className="p-2 text-left">Company</th>
-                      <th className="p-2 text-right">Market Cap</th>
-                      <th className="p-2 text-right">EV</th>
-                      <th className="p-2 text-right">Revenue</th>
-                      <th className="p-2 text-right">EBITDA</th>
-                      <th className="p-2 text-right">P/E</th>
-                      <th className="p-2 text-right">EV/EBITDA</th>
-                      <th className="p-2 text-right">P/S</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {lifeScienceComparables.map((c) => (
-                      <tr key={c.companyName} className="border-b">
-                        <td className="p-2">{c.companyName}</td>
-                        <td className="p-2 text-right">{c.marketCap.toLocaleString()}</td>
-                        <td className="p-2 text-right">{c.ev.toLocaleString()}</td>
-                        <td className="p-2 text-right">{c.revenue.toLocaleString()}</td>
-                        <td className="p-2 text-right">{c.ebitda.toLocaleString()}</td>
-                        <td className="p-2 text-right">{c.per.toFixed(1)}</td>
-                        <td className="p-2 text-right">{c.evEbitda.toFixed(1)}</td>
-                        <td className="p-2 text-right">{c.psr.toFixed(2)}</td>
-                      </tr>
-                    ))}
-                    <tr className="bg-muted/50 font-medium">
-                      <td className="p-2">Average</td>
-                      <td className="p-2 text-right">{Math.round(lifeScienceComparables.reduce((s, c) => s + c.marketCap, 0) / lifeScienceComparables.length).toLocaleString()}</td>
-                      <td className="p-2 text-right">{Math.round(lifeScienceComparables.reduce((s, c) => s + c.ev, 0) / lifeScienceComparables.length).toLocaleString()}</td>
-                      <td className="p-2 text-right">{Math.round(lifeScienceComparables.reduce((s, c) => s + c.revenue, 0) / lifeScienceComparables.length).toLocaleString()}</td>
-                      <td className="p-2 text-right">{Math.round(lifeScienceComparables.reduce((s, c) => s + c.ebitda, 0) / lifeScienceComparables.length).toLocaleString()}</td>
-                      <td className="p-2 text-right">{(lifeScienceComparables.reduce((s, c) => s + c.per, 0) / lifeScienceComparables.length).toFixed(1)}</td>
-                      <td className="p-2 text-right">{(lifeScienceComparables.reduce((s, c) => s + c.evEbitda, 0) / lifeScienceComparables.length).toFixed(1)}</td>
-                      <td className="p-2 text-right">{(lifeScienceComparables.reduce((s, c) => s + c.psr, 0) / lifeScienceComparables.length).toFixed(2)}</td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-            </CardContent>
-          </Card>
+          {waccResult && waccResult.steps.length > 0 && (
+            <ValuationFormulaDisplay steps={waccResult.steps} title="WACC Calculation Steps" />
+          )}
         </TabsContent>
 
-        <TabsContent value="summary" className="space-y-4">
-          <div className="grid gap-4 md:grid-cols-3">
+        <TabsContent value="monte-carlo" className="space-y-4">
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
             <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium">DCF Method</CardTitle>
+              <CardHeader>
+                <CardTitle>Monte Carlo Simulation</CardTitle>
+                <CardDescription>Probabilistic valuation with 1,000 iterations</CardDescription>
               </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-green-600">
-                  {Math.round(dcfResult.enterpriseValue).toLocaleString()} MM JPY
-                </div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium">Comparable (EV/EBITDA)</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-blue-600">
-                  {Math.round(comparableValuation.evEbitda).toLocaleString()} MM JPY
-                </div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium">Valuation Range</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-purple-600">
-                  {Math.round(Math.min(dcfResult.enterpriseValue, comparableValuation.evEbitda)).toLocaleString()} - {Math.round(Math.max(dcfResult.enterpriseValue, comparableValuation.evEbitda)).toLocaleString()} MM JPY
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Valuation Summary</CardTitle>
-              <CardDescription>Integrated Enterprise Valuation</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div className="rounded-lg border p-4">
-                  <div className="mb-2 font-medium">Valuation Assumptions</div>
-                  <ul className="text-sm text-muted-foreground space-y-1">
-                    <li>Projection Period: {dcfInputs.projectionYears} years</li>
-                    <li>Growth Rate: Initial {dcfInputs.growthRate}% / Terminal {dcfInputs.terminalGrowthRate}%</li>
-                    <li>Discount Rate (WACC): {dcfInputs.discountRate}%</li>
-                    <li>Industry: Life Science</li>
+              <CardContent className="space-y-4">
+                <div className="rounded-lg bg-muted/50 p-3 text-sm">
+                  <div className="mb-1 font-medium">Distribution Parameters</div>
+                  <ul className="space-y-1 text-xs text-muted-foreground">
+                    <li>Growth Rate: μ={dcfInputs.growthRate}%, σ=3%</li>
+                    <li>Terminal Growth: μ={dcfInputs.terminalGrowthRate}%, σ=1.5%</li>
+                    <li>Discount Rate: μ={dcfInputs.discountRate}%, σ=2%</li>
                   </ul>
                 </div>
-                <div className="rounded-lg bg-primary/10 p-4">
-                  <div className="mb-2 font-medium">Estimated Enterprise Value (Weighted Average)</div>
-                  <div className="text-2xl font-bold">
-                    {Math.round((dcfResult.enterpriseValue * 0.6 + comparableValuation.evEbitda * 0.4)).toLocaleString()} MM JPY
+
+                <Button onClick={handleRunMonteCarlo} disabled={isCalculating} className="w-full">
+                  {isCalculating ? (
+                    <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <Play className="mr-2 h-4 w-4" />
+                  )}
+                  Run Monte Carlo Simulation
+                </Button>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Simulation Results</CardTitle>
+                <CardDescription>Statistical distribution of enterprise values</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {monteCarloResult ? (
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-3 gap-2">
+                      <div className="rounded-lg border p-3 text-center">
+                        <div className="text-xs text-muted-foreground">Mean</div>
+                        <div className="font-bold">
+                          {formatCurrency(monteCarloResult.statistics.mean)}
+                        </div>
+                      </div>
+                      <div className="rounded-lg border p-3 text-center">
+                        <div className="text-xs text-muted-foreground">Median</div>
+                        <div className="font-bold">
+                          {formatCurrency(monteCarloResult.statistics.median)}
+                        </div>
+                      </div>
+                      <div className="rounded-lg border p-3 text-center">
+                        <div className="text-xs text-muted-foreground">Std Dev</div>
+                        <div className="font-bold">
+                          {formatCurrency(monteCarloResult.statistics.stdDev)}
+                        </div>
+                      </div>
+                    </div>
+
+                    <Separator />
+
+                    <div className="space-y-2">
+                      <div className="text-sm font-medium">Percentiles</div>
+                      <div className="grid grid-cols-5 gap-1 text-xs">
+                        <div className="rounded bg-muted p-2 text-center">
+                          <div className="text-muted-foreground">P5</div>
+                          <div>{formatCurrency(monteCarloResult.statistics.percentiles.p5)}</div>
+                        </div>
+                        <div className="rounded bg-muted p-2 text-center">
+                          <div className="text-muted-foreground">P25</div>
+                          <div>{formatCurrency(monteCarloResult.statistics.percentiles.p25)}</div>
+                        </div>
+                        <div className="rounded bg-muted p-2 text-center">
+                          <div className="text-muted-foreground">P50</div>
+                          <div>{formatCurrency(monteCarloResult.statistics.percentiles.p50)}</div>
+                        </div>
+                        <div className="rounded bg-muted p-2 text-center">
+                          <div className="text-muted-foreground">P75</div>
+                          <div>{formatCurrency(monteCarloResult.statistics.percentiles.p75)}</div>
+                        </div>
+                        <div className="rounded bg-muted p-2 text-center">
+                          <div className="text-muted-foreground">P95</div>
+                          <div>{formatCurrency(monteCarloResult.statistics.percentiles.p95)}</div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <Badge variant="outline">{monteCarloResult.iterations} iterations</Badge>
+                      <Badge variant="outline">{monteCarloResult.executionTimeMs}ms</Badge>
+                      <Badge variant="outline">{monteCarloResult.source}</Badge>
+                    </div>
                   </div>
-                  <div className="text-sm text-muted-foreground">DCF 60% / Comparable 40%</div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+                ) : (
+                  <div className="flex h-32 items-center justify-center text-muted-foreground">
+                    Click Run to start simulation
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+
+          {monteCarloResult && monteCarloResult.steps.length > 0 && (
+            <ValuationFormulaDisplay steps={monteCarloResult.steps} title="Monte Carlo Steps" />
+          )}
         </TabsContent>
       </Tabs>
     </div>

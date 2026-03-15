@@ -1,12 +1,14 @@
 import type {
   WACCAdviceRequest,
-  WACCAdviceResponse,
   WACCAdviceItem,
   CalculationStep,
   Result,
   ValuationError,
   INDUSTRY_DEFAULTS as _INDUSTRY_DEFAULTS,
 } from './types'
+import type { WACCAdviceResponse as WACCAdviceResponseType } from './types'
+
+export type WACCAdviceResponse = WACCAdviceResponseType
 
 const _VERSION = '1.0.0'
 
@@ -234,13 +236,49 @@ export function getWACCAdvice(request: WACCAdviceRequest): Result<WACCAdviceResp
     )
 
     const response: WACCAdviceResponse = {
+      industry: normalizedIndustry,
+      confidence,
+      advice: [
+        {
+          parameter: 'Risk-Free Rate',
+          reason: riskFreeRate.rationale,
+          suggested: riskFreeRate.suggested,
+          range: riskFreeRate.range,
+          rationale: riskFreeRate.rationale,
+          dataSource: riskFreeRate.dataSource,
+        },
+        {
+          parameter: 'Market Risk Premium',
+          reason: marketRiskPremium.rationale,
+          suggested: marketRiskPremium.suggested,
+          range: marketRiskPremium.range,
+          rationale: marketRiskPremium.rationale,
+          dataSource: marketRiskPremium.dataSource,
+        },
+        {
+          parameter: 'Beta',
+          reason: beta.rationale,
+          suggested: beta.suggested,
+          range: beta.range,
+          rationale: beta.rationale,
+          dataSource: beta.dataSource,
+        },
+      ],
+      warnings: [],
+      recommendedValues: {
+        riskFreeRate: riskFreeRate.suggested,
+        marketRiskPremium: marketRiskPremium.suggested,
+        beta: beta.suggested,
+        costOfDebt: costOfDebt.suggested,
+        taxRate: taxRateAdvice.suggested,
+        debtRatio: optimalCapitalStructure.suggestedDERatio * 100,
+      },
       riskFreeRate,
       marketRiskPremium,
       beta,
       costOfDebt,
       taxRate: taxRateAdvice,
       optimalCapitalStructure,
-      confidence,
       lastUpdated: new Date().toISOString(),
     }
 
