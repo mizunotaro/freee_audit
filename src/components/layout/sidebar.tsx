@@ -40,6 +40,7 @@ interface NavItem {
   href: string
   icon: React.ComponentType<{ className?: string }>
   requiredRole?: string
+  isChild?: boolean
 }
 
 interface SidebarProps {
@@ -53,21 +54,21 @@ interface SidebarProps {
 
 const navItems: NavItem[] = [
   { key: 'dashboard', href: '/dashboard', icon: LayoutDashboard },
-  { key: 'audit', href: '/audit/journals', icon: FileCheck },
-  { key: 'conversion', href: '/conversion/projects', icon: ArrowLeftRight },
-  { key: 'valuation', href: '/valuation', icon: TrendingUp },
-  { key: 'financialDD', href: '/financial-dd', icon: SearchCheck },
   { key: 'journalProposal', href: '/journal-proposal', icon: Sparkles, requiredRole: 'ACCOUNTANT' },
-  { key: 'reports', href: '/reports', icon: BarChart3 },
-  { key: 'periodicReports', href: '/reports/periodic', icon: TrendingUp },
-  { key: 'budgets', href: '/budgets', icon: Wallet },
-  { key: 'kpiSettings', href: '/settings/kpi', icon: BarChart3 },
-  { key: 'inventory', href: '/inventory', icon: Package },
-  { key: 'tax', href: '/tax', icon: Receipt },
+  { key: 'monthlyReport', href: '/reports/monthly', icon: BarChart3 },
+  { key: 'periodicComparison', href: '/reports/periodic', icon: TrendingUp },
+  { key: 'budget', href: '/reports/budget', icon: Wallet },
   { key: 'board', href: '/board', icon: Users },
   { key: 'businessReport', href: '/reports/business', icon: FileText },
+  { key: 'kpiSettings', href: '/settings/kpi', icon: BarChart3 },
+  { key: 'audit', href: '/audit/journals', icon: FileCheck },
+  { key: 'valuation', href: '/valuation', icon: TrendingUp },
+  { key: 'financialDD', href: '/financial-dd', icon: SearchCheck, isChild: true },
+  { key: 'deferredAccrual', href: '/deferred-accrual', icon: Calculator, isChild: true },
+  { key: 'conversion', href: '/conversion/projects', icon: ArrowLeftRight },
+  { key: 'tax', href: '/tax', icon: Receipt },
   { key: 'socialInsurance', href: '/social-insurance', icon: Shield },
-  { key: 'deferredAccrual', href: '/deferred-accrual', icon: Calculator },
+  { key: 'inventory', href: '/inventory', icon: Package },
   { key: 'settings', href: '/settings', icon: Settings },
 ]
 
@@ -108,6 +109,7 @@ export function Sidebar({ user, locale }: SidebarProps) {
                 href={href}
                 className={cn(
                   'flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors',
+                  item.isChild && 'ml-4',
                   isActive
                     ? 'bg-primary text-primary-foreground'
                     : 'text-muted-foreground hover:bg-muted hover:text-foreground'

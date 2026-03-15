@@ -3,18 +3,11 @@
 import { useTranslations } from 'next-intl'
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import {
   FileCheck,
   TrendingUp,
   ArrowLeftRight,
-  SearchCheck,
   Sparkles,
   BarChart3,
   Wallet,
@@ -56,7 +49,13 @@ interface DashboardData {
   }>
 }
 
-function QuickAction({ href, icon: Icon, label, description, color = 'text-primary' }: QuickActionProps) {
+function QuickAction({
+  href,
+  icon: Icon,
+  label,
+  description,
+  color = 'text-primary',
+}: QuickActionProps) {
   return (
     <Link
       href={href}
@@ -108,10 +107,45 @@ export default function DashboardPage() {
 
   const quickActions: QuickActionProps[] = [
     {
+      href: '/journal-proposal',
+      icon: Sparkles,
+      label: t('journalProposal'),
+      description: 'AI journal entry suggestions',
+      color: 'text-pink-500',
+    },
+    {
+      href: '/reports/monthly',
+      icon: BarChart3,
+      label: t('monthlyReport'),
+      description: 'Monthly closing reports',
+      color: 'text-cyan-500',
+    },
+    {
+      href: '/reports/periodic',
+      icon: TrendingUp,
+      label: t('periodicComparison'),
+      description: 'Multi-period trend analysis',
+      color: 'text-emerald-500',
+    },
+    {
+      href: '/reports/budget',
+      icon: Wallet,
+      label: t('budget'),
+      description: 'Budget vs actual management',
+      color: 'text-amber-500',
+    },
+    {
+      href: '/board',
+      icon: Users,
+      label: t('board'),
+      description: 'Board meeting materials',
+      color: 'text-indigo-500',
+    },
+    {
       href: '/audit/journals',
       icon: FileCheck,
       label: t('audit'),
-      description: 'Run journal entry audit',
+      description: 'Journal entry audit',
       color: 'text-blue-500',
     },
     {
@@ -129,46 +163,11 @@ export default function DashboardPage() {
       color: 'text-purple-500',
     },
     {
-      href: '/financial-dd',
-      icon: SearchCheck,
-      label: t('financialDD'),
-      description: 'IPO/M&A financial DD',
-      color: 'text-orange-500',
-    },
-    {
-      href: '/journal-proposal',
-      icon: Sparkles,
-      label: t('journalProposal'),
-      description: 'AI journal entry suggestions',
-      color: 'text-pink-500',
-    },
-    {
-      href: '/reports',
-      icon: BarChart3,
-      label: t('reports'),
-      description: 'Monthly & periodic reports',
-      color: 'text-cyan-500',
-    },
-    {
-      href: '/budgets',
-      icon: Wallet,
-      label: t('budgets'),
-      description: 'Budget vs actual management',
-      color: 'text-amber-500',
-    },
-    {
       href: '/tax',
       icon: Calculator,
       label: t('tax'),
       description: 'Tax schedule management',
       color: 'text-red-500',
-    },
-    {
-      href: '/board',
-      icon: Users,
-      label: t('board'),
-      description: 'Board meeting management',
-      color: 'text-indigo-500',
     },
     {
       href: '/settings',
@@ -288,23 +287,38 @@ export default function DashboardPage() {
           <CardContent>
             <div className="space-y-3">
               {data?.milestones?.slice(0, 5).map((m, index) => (
-                <div key={index} className="flex items-center justify-between rounded-lg bg-muted/50 p-3">
+                <div
+                  key={index}
+                  className="flex items-center justify-between rounded-lg bg-muted/50 p-3"
+                >
                   <div className="flex items-center gap-3">
-                    <div className={`h-2 w-2 rounded-full ${
-                      m.status === 'completed' ? 'bg-green-500' :
-                      m.status === 'in_progress' ? 'bg-blue-500' :
-                      'bg-gray-300'
-                    }`} />
+                    <div
+                      className={`h-2 w-2 rounded-full ${
+                        m.status === 'completed'
+                          ? 'bg-green-500'
+                          : m.status === 'in_progress'
+                            ? 'bg-blue-500'
+                            : 'bg-gray-300'
+                      }`}
+                    />
                     <span className="text-sm">{m.milestone}</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="text-xs text-muted-foreground">{m.date}</span>
-                    <span className={`text-xs px-2 py-0.5 rounded-full ${
-                      m.status === 'completed' ? 'bg-green-100 text-green-700' :
-                      m.status === 'in_progress' ? 'bg-blue-100 text-blue-700' :
-                      'bg-gray-100 text-gray-600'
-                    }`}>
-                      {m.status === 'completed' ? '完了' : m.status === 'in_progress' ? '進行中' : '計画'}
+                    <span
+                      className={`rounded-full px-2 py-0.5 text-xs ${
+                        m.status === 'completed'
+                          ? 'bg-green-100 text-green-700'
+                          : m.status === 'in_progress'
+                            ? 'bg-blue-100 text-blue-700'
+                            : 'bg-gray-100 text-gray-600'
+                      }`}
+                    >
+                      {m.status === 'completed'
+                        ? '完了'
+                        : m.status === 'in_progress'
+                          ? '進行中'
+                          : '計画'}
                     </span>
                   </div>
                 </div>
@@ -315,35 +329,45 @@ export default function DashboardPage() {
                       <div className="h-2 w-2 rounded-full bg-green-500" />
                       <span className="text-sm">Series A Closing</span>
                     </div>
-                    <span className="text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-700">完了</span>
+                    <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs text-green-700">
+                      完了
+                    </span>
                   </div>
                   <div className="flex items-center justify-between rounded-lg bg-muted/50 p-3">
                     <div className="flex items-center gap-3">
                       <div className="h-2 w-2 rounded-full bg-green-500" />
                       <span className="text-sm">Lead Compound Selection</span>
                     </div>
-                    <span className="text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-700">完了</span>
+                    <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs text-green-700">
+                      完了
+                    </span>
                   </div>
                   <div className="flex items-center justify-between rounded-lg bg-muted/50 p-3">
                     <div className="flex items-center gap-3">
                       <div className="h-2 w-2 rounded-full bg-blue-500" />
                       <span className="text-sm">GLP Toxicology Study</span>
                     </div>
-                    <span className="text-xs px-2 py-0.5 rounded-full bg-blue-100 text-blue-700">進行中</span>
+                    <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs text-blue-700">
+                      進行中
+                    </span>
                   </div>
                   <div className="flex items-center justify-between rounded-lg bg-muted/50 p-3">
                     <div className="flex items-center gap-3">
                       <div className="h-2 w-2 rounded-full bg-gray-300" />
                       <span className="text-sm">IND Submission</span>
                     </div>
-                    <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">計画</span>
+                    <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-600">
+                      計画
+                    </span>
                   </div>
                   <div className="flex items-center justify-between rounded-lg bg-muted/50 p-3">
                     <div className="flex items-center gap-3">
                       <div className="h-2 w-2 rounded-full bg-gray-300" />
                       <span className="text-sm">Phase 1 Trial Start</span>
                     </div>
-                    <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">計画</span>
+                    <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-600">
+                      計画
+                    </span>
                   </div>
                 </>
               )}
@@ -361,12 +385,12 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
-              <div className="grid grid-cols-3 gap-2 text-xs text-muted-foreground font-medium">
+              <div className="grid grid-cols-3 gap-2 text-xs font-medium text-muted-foreground">
                 <span>Company</span>
                 <span className="text-right">Stage</span>
                 <span className="text-right">Runway</span>
               </div>
-              <div className="flex items-center justify-between rounded-lg bg-primary/5 p-3 border border-primary/20">
+              <div className="flex items-center justify-between rounded-lg border border-primary/20 bg-primary/5 p-3">
                 <span className="text-sm font-medium">Sample Therapeutics</span>
                 <span className="text-xs text-primary">IND Prep</span>
                 <span className="text-sm font-bold text-primary">24 mo</span>

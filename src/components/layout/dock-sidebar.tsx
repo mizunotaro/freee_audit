@@ -39,6 +39,7 @@ interface NavItem {
   href: string
   icon: React.ComponentType<{ className?: string }>
   requiredRole?: string
+  isChild?: boolean
 }
 
 interface DockSidebarProps {
@@ -52,21 +53,21 @@ interface DockSidebarProps {
 
 const navItems: NavItem[] = [
   { key: 'dashboard', href: '/dashboard', icon: LayoutDashboard },
-  { key: 'audit', href: '/audit/journals', icon: FileCheck },
-  { key: 'conversion', href: '/conversion/projects', icon: ArrowLeftRight },
-  { key: 'valuation', href: '/valuation', icon: TrendingUp },
-  { key: 'financialDD', href: '/financial-dd', icon: SearchCheck },
   { key: 'journalProposal', href: '/journal-proposal', icon: Sparkles, requiredRole: 'ACCOUNTANT' },
-  { key: 'reports', href: '/reports', icon: BarChart3 },
-  { key: 'periodicReports', href: '/reports/periodic', icon: TrendingUp },
-  { key: 'budgets', href: '/budgets', icon: Wallet },
-  { key: 'kpiSettings', href: '/settings/kpi', icon: BarChart3 },
-  { key: 'inventory', href: '/inventory', icon: Package },
-  { key: 'tax', href: '/tax', icon: Receipt },
+  { key: 'monthlyReport', href: '/reports/monthly', icon: BarChart3 },
+  { key: 'periodicComparison', href: '/reports/periodic', icon: TrendingUp },
+  { key: 'budget', href: '/reports/budget', icon: Wallet },
   { key: 'board', href: '/board', icon: Users },
   { key: 'businessReport', href: '/reports/business', icon: FileText },
+  { key: 'kpiSettings', href: '/settings/kpi', icon: BarChart3 },
+  { key: 'audit', href: '/audit/journals', icon: FileCheck },
+  { key: 'valuation', href: '/valuation', icon: TrendingUp },
+  { key: 'financialDD', href: '/financial-dd', icon: SearchCheck, isChild: true },
+  { key: 'deferredAccrual', href: '/deferred-accrual', icon: Calculator, isChild: true },
+  { key: 'conversion', href: '/conversion/projects', icon: ArrowLeftRight },
+  { key: 'tax', href: '/tax', icon: Receipt },
   { key: 'socialInsurance', href: '/social-insurance', icon: Shield },
-  { key: 'deferredAccrual', href: '/deferred-accrual', icon: Calculator },
+  { key: 'inventory', href: '/inventory', icon: Package },
   { key: 'settings', href: '/settings', icon: Settings },
 ]
 
@@ -158,6 +159,7 @@ export function DockSidebar({ user, locale }: DockSidebarProps) {
                     className={cn(
                       'relative flex items-center gap-3 px-4 py-3 transition-colors',
                       'hover:bg-accent hover:text-accent-foreground',
+                      item.isChild && 'ml-4',
                       isActive && 'bg-accent/50'
                     )}
                   >
