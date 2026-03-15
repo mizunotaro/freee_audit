@@ -228,3 +228,231 @@ const res = await fetchWithTimeout(
 - [Next.js 15 Migration Guide](https://nextjs.org/docs/app/building-your-application/upgrading/version-15)
 - [next-intl Documentation](https://next-intl.dev/docs/getting-started/app-router)
 - [Prisma Best Practices](https://www.prisma.io/docs/guides/performance-and-optimization)
+
+---
+
+## 2026-03-15 セッション
+
+### 目標
+freee API連携の型定義修正、認証フローの改善、ダッシュボードの正常動作確認
+
+---
+
+## 問題と解決方法
+
+### 7. freee API型定義の不整合
+
+#### 問題
+- `FreeeTrialBalanceItem` のプロパティ名が実際のAPIレスポンスと一致しない
+- `id`, `name` ではなく `account_item_id`, `account_item_name` が返される
+- `FreeeJournalDetail` 型が存在せず、仕訳明細の型エラーが発生
+
+#### 原因
+- 型定義がfreee APIの実際のレスポンス構造と異なっていた
+- `FreeeJournalEntry` と `FreeeJournalDetail` の使い分けが不明確
+
+#### 解決方法
+```typescript
+// types.ts - 正しい型定義
+export interface FreeeTrialBalanceItem {
+  account_item_id: number        // ✅ 正しい
+  account_item_name: string      // ✅ 正しい
+  hierarchy_level: number
+  opening_balance: number
+  closing_balance: number
+  closing_dr_balance?: number
+  closing_cr_balance?: number
+}
+
+export interface FreeeJournalDetail {
+  id: number
+  account_item_id: number
+  account_item_name: string
+  amount: number
+  vat?: number | null
+  vat_name?: string | null
+  entry_side: 'debit' | 'credit'
+  description?: string
+  receipt_id?: number | null
+  tag_ids?: number[]
+}
+```
+
+---
+
+### 8. middleware.ts の構文エラー
+
+#### 問題
+- `isPublicApiPath` 関数の閉じ括弧が不足
+- TypeScript/ESLintで `',' expected` エラーが発生
+
+#### 原因
+- コード編集中に誤って括弧を削除してしまった
+
+#### 解決方法
+```typescript
+// ❌ エラー
+function isPublicApiPath(pathname: string): boolean {
+  return publicApiPaths.some((path) => pathname === path || pathname.startsWith(`${path}/`)
+}  // 閉じ括弧が1つ足りない
+
+// ✅ 修正
+function isPublicApiPath(pathname: string): boolean {
+  return publicApiPaths.some((path) => pathname === path || pathname.startsWith(`${path}/`))
+}  // 閉じ括弧を追加
+```
+
+---
+
+### 9. 認証フロー: JWTにrole/companyIdが含まれない問題
+
+#### 問題
+- `validateSessionEdge` が常に固定値 `role: 'USER'`, `companyId: null` を返していた
+- 実際のユーザーロールや会社IDが反映されない
+- ダッシュボードでログインなしでアクセスできる状態
+
+#### 原因
+- `generateToken` が userId と sessionId しかJWTに含めていなかった
+- `validateSessionEdge` がJWTのペイロードからrole/companyIdを抽出していなかった
+
+#### 解決方法
+```typescript
+// auth.ts - トークン生成時にrole/companyIdを含める
+export async function generateToken(
+  userId: string,
+  sessionId: string,
+  role: string,
+  companyId: string | null
+): Promise<string> {
+  return jwt.sign(
+    {
+      userId,
+      sessionId,
+      role,           // ✅ 追加
+      companyId,      // ✅ 追加
+      iat: Math.floor(Date.now() / 1000),
+    },
+    JWT_SECRET,
+    { expiresIn: `${SESSION_DURATION_HOURS}h`, issuer: 'freee_audit', audience: 'freee_audit_users' }
+  )
+}
+
+// createSession も更新
+export async function createSession(
+  userId: string,
+  role: string,
+  companyId: string | null
+): Promise<Session> {
+  const sessionId = crypto.randomUUID()
+  const token = await generateToken(userId, sessionId, role, companyId)
+  // ...
+}
+
+// auth-edge.ts - JWTからrole/companyIdを抽出
+interface JwtPayload {
+  userId: string
+  sessionId: string
+  role?: string
+  companyId?: string | null
+  exp?: number
+  iss?: string
+  aud?: string
+}
+
+export async function validateSessionEdge(token: string): Promise<EdgeAuthUser | null> {
+  const decoded = await verifyJwtEdge(token)
+  if (!decoded) return null
+
+  return {
+    id: decoded.userId,
+    role: decoded.role || 'USER',
+    companyId: decoded.companyId || null,
+  }
+}
+```
+
+---
+
+### 10. 重複する型定義の問題
+
+#### 問題
+- `journal-receipt-mapping-service.ts` に同じ型やクラスが複数回定義されていた
+- `FreeeReceipt`, `FreeeDealsResponse`, `FreeeDealParams` などが重複
+
+#### 原因
+- 編集中に誤ってコードブロックが複製されてしまった
+
+#### 解決方法
+- 重複する定義を削除し、types.tsからimportする形に統一
+- クラス定義が2回ある場合は1つを削除
+
+---
+
+### 11. ダッシュボードへの未認証アクセス問題
+
+#### 問題
+- `/ja/dashboard` に直接アクセスすると、ログインしていない状態でもページが表示される
+- 認証チェックが正しく動作していない
+
+#### 原因
+- middleware.ts の `isPublicPath` 判定ロジックに問題があった
+- 非公開パスの場合の認証チェックが逆になっていた
+
+#### 解決方法
+```typescript
+// middleware.ts - 修正後
+if (localeMatch && !isPublicPath(pathname)) {  // ✅ 非公開パスの場合のみチェック
+  const token = request.cookies.get('session')?.value
+  if (!token) {
+    return NextResponse.redirect(new URL(`/${locale}/login`, request.url))
+  }
+
+  const user = await validateSessionEdge(token)
+  if (!user) {
+    const response = NextResponse.redirect(new URL(`/${locale}/login`, request.url))
+    response.cookies.delete('session')
+    return response
+  }
+}
+```
+
+---
+
+### 12. ルートページ ([locale]/page.tsx) の削除
+
+#### 問題
+- `/ja` にアクセスすると、認証済みでもシンプルなHTMLページが表示される
+- サイドバーやチャットウィジェットが表示されない
+
+#### 原因
+- `[locale]/page.tsx` が存在し、`(authenticated)/dashboard/page.tsx` より優先されていた
+- ルートページは認証レイアウトの外にあった
+
+#### 解決方法
+- `[locale]/page.tsx` を削除
+- middleware でルートアクセス時は `/ja/login` にリダイレクト
+- ログイン後は `/ja/dashboard` に遷移
+
+---
+
+## 起動コマンド（最終版）
+
+```powershell
+cd C:\src\freee_audit
+pnpm db:push --force-reset
+pnpm db:seed
+pnpm dev --webpack
+```
+
+## アクセス先
+
+| URL | 説明 |
+|-----|------|
+| http://localhost:3000/ja/login | ログインページ |
+| http://localhost:3000/ja/dashboard | ダッシュボード（認証必要） |
+| http://localhost:3000/reports/monthly | 月次決算資料 |
+
+## ログイン情報
+
+- Email: admin@example.com
+- Password: admin123
