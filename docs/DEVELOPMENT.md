@@ -643,7 +643,78 @@ MAJOR.MINOR.PATCH
 
 ## 8. トラブルシューティング
 
-### 8.1 よくある問題
+### 8.1 Next.js キャッシュクリア・再構築
+
+ルート構造の変更やページ移動後は、Next.jsのキャッシュをクリアして再構築する必要があります。
+
+#### 簡易版（.next キャッシュのみ削除）
+
+```powershell
+# プロジェクトディレクトリに移動
+Set-Location -Path "C:\src\freee_audit"
+
+# .next キャッシュを削除
+Remove-Item -Recurse -Force ".next" -ErrorAction SilentlyContinue
+
+# 開発サーバーを起動
+pnpm dev --webpack
+```
+
+#### 完全版（node_modules も再構築）
+
+依存関係の問題がある場合は、完全な再構築を行ってください：
+
+```powershell
+# プロジェクトディレクトリに移動
+Set-Location -Path "C:\src\freee_audit"
+
+# .next キャッシュを削除
+Remove-Item -Recurse -Force ".next" -ErrorAction SilentlyContinue
+
+# node_modules と pnpm-lock.yaml を削除
+Remove-Item -Recurse -Force "node_modules" -ErrorAction SilentlyContinue
+Remove-Item -Force "pnpm-lock.yaml" -ErrorAction SilentlyContinue
+
+# 依存関係を再インストール
+pnpm install
+
+# 開発サーバーを起動
+pnpm dev --webpack
+```
+
+#### データベースもリセットする場合
+
+開発環境のデータをリセットする場合：
+
+```powershell
+# プロジェクトディレクトリに移動
+Set-Location -Path "C:\src\freee_audit"
+
+# .next キャッシュを削除
+Remove-Item -Recurse -Force ".next" -ErrorAction SilentlyContinue
+
+# データベースをリセット＆シード
+pnpm db:push --force-reset
+pnpm db:seed
+
+# 開発サーバーを起動
+pnpm dev --webpack
+```
+
+#### ワンライナー版（コピー＆ペースト用）
+
+```powershell
+# 簡易版
+cd C:\src\freee_audit; Remove-Item -Recurse -Force .next -ErrorAction SilentlyContinue; pnpm dev --webpack
+
+# 完全版
+cd C:\src\freee_audit; Remove-Item -Recurse -Force .next -ErrorAction SilentlyContinue; Remove-Item -Recurse -Force node_modules -ErrorAction SilentlyContinue; Remove-Item -Force pnpm-lock.yaml -ErrorAction SilentlyContinue; pnpm install; pnpm dev --webpack
+
+# データベースリセット付き
+cd C:\src\freee_audit; Remove-Item -Recurse -Force .next -ErrorAction SilentlyContinue; pnpm db:push --force-reset; pnpm db:seed; pnpm dev --webpack
+```
+
+### 8.2 よくある問題
 
 #### データベース接続エラー
 
@@ -672,7 +743,23 @@ pnpm test --clearCache
 pnpm playwright install --with-deps
 ```
 
-### 8.2 ログ確認
+#### ページが404エラーになる
+
+ルート構造を変更した場合：
+
+```powershell
+# キャッシュをクリアして再起動
+cd C:\src\freee_audit; Remove-Item -Recurse -Force .next -ErrorAction SilentlyContinue; pnpm dev --webpack
+```
+
+#### サイドバーが表示されない
+
+ページが `(authenticated)` ルートグループ外にある場合：
+
+1. ページを `src/app/[locale]/(authenticated)/` 以下に移動
+2. 上記のキャッシュクリアコマンドを実行
+
+### 8.3 ログ確認
 
 ```bash
 # 開発サーバーログ
