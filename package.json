@@ -101,7 +101,7 @@
     "tiktoken": "^1.0.22",
     "uuid": "^9.0.1",
     "vaul": "^1.1.2",
-    "xlsx": "^0.18.5",
+    "exceljs": "^4.4.0",
     "zod": "^3.23.0"
   },
   "devDependencies": {

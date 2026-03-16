@@ -31,10 +31,10 @@ function formatNumber(num: number, decimals: number = 2): string {
 
 export function calculateComparable(inputs: ComparableInputs): Result<ComparableResult> {
   const {
-    targetRevenue,
-    targetEBITDA,
-    targetNetIncome,
-    targetBookValue,
+    targetRevenue: _targetRevenue,
+    targetEBITDA: _targetEBITDA,
+    targetNetIncome: _targetNetIncome,
+    targetBookValue: _targetBookValue,
     selectedMultiples,
     comparableData,
   } = inputs

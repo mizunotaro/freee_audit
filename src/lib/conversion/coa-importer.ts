@@ -1,4 +1,4 @@
-import * as XLSX from 'xlsx'
+import ExcelJS from 'exceljs'
 import type { AccountCategory } from '@/types/conversion'
 import { COAValidator, type ValidationError } from './coa-validator'
 
@@ -267,10 +267,11 @@ export class COAImporter {
     }
 
     const arrayBuffer = await file.arrayBuffer()
-    const workbook = XLSX.read(arrayBuffer, { type: 'array' })
+    const workbook = new ExcelJS.Workbook()
+    await workbook.xlsx.load(arrayBuffer)
 
-    const sheetName = workbook.SheetNames[0]
-    if (!sheetName) {
+    const worksheet = workbook.worksheets[0]
+    if (!worksheet) {
       return {
         success: false,
         items: [],
@@ -285,8 +286,14 @@ export class COAImporter {
       }
     }
 
-    const worksheet = workbook.Sheets[sheetName]
-    const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 }) as unknown[][]
+    const jsonData: unknown[][] = []
+    worksheet.eachRow((row) => {
+      const rowData: unknown[] = []
+      row.eachCell((cell) => {
+        rowData[Number(cell.col) - 1] = cell.value
+      })
+      jsonData.push(rowData)
+    })
 
     if (jsonData.length > MAX_ROWS + 1) {
       return {
