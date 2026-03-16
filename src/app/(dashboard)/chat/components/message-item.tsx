@@ -1,6 +1,7 @@
 'use client'
 
 import { memo, useMemo } from 'react'
+import DOMPurify from 'isomorphic-dompurify'
 import { PersonaIndicator, getPersonaConfig } from './persona-indicator'
 import type { ChatMessage } from '@/app/api/chat/types'
 import { cn } from '@/lib/utils'
@@ -10,15 +11,44 @@ interface MessageItemProps {
   readonly isLast: boolean
 }
 
-function escapeHtml(text: string): string {
-  const map: Record<string, string> = {
-    '&': '&amp;',
-    '<': '&lt;',
-    '>': '&gt;',
-    '"': '&quot;',
-    "'": '&#039;',
-  }
-  return text.replace(/[&<>"']/g, (char) => map[char] || char)
+const ALLOWED_TAGS = [
+  'b',
+  'i',
+  'u',
+  'strong',
+  'em',
+  'br',
+  'p',
+  'span',
+  'ul',
+  'ol',
+  'li',
+  'a',
+  'code',
+  'pre',
+  'blockquote',
+]
+
+const ALLOWED_ATTR = ['href', 'target', 'rel', 'class']
+
+function sanitizeHtml(dirty: string): string {
+  return DOMPurify.sanitize(dirty, {
+    ALLOWED_TAGS,
+    ALLOWED_ATTR,
+    ALLOW_DATA_ATTR: false,
+    ADD_ATTR: ['target'],
+    FORCE_BODY: true,
+  })
+}
+
+function formatMarkdownToHtml(text: string): string {
+  const escaped = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+
+  return escaped
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\*(.+?)\*/g, '<em>$1</em>')
+    .replace(/`(.+?)`/g, '<code>$1</code>')
+    .replace(/\n/g, '<br/>')
 }
 
 function formatTime(date: Date | string | undefined): string {
@@ -40,7 +70,9 @@ export const MessageItem = memo(function MessageItem({
   const personaConfig = useMemo(() => getPersonaConfig(message.persona), [message.persona])
 
   const sanitizedContent = useMemo(() => {
-    return escapeHtml(message.content || '')
+    const content = message.content || ''
+    const formatted = formatMarkdownToHtml(content)
+    return sanitizeHtml(formatted)
   }, [message.content])
 
   const formattedTime = useMemo(() => formatTime(message.timestamp), [message.timestamp])

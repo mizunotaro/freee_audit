@@ -1,6 +1,5 @@
 import { NextIntlClientProvider } from 'next-intl'
 import { Toaster } from '@/components/ui/sonner'
-import '../globals.css'
 import { Locale, locales, defaultLocale } from '@/lib/i18n/types'
 
 type Props = {
@@ -17,13 +16,9 @@ export default async function LocaleLayout({ children, params }: Props) {
   const messages = (await import(`../../../messages/${locale}.json`)).default
 
   return (
-    <html lang={locale} suppressHydrationWarning>
-      <body className="min-h-screen bg-background">
-        <NextIntlClientProvider messages={messages} locale={locale}>
-          {children}
-          <Toaster />
-        </NextIntlClientProvider>
-      </body>
-    </html>
+    <NextIntlClientProvider messages={messages} locale={locale}>
+      {children}
+      <Toaster />
+    </NextIntlClientProvider>
   )
 }

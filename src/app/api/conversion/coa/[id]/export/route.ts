@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { withAuth, type AuthenticatedRequest } from '@/lib/api'
 import { chartOfAccountService } from '@/services/conversion/chart-of-account-service'
-import * as XLSX from 'xlsx'
+import ExcelJS from 'exceljs'
 import { z } from 'zod'
 
 const querySchema = z.object({
@@ -15,20 +15,23 @@ async function getHandler(
 ) {
   if (!context?.params) {
     return NextResponse.json(
-      { error: 'Missing parameters', code: 'VALIDATION_ERROR' },
+      { error: 'Missing parameters', code: 'missing_parameters' },
       { status: 400 }
     )
   }
 
-  const params = await Promise.resolve(context.params)
-  const id = params.id
+  const resolvedParams = context.params instanceof Promise ? await context.params : context.params
+  const { id } = resolvedParams
 
   const { searchParams } = new URL(req.url)
-  const parseResult = querySchema.safeParse(Object.fromEntries(searchParams))
+  const parseResult = querySchema.safeParse({
+    format: searchParams.get('format') || 'csv',
+    language: searchParams.get('language') || 'ja',
+  })
 
   if (!parseResult.success) {
     return NextResponse.json(
-      { error: 'Invalid parameters', code: 'VALIDATION_ERROR' },
+      { error: 'Invalid parameters', details: parseResult.error, code: 'invalid_parameters' },
       { status: 400 }
     )
   }
@@ -37,91 +40,184 @@ async function getHandler(
 
   try {
     const coa = await chartOfAccountService.getById(id)
-
     if (!coa) {
       return NextResponse.json(
-        { error: 'Chart of Accounts not found', code: 'NOT_FOUND' },
+        { error: 'Chart of Accounts not found', code: 'not_found' },
         { status: 404 }
       )
     }
 
-    if (
-      coa.companyId !== req.user.companyId &&
-      req.user.role !== 'ADMIN' &&
-      req.user.role !== 'SUPER_ADMIN'
-    ) {
-      return NextResponse.json({ error: 'Access denied', code: 'FORBIDDEN' }, { status: 403 })
-    }
+    const accounts = coa.items
 
-    const headers = [
-      'code',
-      'name',
-      'name_en',
-      'category',
-      'subcategory',
-      'normal_balance',
-      'parent_code',
-      'is_convertible',
-    ]
-    const rows = coa.items.map((item) => {
-      const row: (string | number | boolean)[] = [
-        item.code,
-        language === 'en' ? item.nameEn : item.name,
-        item.nameEn,
-        item.category,
-        item.subcategory || '',
-        item.normalBalance,
-        item.parentId || '',
-        item.isConvertible,
-      ]
-      return row
-    })
+    if (format === 'excel') {
+      const workbook = new ExcelJS.Workbook()
+      workbook.creator = 'freee_audit'
+      workbook.created = new Date()
 
-    if (format === 'csv') {
-      const csvContent = [
-        headers.join(','),
-        ...rows.map((row) =>
-          row
-            .map((cell) => {
-              if (typeof cell === 'string' && (cell.includes(',') || cell.includes('"'))) {
-                return `"${cell.replace(/"/g, '""')}"`
-              }
-              return String(cell)
-            })
-            .join(',')
-        ),
-      ].join('\n')
+      const worksheet = workbook.addWorksheet('勘定科目')
 
-      const buffer = Buffer.from(csvContent, 'utf-8')
-      const fileName = `${coa.name}_${coa.standard}.csv`
+      const headers =
+        language === 'both'
+          ? [
+              'コード',
+              '科目名',
+              'Name (EN)',
+              'カテゴリ',
+              'サブカテゴリ',
+              '借方/貸方',
+              '親コード',
+              '変換可能',
+            ]
+          : language === 'en'
+            ? [
+                'Code',
+                'Name',
+                'Name (EN)',
+                'Category',
+                'Subcategory',
+                'Normal Balance',
+                'Parent Code',
+                'Convertible',
+              ]
+            : ['コード', '科目名', 'カテゴリ', 'サブカテゴリ', '借方/貸方', '親コード', '変換可能']
 
-      return new NextResponse(buffer, {
-        headers: {
-          'Content-Type': 'text/csv; charset=utf-8',
-          'Content-Disposition': `attachment; filename*=UTF-8''${encodeURIComponent(fileName)}`,
-          'Content-Length': buffer.length.toString(),
-        },
+      worksheet.addRow(headers)
+
+      for (const account of accounts) {
+        const row =
+          language === 'both'
+            ? [
+                account.code,
+                account.name,
+                account.nameEn,
+                account.category,
+                account.subcategory || '',
+                account.normalBalance,
+                account.parentId || '',
+                account.isConvertible ? 'Yes' : 'No',
+              ]
+            : language === 'en'
+              ? [
+                  account.code,
+                  account.name,
+                  account.nameEn,
+                  account.category,
+                  account.subcategory || '',
+                  account.normalBalance,
+                  account.parentId || '',
+                  account.isConvertible ? 'Yes' : 'No',
+                ]
+              : [
+                  account.code,
+                  account.name,
+                  account.category,
+                  account.subcategory || '',
+                  account.normalBalance,
+                  account.parentId || '',
+                  account.isConvertible ? 'はい' : 'いいえ',
+                ]
+
+        worksheet.addRow(row)
+      }
+
+      worksheet.columns.forEach((column, _index) => {
+        let maxLength = 0
+        column?.eachCell?.((cell) => {
+          const cellLength = cell.value ? String(cell.value).length : 0
+          if (cellLength > maxLength) {
+            maxLength = cellLength
+          }
+        })
+        column.width = Math.min(maxLength + 2, 50)
       })
-    } else {
-      const worksheetData = [headers, ...rows]
-      const worksheet = XLSX.utils.aoa_to_sheet(worksheetData)
-      const workbook = XLSX.utils.book_new()
-      XLSX.utils.book_append_sheet(workbook, worksheet, 'Chart of Accounts')
 
-      const buffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' })
-      const fileName = `${coa.name}_${coa.standard}.xlsx`
+      const buffer = await workbook.xlsx.writeBuffer()
 
       return new NextResponse(buffer, {
         headers: {
           'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-          'Content-Disposition': `attachment; filename*=UTF-8''${encodeURIComponent(fileName)}`,
-          'Content-Length': buffer.length.toString(),
+          'Content-Disposition': `attachment; filename="${coa.name}_${coa.standard}.xlsx"`,
+        },
+      })
+    } else {
+      const csvLines: string[] = []
+      const headers =
+        language === 'both'
+          ? [
+              'コード',
+              '科目名',
+              'Name (EN)',
+              'カテゴリ',
+              'サブカテゴリ',
+              '借方/貸方',
+              '親コード',
+              '変換可能',
+            ]
+          : language === 'en'
+            ? [
+                'Code',
+                'Name',
+                'Name (EN)',
+                'Category',
+                'Subcategory',
+                'Normal Balance',
+                'Parent Code',
+                'Convertible',
+              ]
+            : ['コード', '科目名', 'カテゴリ', 'サブカテゴリ', '借方/貸方', '親コード', '変換可能']
+
+      csvLines.push(headers.map((h) => `"${h}"`).join(','))
+
+      for (const account of accounts) {
+        const row =
+          language === 'both'
+            ? [
+                account.code,
+                account.name,
+                account.nameEn,
+                account.category,
+                account.subcategory || '',
+                account.normalBalance,
+                account.parentId || '',
+                account.isConvertible ? 'Yes' : 'No',
+              ]
+            : language === 'en'
+              ? [
+                  account.code,
+                  account.name,
+                  account.nameEn,
+                  account.category,
+                  account.subcategory || '',
+                  account.normalBalance,
+                  account.parentId || '',
+                  account.isConvertible ? 'Yes' : 'No',
+                ]
+              : [
+                  account.code,
+                  account.name,
+                  account.category,
+                  account.subcategory || '',
+                  account.normalBalance,
+                  account.parentId || '',
+                  account.isConvertible ? 'はい' : 'いいえ',
+                ]
+
+        csvLines.push(row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+      }
+
+      const csvContent = csvLines.join('\n')
+      const fileName = `${coa.name}_${coa.standard}.csv`
+
+      return new NextResponse(csvContent, {
+        headers: {
+          'Content-Type': 'text/csv; charset=utf-8',
+          'Content-Disposition': `attachment; filename="${fileName}"`,
         },
       })
     }
   } catch (error) {
-    console.error('Export failed:', error)
-    return NextResponse.json({ error: 'Export failed', code: 'EXPORT_ERROR' }, { status: 500 })
+    console.error('Export error:', error)
+    return NextResponse.json({ error: 'Export failed', code: 'export_error' }, { status: 500 })
   }
 }
 
