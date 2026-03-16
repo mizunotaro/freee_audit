@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { validateFile } from '@/app/[locale]/journal-proposal/components/ReceiptUploader'
+import { validateFile } from '@/app/[locale]/(authenticated)/journal-proposal/components/ReceiptUploader'
 import { JOURNAL_PROPOSAL_CONFIG } from '@/config/journal-proposal'
 
 describe('ReceiptUploader', () => {
