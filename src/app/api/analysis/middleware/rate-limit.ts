@@ -15,6 +15,7 @@ export interface RateLimitConfig {
   windowMs: number
   maxRequests: number
   keyGenerator?: (request: NextRequest) => string
+  useHybrid?: boolean
 }
 
 function getClientIdentifier(request: NextRequest): string {
@@ -32,12 +33,70 @@ function getClientIdentifier(request: NextRequest): string {
   return 'unknown'
 }
 
+async function getHybridRateLimit(
+  key: string,
+  config: RateLimitConfig
+): Promise<{ allowed: boolean; remaining: number; resetAt: number } | null> {
+  try {
+    const { createHybridRateLimiter } = await import('@/lib/security/rate-limit-hybrid')
+    const limiter = createHybridRateLimiter({
+      ...config,
+      keyPrefix: 'analysis-api',
+    })
+    const result = await limiter.check(key)
+    return {
+      allowed: result.allowed,
+      remaining: result.remaining,
+      resetAt: result.resetAt,
+    }
+  } catch {
+    return null
+  }
+}
+
 export function withRateLimit(config: RateLimitConfig = RATE_LIMIT_CONFIG) {
   return function (
     handler: (request: NextRequest) => Promise<NextResponse>
   ): (request: NextRequest) => Promise<NextResponse> {
     return async (request: NextRequest) => {
       const key = config.keyGenerator ? config.keyGenerator(request) : getClientIdentifier(request)
+
+      if (config.useHybrid !== false && process.env.REDIS_URL) {
+        const hybridResult = await getHybridRateLimit(key, config)
+        if (hybridResult) {
+          if (!hybridResult.allowed) {
+            const error = createError(
+              'RATE_LIMIT_EXCEEDED',
+              'Too many requests, please try again later',
+              {
+                details: {
+                  retryAfter: Math.ceil((hybridResult.resetAt - Date.now()) / 1000),
+                },
+              }
+            )
+
+            const response: ApiResponse<never> = createErrorResponse(error, {
+              requestId: request.headers.get('x-request-id') ?? undefined,
+            })
+
+            return NextResponse.json(response, {
+              status: 429,
+              headers: {
+                'X-RateLimit-Limit': config.maxRequests.toString(),
+                'X-RateLimit-Remaining': '0',
+                'X-RateLimit-Reset': hybridResult.resetAt.toString(),
+                'Retry-After': Math.ceil((hybridResult.resetAt - Date.now()) / 1000).toString(),
+              },
+            })
+          }
+
+          const response = await handler(request)
+          response.headers.set('X-RateLimit-Limit', config.maxRequests.toString())
+          response.headers.set('X-RateLimit-Remaining', hybridResult.remaining.toString())
+          response.headers.set('X-RateLimit-Reset', hybridResult.resetAt.toString())
+          return response
+        }
+      }
 
       const now = Date.now()
       const windowStart = now - (now % config.windowMs)

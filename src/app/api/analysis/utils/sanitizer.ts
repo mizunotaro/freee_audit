@@ -8,6 +8,46 @@ export const SENSITIVE_KEYS = [
   'authorization',
   'session',
   'cookie',
+  'privateKey',
+  'private_key',
+  'accessToken',
+  'access_token',
+  'refreshToken',
+  'refresh_token',
+  'clientSecret',
+  'client_secret',
+  'encryptionKey',
+  'encryption_key',
+  'databaseUrl',
+  'database_url',
+  'dbUrl',
+  'db_url',
+  'connectionString',
+  'connection_string',
+  'sshKey',
+  'ssh_key',
+  'cardNumber',
+  'card_number',
+  'cvv',
+  'cvc',
+  'ssn',
+]
+
+const SENSITIVE_KEY_PATTERNS: readonly RegExp[] = [
+  /(?:api[_-]?key|apikey)/i,
+  /(?:secret|password|passwd|pwd)/i,
+  /(?:token|bearer|jwt)/i,
+  /(?:credential|auth)/i,
+  /(?:private[_-]?key|access[_-]?key)/i,
+  /(?:session[_-]?id|sessionid)/i,
+  /(?:refresh[_-]?token)/i,
+  /(?:client[_-]?secret)/i,
+  /(?:encryption[_-]?key)/i,
+  /(?:database[_-]?url|db[_-]?url)/i,
+  /(?:connection[_-]?string)/i,
+  /(?:ssh[_-]?key|rsa[_-]?key)/i,
+  /(?:card[_-]?number|cvv|cvc)/i,
+  /(?:ssn|social[_-]?security)/i,
 ]
 
 /**
@@ -36,17 +76,36 @@ export function sanitizeInput(input: string, maxLength: number = 10000): string 
  * @param obj - フィルタリング対象のオブジェクト
  * @returns フィルタリング済みのオブジェクト
  */
-export function sanitizeForLog(obj: Record<string, unknown>): Record<string, unknown> {
+export function sanitizeForLog(
+  obj: Record<string, unknown>,
+  depth: number = 0
+): Record<string, unknown> {
+  if (depth > 10) {
+    return { '[MAX_DEPTH]': true }
+  }
+
   const result: Record<string, unknown> = {}
 
   for (const [key, value] of Object.entries(obj)) {
     const lowerKey = key.toLowerCase()
-    const isSensitive = SENSITIVE_KEYS.some((k) => lowerKey.includes(k))
+    const isSensitive =
+      SENSITIVE_KEYS.some((k) => lowerKey.includes(k.toLowerCase())) ||
+      SENSITIVE_KEY_PATTERNS.some((pattern) => pattern.test(key))
 
     if (isSensitive) {
       result[key] = '[REDACTED]'
     } else if (typeof value === 'object' && value !== null) {
-      result[key] = sanitizeForLog(value as Record<string, unknown>)
+      if (Array.isArray(value)) {
+        result[key] = value.map((item) =>
+          typeof item === 'object' && item !== null
+            ? sanitizeForLog(item as Record<string, unknown>, depth + 1)
+            : item
+        )
+      } else {
+        result[key] = sanitizeForLog(value as Record<string, unknown>, depth + 1)
+      }
+    } else if (typeof value === 'string' && value.length > 1000) {
+      result[key] = value.slice(0, 100) + '...[TRUNCATED]'
     } else {
       result[key] = value
     }

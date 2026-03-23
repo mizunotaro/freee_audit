@@ -1,4 +1,5 @@
 import * as ss from 'simple-statistics'
+import { SafeFormulaEvaluator, FormulaError } from '@/lib/utils/safe-formula-evaluator'
 import type {
   MonteCarloInputs,
   MonteCarloResult,
@@ -236,31 +237,21 @@ function validateInputs(inputs: MonteCarloInputs): Result<true> {
   return { success: true, data: true }
 }
 
-function evaluateFormula(formula: string, variables: Record<string, number>): number {
-  let expr = formula
-
-  const sortedNames = Object.keys(variables).sort((a, b) => b.length - a.length)
-
-  for (const name of sortedNames) {
-    const value = variables[name]
-    const regex = new RegExp(`\\b${name}\\b`, 'g')
-    expr = expr.replace(regex, `(${value})`)
-  }
-
-  const allowedPattern = /^[\d\s+\-*/().^%]+$/
-  if (!allowedPattern.test(expr)) {
-    throw new Error(`Formula contains invalid characters: ${expr}`)
-  }
-
-  expr = expr.replace(/\^/g, '**')
-
+function evaluateFormula(
+  evaluator: SafeFormulaEvaluator,
+  formula: string,
+  variables: Record<string, number>
+): number {
   try {
-    const result = Function(`"use strict"; return (${expr})`)()
-    if (typeof result !== 'number' || !isFinite(result)) {
+    const result = evaluator.evaluate(formula, variables)
+    if (result === null || typeof result !== 'number' || !isFinite(result)) {
       throw new Error('Formula evaluation resulted in non-finite number')
     }
     return result
   } catch (error) {
+    if (error instanceof FormulaError) {
+      throw new Error(`Formula evaluation failed: ${error.message}`)
+    }
     throw new Error(
       `Formula evaluation failed: ${error instanceof Error ? error.message : 'Unknown error'}`
     )
@@ -288,6 +279,9 @@ export function runMonteCarloSimulation(inputs: MonteCarloInputs): Result<MonteC
   const rng =
     seed !== undefined ? new SeededRandom(seed).next.bind(new SeededRandom(seed)) : Math.random
 
+  const variableNames = variables.map((v) => v.name)
+  const evaluator = new SafeFormulaEvaluator(variableNames)
+
   const results: number[] = []
 
   try {
@@ -298,7 +292,7 @@ export function runMonteCarloSimulation(inputs: MonteCarloInputs): Result<MonteC
         sampledValues[variable.name] = sampleDistribution(variable.distribution, rng)
       }
 
-      const result = evaluateFormula(formula, sampledValues)
+      const result = evaluateFormula(evaluator, formula, sampledValues)
       results.push(result)
     }
   } catch (error) {

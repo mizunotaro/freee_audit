@@ -8,6 +8,7 @@ import {
   constantTimeCompare,
   dpapi,
   type EncryptedData,
+  type HashedPassword,
 } from '@/lib/crypto/encryption'
 
 describe('Encryption', () => {
@@ -113,50 +114,53 @@ describe('Encryption', () => {
   })
 
   describe('hashPassword/verifyPassword', () => {
-    it('should hash password', async () => {
+    it('should hash password with random salt', async () => {
       const password = 'myPassword123'
-      const hash = await hashPassword(password)
+      const result = await hashPassword(password)
 
-      expect(hash).not.toBe(password)
-      expect(hash.length).toBe(128)
-      expect(/^[a-f0-9]+$/.test(hash)).toBe(true)
+      expect(result.hash).not.toBe(password)
+      expect(result.hash.length).toBe(128)
+      expect(result.salt.length).toBe(32)
+      expect(/^[a-f0-9]+$/.test(result.hash)).toBe(true)
+      expect(/^[a-f0-9]+$/.test(result.salt)).toBe(true)
     })
 
     it('should verify correct password', async () => {
       const password = 'myPassword123'
-      const hash = await hashPassword(password)
+      const hashedPassword = await hashPassword(password)
 
-      const isValid = await verifyPassword(password, hash)
+      const isValid = await verifyPassword(password, hashedPassword)
       expect(isValid).toBe(true)
     })
 
     it('should reject incorrect password', async () => {
       const password = 'myPassword123'
-      const hash = await hashPassword(password)
+      const hashedPassword = await hashPassword(password)
 
-      const isValid = await verifyPassword('wrongPassword', hash)
+      const isValid = await verifyPassword('wrongPassword', hashedPassword)
       expect(isValid).toBe(false)
     })
 
-    it('should produce consistent hashes for same password', async () => {
+    it('should produce different hashes for same password (random salt)', async () => {
       const password = 'testPassword'
       const hash1 = await hashPassword(password)
       const hash2 = await hashPassword(password)
 
-      expect(hash1).toBe(hash2)
+      expect(hash1.hash).not.toBe(hash2.hash)
+      expect(hash1.salt).not.toBe(hash2.salt)
     })
 
     it('should handle empty password', async () => {
-      const hash = await hashPassword('')
-      expect(hash.length).toBe(128)
-      const isValid = await verifyPassword('', hash)
+      const hashedPassword = await hashPassword('')
+      expect(hashedPassword.hash.length).toBe(128)
+      const isValid = await verifyPassword('', hashedPassword)
       expect(isValid).toBe(true)
     })
 
     it('should handle special characters in password', async () => {
       const password = 'p@$$w0rd!#$%^&*()'
-      const hash = await hashPassword(password)
-      const isValid = await verifyPassword(password, hash)
+      const hashedPassword = await hashPassword(password)
+      const isValid = await verifyPassword(password, hashedPassword)
       expect(isValid).toBe(true)
     })
   })

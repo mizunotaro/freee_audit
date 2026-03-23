@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { withAuth, type AuthenticatedRequest, validateCompanyId } from '@/lib/api'
-import { journalImporter } from '@/services/import/journal-importer'
+import { accountItemImporter } from '@/services/import/account-item-importer'
 import { IMPORT_LIMITS, type ImportErrorCode } from '@/services/import/types'
 
 const IMPORT_TIMEOUT_MS = 60000
@@ -24,11 +24,11 @@ async function handler(req: AuthenticatedRequest) {
     const language = (searchParams.get('language') as 'ja' | 'en') || 'ja'
 
     if (action === 'template') {
-      const template = journalImporter.generateTemplate(language)
+      const template = accountItemImporter.generateTemplate(language)
       return new NextResponse(template, {
         headers: {
           'Content-Type': 'text/csv; charset=utf-8',
-          'Content-Disposition': `attachment; filename="journal_import_template_${language}.csv"`,
+          'Content-Disposition': `attachment; filename="account_item_template_${language}.csv"`,
         },
       })
     }
@@ -69,7 +69,7 @@ async function handler(req: AuthenticatedRequest) {
     }
 
     if (mode === 'preview') {
-      const result = await journalImporter.preview(file, language)
+      const result = await accountItemImporter.preview(file, language)
 
       if (!result.success) {
         return NextResponse.json({ success: false, error: result.error.message }, { status: 400 })
@@ -81,7 +81,7 @@ async function handler(req: AuthenticatedRequest) {
       })
     }
 
-    const result = await journalImporter.import(
+    const result = await accountItemImporter.import(
       file,
       { companyId },
       {
@@ -113,7 +113,7 @@ async function handler(req: AuthenticatedRequest) {
       durationMs: importResult.durationMs,
     })
   } catch (error) {
-    console.error('[API] Journal import error:', error)
+    console.error('[API] Account item import error:', error)
     if (error instanceof Error && error.name === 'AbortError') {
       return NextResponse.json(
         { success: false, error: 'インポートがタイムアウトしました' },
@@ -140,11 +140,11 @@ export async function GET(req: NextRequest) {
   const language = (searchParams.get('language') as 'ja' | 'en') || 'ja'
 
   if (action === 'template') {
-    const template = journalImporter.generateTemplate(language)
+    const template = accountItemImporter.generateTemplate(language)
     return new NextResponse(template, {
       headers: {
         'Content-Type': 'text/csv; charset=utf-8',
-        'Content-Disposition': `attachment; filename="journal_import_template_${language}.csv"`,
+        'Content-Disposition': `attachment; filename="account_item_template_${language}.csv"`,
       },
     })
   }

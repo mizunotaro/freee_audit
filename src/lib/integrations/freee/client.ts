@@ -155,6 +155,20 @@ export class FreeeClient {
     return token.accessToken
   }
 
+  private validateEndpoint(endpoint: string): void {
+    if (endpoint.includes('..')) {
+      throw new Error('Path traversal detected in endpoint')
+    }
+
+    if (endpoint.startsWith('//') || endpoint.startsWith('\\')) {
+      throw new Error('Invalid endpoint format')
+    }
+
+    if (!endpoint.startsWith('/')) {
+      throw new Error('Endpoint must start with /')
+    }
+  }
+
   private async request<T>(
     method: string,
     endpoint: string,
@@ -164,6 +178,8 @@ export class FreeeClient {
       rateLimitType?: string
     }
   ): Promise<T> {
+    this.validateEndpoint(endpoint)
+
     if (isMockMode()) {
       return this.getMockResponse<T>(endpoint, options?.params)
     }
@@ -175,6 +191,11 @@ export class FreeeClient {
         const accessToken = await this.getValidAccessToken()
 
         const url = new URL(`${FREEE_API_BASE_URL}${endpoint}`)
+
+        if (url.host !== 'api.freee.co.jp' && url.host !== 'accounts.secure.freee.co.jp') {
+          throw new Error(`Invalid host in URL: ${url.host}`)
+        }
+
         if (options?.params) {
           Object.entries(options.params).forEach(([key, value]) => {
             if (value !== undefined) {

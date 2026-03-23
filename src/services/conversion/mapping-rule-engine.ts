@@ -7,6 +7,7 @@ import {
   createAppError,
   ERROR_CODES,
 } from '@/types/result'
+import { SafeFormulaEvaluator } from '@/lib/utils/safe-formula-evaluator'
 
 export interface MappingContext {
   date?: Date
@@ -225,7 +226,16 @@ export class MappingRuleEngine {
         )
       }
 
-      const evalResult = Function(`"use strict"; return (${result})`)()
+      const evaluator = new SafeFormulaEvaluator(Object.keys(variables), {
+        maxFormulaLength: 1000,
+        maxOperators: 50,
+      })
+      const evalResult = evaluator.evaluate(result, variables)
+      if (evalResult === null) {
+        return failure(
+          createAppError(ERROR_CODES.VALIDATION_ERROR, 'Formula evaluation returned null')
+        )
+      }
       if (typeof evalResult !== 'number' || !isFinite(evalResult)) {
         return failure(
           createAppError(ERROR_CODES.VALIDATION_ERROR, 'Formula did not evaluate to a valid number')

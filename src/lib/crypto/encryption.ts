@@ -75,20 +75,49 @@ export function decrypt(encryptedString: string): string {
   return decrypted
 }
 
-export function hashPassword(password: string): Promise<string> {
+export interface HashedPassword {
+  hash: string
+  salt: string
+}
+
+export function hashPassword(password: string): Promise<HashedPassword> {
+  const salt = crypto.randomBytes(16).toString('hex')
   return new Promise((resolve, reject) => {
-    crypto.scrypt(password, 'salt', 64, (err, derivedKey) => {
+    crypto.scrypt(password, salt, 64, (err, derivedKey) => {
       if (err) reject(err)
-      resolve(derivedKey.toString('hex'))
+      resolve({
+        hash: derivedKey.toString('hex'),
+        salt,
+      })
     })
   })
 }
 
-export function verifyPassword(password: string, hash: string): Promise<boolean> {
+export function verifyPassword(
+  password: string,
+  stored: HashedPassword | string
+): Promise<boolean> {
+  if (typeof stored === 'string') {
+    console.warn(
+      '[DEPRECATED] verifyPassword called with string hash. This is insecure. Use HashedPassword object instead.'
+    )
+    return new Promise((resolve, reject) => {
+      crypto.scrypt(password, 'salt', 64, (err, derivedKey) => {
+        if (err) reject(err)
+        resolve(derivedKey.toString('hex') === stored)
+      })
+    })
+  }
+
+  const { hash, salt } = stored
   return new Promise((resolve, reject) => {
-    crypto.scrypt(password, 'salt', 64, (err, derivedKey) => {
+    crypto.scrypt(password, salt, 64, (err, derivedKey) => {
       if (err) reject(err)
-      resolve(derivedKey.toString('hex') === hash)
+      try {
+        resolve(crypto.timingSafeEqual(Buffer.from(derivedKey.toString('hex')), Buffer.from(hash)))
+      } catch {
+        resolve(false)
+      }
     })
   })
 }

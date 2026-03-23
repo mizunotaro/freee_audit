@@ -1,5 +1,6 @@
 import { getSecretsManager } from '@/lib/secrets'
 import { decrypt } from '@/lib/crypto'
+import { encryptForCache, decryptFromCache } from '@/lib/crypto/encryption-v2'
 import { prisma } from '@/lib/db'
 import type { AIProviderType } from '@/lib/ai/config/types'
 
@@ -27,8 +28,14 @@ export interface APIKeySource {
 }
 
 class APIKeyService {
-  private cache: Map<string, { config: APIKeyConfig; source: APIKeySource; expiresAt: number }> =
-    new Map()
+  private cache: Map<
+    string,
+    {
+      encryptedConfig: string
+      source: APIKeySource
+      expiresAt: number
+    }
+  > = new Map()
   private cacheTTL = 5 * 60 * 1000
 
   async getAPIKey(
@@ -43,23 +50,35 @@ class APIKeyService {
     const cached = this.cache.get(cacheKey)
 
     if (cached && cached.expiresAt > Date.now()) {
-      return {
-        ...cached.config,
-        metadata: {
-          ...cached.config.metadata,
-          source: String(cached.source.source),
-          cached: 'true',
-        },
+      try {
+        const decryptedConfig = decryptFromCache(cached.encryptedConfig)
+        const config = JSON.parse(decryptedConfig) as APIKeyConfig
+        return {
+          ...config,
+          metadata: {
+            ...config.metadata,
+            source: String(cached.source.source),
+            cached: 'true',
+          },
+        }
+      } catch (error) {
+        console.error('[APIKeyService] Failed to decrypt cached config:', error)
+        this.cache.delete(cacheKey)
       }
     }
 
     const result = await this.fetchAPIKey(provider, options)
     if (result) {
-      this.cache.set(cacheKey, {
-        config: result.config,
-        source: result.source,
-        expiresAt: Date.now() + this.cacheTTL,
-      })
+      try {
+        const encryptedConfig = encryptForCache(JSON.stringify(result.config))
+        this.cache.set(cacheKey, {
+          encryptedConfig,
+          source: result.source,
+          expiresAt: Date.now() + this.cacheTTL,
+        })
+      } catch (error) {
+        console.error('[APIKeyService] Failed to encrypt config for cache:', error)
+      }
     }
 
     return result?.config || null
