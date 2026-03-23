@@ -586,12 +586,29 @@ DATABASE_URL="postgresql://user:password@host:5432/dbname"
 
 ### 8.5 LLMプロバイダー
 
-| プロバイダー | デフォルトモデル | ZDR対応 | データ所在地 |
-|------------|----------------|---------|-------------|
-| OpenAI | gpt-5-nano | No | US |
-| Claude | claude-sonnet-4-20250514 | Yes | US |
-| Gemini | gemini-2.0-flash | No | US, EU |
-| OpenRouter | openai/gpt-5-nano | Yes | US, EU, GLOBAL |
+| プロバイダー | デフォルトモデル | Input価格 | Output価格 | ZDR対応 | データ所在地 |
+|------------|----------------|----------|-----------|---------|-------------|
+| OpenAI | gpt-5.4-nano | $0.20/MTok | $1.25/MTok | No | US |
+| Claude | claude-sonnet-4-6-20250514 | $3.00/MTok | $15.00/MTok | Yes | US |
+| Gemini | gemini-2.5-flash-preview-05-20 | $0.15/MTok | $0.60/MTok | No | US, EU |
+| OpenRouter | openai/gpt-5.4-nano | $0.20/MTok | $1.25/MTok | Yes | US, EU, GLOBAL |
+
+#### モデル選択の推奨
+
+| 用途 | 推奨モデル | 理由 |
+|------|-----------|------|
+| 高速処理・分類 | GPT-5.4 nano | 最も低コスト、高速 |
+| 標準的な分析 | Gemini 2.5 Flash | コストパフォーマンス最高 |
+| 高品質な分析 | Claude Sonnet 4.6 | 最高品質の分析 |
+| 戦略判断 | Claude Opus 4.6 / GPT-5.4 | 最も知的な判断 |
+
+#### 価格比較（1MTokあたり）
+
+| カテゴリ | 最安値 | 最高品質 |
+|---------|--------|---------|
+| **OpenAI** | GPT-5.4 nano ($0.20/$1.25) | GPT-5.4 ($2.50/$15.00) |
+| **Claude** | Haiku 4.5 ($1.00/$5.00) | Opus 4.6 ($5.00/$25.00) |
+| **Gemini** | 2.5 Flash ($0.15/$0.60) | 2.5 Pro ($1.25/$10.00) |
 
 ### 8.6 環境変数
 
@@ -621,6 +638,9 @@ AI_PROVIDER=openai                              # デフォルトプロバイダ
 AI_MOCK_MODE=false                              # モックモード
 AI_TEMPERATURE=0.1                              # 生成温度
 AI_MAX_TOKENS=4096                              # 最大トークン数
+OPENAI_MODEL=gpt-5.4-nano                       # OpenAIモデル指定
+CLAUDE_MODEL=claude-sonnet-4-6-20250514         # Claudeモデル指定
+GEMINI_MODEL=gemini-2.5-flash-preview-05-20     # Geminiモデル指定
 
 # Slack（オプション）
 SLACK_BOT_TOKEN="xoxb-..."
