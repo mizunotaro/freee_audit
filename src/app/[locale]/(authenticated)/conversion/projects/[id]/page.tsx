@@ -2,6 +2,7 @@
 
 import { useState, useEffect, use } from 'react'
 import { useRouter } from 'next/navigation'
+import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Play, Download, Settings, Loader2, AlertTriangle } from 'lucide-react'
@@ -80,11 +81,11 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
         router.refresh()
       } else {
         const data = await res.json()
-        alert(data.error || 'Failed to execute conversion')
+        toast.error(data.error || 'Failed to execute conversion')
       }
     } catch (error) {
       console.error('Failed to execute:', error)
-      alert('Failed to execute conversion')
+      toast.error('Failed to execute conversion')
     } finally {
       setExecuting(false)
     }

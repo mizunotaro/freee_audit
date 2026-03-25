@@ -2,6 +2,7 @@
 
 import { useState, useCallback } from 'react'
 import { useTranslations } from 'next-intl'
+import { toast } from 'sonner'
 import { ReceiptUploader } from './components/ReceiptUploader'
 import { OcrPreview } from './components/OcrPreview'
 import { ProposalList } from './components/ProposalList'
@@ -163,14 +164,109 @@ export default function JournalProposalPage() {
   }, [state.currentProposal])
 
   const handleRegenerate = useCallback(async () => {
-    console.log('[JournalProposal] Regenerate proposals')
-  }, [])
+    if (!state.currentProposal) return
+
+    setState((prev) => ({
+      ...prev,
+      isProcessing: true,
+      error: null,
+    }))
+
+    try {
+      const response = await fetch(
+        `/api/journal-proposal/${state.currentProposal.documentId}/regenerate`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+        }
+      )
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        setState((prev) => ({
+          ...prev,
+          isProcessing: false,
+          error: {
+            code: 'REGENERATE_FAILED',
+            message: t('errors.regenerateFailed'),
+          } as AppError,
+        }))
+        return
+      }
+
+      const data = await response.json()
+      setState((prev) => {
+        if (!prev.currentProposal) return prev
+        return {
+          ...prev,
+          currentProposal: {
+            ...prev.currentProposal,
+            proposals: data.proposals || prev.currentProposal.proposals,
+            regeneratedAt: data.regeneratedAt,
+          },
+          isProcessing: false,
+        }
+      })
+    } catch (error) {
+      console.error('Failed to regenerate proposal:', error)
+      setState((prev) => ({
+        ...prev,
+        isProcessing: false,
+        error: {
+          code: 'REGENERATE_ERROR',
+          message: t('errors.regenerateFailed'),
+        } as AppError,
+      }))
+    }
+  }, [state.currentProposal, t])
 
   const handleExportToFreee = useCallback(async () => {
     if (!state.currentProposal) return
-    setState((prev) => ({ ...prev, proposalStatus: 'exported' }))
-    console.log('[JournalProposal] Export to freee:', state.currentProposal.documentId)
-  }, [state.currentProposal])
+
+    setState((prev) => ({ ...prev, isProcessing: true }))
+
+    try {
+      const response = await fetch(
+        `/api/journal-proposal/${state.currentProposal.documentId}/export`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+        }
+      )
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        toast.error(t('errors.exportFailed'))
+        setState((prev) => ({
+          ...prev,
+          isProcessing: false,
+          error: {
+            code: 'EXPORT_FAILED',
+            message: errorData.error?.message || t('errors.exportFailed'),
+          } as AppError,
+        }))
+        return
+      }
+
+      toast.success(t('actions.exportToFreee'))
+      setState((prev) => ({
+        ...prev,
+        isProcessing: false,
+        proposalStatus: 'exported',
+      }))
+    } catch (error) {
+      console.error('Failed to export to freee:', error)
+      toast.error(t('errors.exportFailed'))
+      setState((prev) => ({
+        ...prev,
+        isProcessing: false,
+        error: {
+          code: 'EXPORT_ERROR',
+          message: t('errors.exportFailed'),
+        } as AppError,
+      }))
+    }
+  }, [state.currentProposal, t])
 
   const handleEditProposal = useCallback((proposal: JournalProposal) => {
     setState((prev) => ({ ...prev, editingProposal: proposal }))

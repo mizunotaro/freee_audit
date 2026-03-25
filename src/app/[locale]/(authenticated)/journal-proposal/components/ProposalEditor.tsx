@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useTranslations } from 'next-intl'
+import { toast } from 'sonner'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -39,8 +40,11 @@ export function ProposalEditor({ proposal, onSave, onCancel, className }: Propos
       .reduce((sum, e) => sum + e.amount, 0)
 
     if (totalDebit !== totalCredit) {
-      alert(
-        `借方と貸方の合計が一致しません。\n借方: ¥${totalDebit.toLocaleString()}\n貸方: ¥${totalCredit.toLocaleString()}`
+      toast.warning(
+        t('proposal.balanceMismatch', {
+          debit: `¥${totalDebit.toLocaleString()}`,
+          credit: `¥${totalCredit.toLocaleString()}`,
+        })
       )
       return
     }
