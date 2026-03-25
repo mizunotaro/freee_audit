@@ -420,6 +420,24 @@
       "invalidFileType": "Unsupported file type",
       "fileTooLarge": "File size too large",
       "noProposals": "Could not generate journal proposals"
+    },
+    "fallback": {
+      "title": "Manual Input",
+      "description": "OCR processing failed. Please manually enter the information below.",
+      "fields": {
+        "date": "Date",
+        "vendor": "Vendor",
+        "totalAmount": "Amount (excl. tax)",
+        "taxRate": "Tax Rate",
+        "taxAmount": "Tax Amount",
+        "description": "Description"
+      },
+      "placeholders": {
+        "vendor": "e.g., ABC Corporation",
+        "description": "Enter transaction details"
+      },
+      "submit": "Generate Journal Proposal",
+      "submitting": "Processing..."
     }
   }
 }
