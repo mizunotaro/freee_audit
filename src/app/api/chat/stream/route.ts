@@ -4,6 +4,7 @@ import type { OrchestratorEvent } from '@/lib/ai/orchestrator/orchestrator-types
 import { createContextManager } from '@/lib/ai/context/context-manager'
 import type { ChatRequest, StreamChunk } from '../types'
 import type { PersonaType } from '@/lib/ai/personas/types'
+import { getAuthUser } from '@/lib/api/auth-helpers'
 
 const PERSONA_NAMES: Record<PersonaType, string> = {
   cpa: '公認会計士',
@@ -15,13 +16,18 @@ const PERSONA_NAMES: Record<PersonaType, string> = {
 
 export async function POST(request: NextRequest): Promise<Response> {
   try {
+    const authUser = await getAuthUser(request)
+    if (!authUser) {
+      return new Response(JSON.stringify({ error: 'Authentication required' }), { status: 401 })
+    }
+
     const body: ChatRequest = await request.json()
 
     if (!body.message || typeof body.message !== 'string') {
       return new Response(JSON.stringify({ error: 'Message is required' }), { status: 400 })
     }
 
-    const userId = extractUserId(request)
+    const userId = authUser.id
     const contextManager = createContextManager()
 
     let session
@@ -187,12 +193,4 @@ async function handleOrchestratorEvent(
       })
       break
   }
-}
-
-function extractUserId(request: NextRequest): string {
-  const authHeader = request.headers.get('authorization')
-  if (authHeader?.startsWith('Bearer ')) {
-    return `user_${authHeader.slice(7, 20)}`
-  }
-  return `anonymous_${Date.now()}`
 }

@@ -15,6 +15,7 @@ const AUTH_PATTERNS = [
   'withAdminAuth',
   'withAccountantAuth',
   'validateSession',
+  'getAuthUser',
   'getAuthenticatedUser',
   'requireRole',
   'requireCompanyAccess',

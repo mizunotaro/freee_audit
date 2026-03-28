@@ -39,7 +39,11 @@ function verifySignedToken(signedToken: string): string | null {
   const [token, signature] = parts
   const expectedSignature = crypto.createHmac('sha256', CSRF_SECRET).update(token).digest('hex')
 
-  if (!crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expectedSignature))) {
+  const sigBuf = Buffer.from(signature)
+  const expectedBuf = Buffer.from(expectedSignature)
+  if (sigBuf.length !== expectedBuf.length) return null
+
+  if (!crypto.timingSafeEqual(sigBuf, expectedBuf)) {
     return null
   }
 
@@ -60,13 +64,7 @@ export function validateCsrfToken(token: string): boolean {
 }
 
 export function getCsrfTokenFromRequest(req: NextRequest): string | null {
-  const headerToken = req.headers.get(CSRF_HEADER)
-  if (headerToken) return headerToken
-
-  const cookieToken = req.cookies.get(CSRF_COOKIE)?.value
-  if (cookieToken) return cookieToken
-
-  return null
+  return req.headers.get(CSRF_HEADER)
 }
 
 export function withCsrfProtection(

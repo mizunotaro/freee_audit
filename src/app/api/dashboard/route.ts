@@ -1,5 +1,6 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { sampleTherapeuticsData } from '@/lib/data/sample-therapeutics-data'
+import { getAuthUser } from '@/lib/api/auth-helpers'
 
 const TIMEOUT_MS = 5000
 
@@ -10,8 +11,13 @@ async function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
   return Promise.race([promise, timeout])
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
+    const user = await getAuthUser(request)
+    if (!user) {
+      return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
+    }
+
     const data = await withTimeout(Promise.resolve(sampleTherapeuticsData), TIMEOUT_MS)
 
     if (!data) {

@@ -97,7 +97,7 @@ describe('CSRF Protection', () => {
       expect(token).toBe('header-token')
     })
 
-    it('should get token from cookie if header not present', () => {
+    it('should return null if only cookie is present (header-only)', () => {
       const mockRequest = {
         headers: {
           get: vi.fn(() => null),
@@ -110,10 +110,10 @@ describe('CSRF Protection', () => {
       } as unknown as NextRequest
 
       const token = getCsrfTokenFromRequest(mockRequest)
-      expect(token).toBe('cookie-token')
+      expect(token).toBeNull()
     })
 
-    it('should prefer header over cookie', () => {
+    it('should get token from header', () => {
       const mockRequest = {
         headers: {
           get: vi.fn((name: string) => (name === 'x-csrf-token' ? 'header-token' : null)),

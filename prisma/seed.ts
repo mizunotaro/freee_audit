@@ -327,7 +327,14 @@ async function main() {
 
   console.log('Created company:', company.name)
 
-  const passwordHash = await bcrypt.hash('admin123', 12)
+  const seedPassword = process.env.SEED_ADMIN_PASSWORD
+  if (!seedPassword) {
+    console.error('ERROR: SEED_ADMIN_PASSWORD environment variable is required for seeding.')
+    console.error('Usage: SEED_ADMIN_PASSWORD=<your-password> pnpm prisma db seed')
+    process.exit(1)
+  }
+
+  const passwordHash = await bcrypt.hash(seedPassword, 12)
 
   const user = await prisma.user.upsert({
     where: { email: 'admin@example.com' },
@@ -592,7 +599,7 @@ async function main() {
   console.log('')
   console.log('=== Seed Complete ===')
   console.log('Company: Sample Therapeutics株式会社')
-  console.log('Login: admin@example.com / admin123')
+  console.log('Login: admin@example.com')
   console.log('Stage: Series A (Preclinical)')
   console.log('Fiscal Year:', fiscalYear)
   console.log('Months seeded:', months.length)

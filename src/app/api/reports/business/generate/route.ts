@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthUser } from '@/lib/api/auth-helpers'
 import { buildSectionPrompt } from '@/lib/prompts/business-report/keidanren-prompts'
+import { sanitizeHtml, sanitizePlainText } from '@/lib/utils/html-sanitize'
 import type { ReportTemplateType } from '@/types/reports/business'
 
 const TIMEOUT_MS = 60000
@@ -29,13 +30,22 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
     }
 
+    const safeCompanyName = sanitizePlainText(companyName)
+
     let result: { content: string; sources: string[]; confidence: number; warnings: string[] }
 
     if (templateType === 'keidanren') {
-      result = await generateKeidanrenSection(section, companyName, fiscalYear, controller.signal)
+      result = await generateKeidanrenSection(
+        section,
+        safeCompanyName,
+        fiscalYear,
+        controller.signal
+      )
     } else {
-      result = generateSimpleSection(section, companyName, fiscalYear)
+      result = generateSimpleSection(section, safeCompanyName, fiscalYear)
     }
+
+    result.content = sanitizeHtml(result.content)
 
     clearTimeout(timeoutId)
     return NextResponse.json(result)

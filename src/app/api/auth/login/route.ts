@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { login } from '@/lib/auth'
 import { prisma } from '@/lib/db'
 import { z } from 'zod'
+import { rateLimiters } from '@/lib/api/rate-limiters'
 
 const loginSchema = z.object({
   email: z.string().email(),
@@ -9,11 +10,16 @@ const loginSchema = z.object({
 })
 
 export async function POST(request: NextRequest) {
+  const rateLimitResponse = await rateLimiters.auth(request)
+  if (rateLimitResponse) return rateLimitResponse
+
   try {
     const body = await request.json()
     const { email, password } = loginSchema.parse(body)
 
-    const result = await login(email, password)
+    const ip =
+      request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown'
+    const result = await login(email, password, ip)
 
     if (!result.success || !result.user || !result.token) {
       return NextResponse.json(

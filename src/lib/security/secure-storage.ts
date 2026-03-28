@@ -17,7 +17,11 @@ export interface EncryptedData {
 
 function getEncryptionKey(): string {
   if (typeof window === 'undefined') {
-    return process.env.SECURE_STORAGE_KEY ?? 'default-server-key-change-in-production'
+    const key = process.env.SECURE_STORAGE_KEY
+    if (!key) {
+      throw new Error('SECURE_STORAGE_KEY environment variable is not set')
+    }
+    return key
   }
 
   let key = sessionStorage.getItem('__secure_key')

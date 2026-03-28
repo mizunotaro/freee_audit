@@ -11,7 +11,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { bs, pl, cf, kpis, provider, apiKey, prompt } = body
+    const { bs, pl, cf, kpis, provider, prompt } = body
 
     if (!bs || !pl || !cf) {
       return NextResponse.json({ error: 'Missing financial data' }, { status: 400 })
@@ -29,7 +29,6 @@ export async function POST(request: NextRequest) {
       analysisKpis,
       {
         provider: provider || 'openai',
-        apiKey: apiKey || process.env.OPENAI_API_KEY,
       },
       prompt
     )

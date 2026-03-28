@@ -182,7 +182,7 @@ export default function JournalProposalPage() {
       )
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}))
+        const _errorData = await response.json().catch(() => ({}))
         setState((prev) => ({
           ...prev,
           isProcessing: false,

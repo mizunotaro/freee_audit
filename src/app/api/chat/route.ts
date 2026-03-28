@@ -4,6 +4,7 @@ import { createOrchestrator } from '@/lib/ai/orchestrator/orchestrator'
 import { createContextManager } from '@/lib/ai/context/context-manager'
 import type { PersonaType } from '@/lib/ai/personas/types'
 import type { PersonaAnalysis } from '@/lib/ai/orchestrator/orchestrator-types'
+import { getAuthUser } from '@/lib/api/auth-helpers'
 
 const PERSONA_NAMES: Record<PersonaType, string> = {
   cpa: '公認会計士',
@@ -21,6 +22,18 @@ export async function POST(request: NextRequest): Promise<NextResponse<ChatRespo
   const startTime = Date.now()
 
   try {
+    const authUser = await getAuthUser(request)
+    if (!authUser) {
+      return NextResponse.json(
+        {
+          success: false,
+          sessionId: '',
+          error: { code: 'unauthorized', message: 'Authentication required' },
+        },
+        { status: 401 }
+      )
+    }
+
     const body = await parseRequestBody(request)
     if (!body.success) {
       return NextResponse.json(
@@ -31,7 +44,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<ChatRespo
 
     const { message, sessionId, context, options } = body.data
 
-    const rateLimitResult = checkRateLimit(request)
+    const rateLimitResult = checkRateLimit(authUser.id)
     if (!rateLimitResult.allowed) {
       return NextResponse.json(
         {
@@ -53,7 +66,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<ChatRespo
       )
     }
 
-    const userId = extractUserId(request)
+    const userId = authUser.id
     const contextManager = createContextManager({
       defaultConfig: {
         maxMessages: 50,
@@ -179,13 +192,13 @@ async function parseRequestBody(
   }
 }
 
-function checkRateLimit(request: NextRequest): {
+function checkRateLimit(userId: string): {
   allowed: boolean
   limit: number
   remaining: number
   resetAt: number
 } {
-  const clientId = extractUserId(request) ?? 'anonymous'
+  const clientId = userId
   const now = Date.now()
   const key = `${clientId}:${Math.floor(now / RATE_LIMIT_WINDOW_MS)}`
 
@@ -219,20 +232,6 @@ function checkRateLimit(request: NextRequest): {
     remaining: RATE_LIMIT_MAX_REQUESTS - count - 1,
     resetAt: now + RATE_LIMIT_WINDOW_MS,
   }
-}
-
-function extractUserId(request: NextRequest): string {
-  const authHeader = request.headers.get('authorization')
-  if (authHeader?.startsWith('Bearer ')) {
-    return `user_${authHeader.slice(7, 20)}`
-  }
-
-  const sessionCookie = request.cookies.get('session')
-  if (sessionCookie?.value) {
-    return `session_${sessionCookie.value.slice(0, 12)}`
-  }
-
-  return `anonymous_${Date.now()}`
 }
 
 async function getOrCreateSession(

@@ -93,22 +93,7 @@ export function hashPassword(password: string): Promise<HashedPassword> {
   })
 }
 
-export function verifyPassword(
-  password: string,
-  stored: HashedPassword | string
-): Promise<boolean> {
-  if (typeof stored === 'string') {
-    console.warn(
-      '[DEPRECATED] verifyPassword called with string hash. This is insecure. Use HashedPassword object instead.'
-    )
-    return new Promise((resolve, reject) => {
-      crypto.scrypt(password, 'salt', 64, (err, derivedKey) => {
-        if (err) reject(err)
-        resolve(derivedKey.toString('hex') === stored)
-      })
-    })
-  }
-
+export function verifyPassword(password: string, stored: HashedPassword): Promise<boolean> {
   const { hash, salt } = stored
   return new Promise((resolve, reject) => {
     crypto.scrypt(password, salt, 64, (err, derivedKey) => {

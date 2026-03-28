@@ -50,13 +50,16 @@ RUN R -e "install.packages(c('ggplot2', 'plotly'), \
 RUN R -e "install.packages(c('nortest', 'Kendall', 'changepoint'), \
     repos='https://cloud.r-project.org/', dependencies=TRUE)"
 
+RUN groupadd -r appuser && useradd -r appuser -g appuser
+
 # Copy application files
 COPY R/ /app/R/
 COPY plumber.R /app/
 COPY tests/ /app/tests/
 
-# Create log directory
-RUN mkdir -p /app/logs
+RUN mkdir -p /app/logs && chown -R appuser:appuser /app
+
+USER appuser
 
 # Set environment variables
 ENV R_ENVIRON_USER=/app/.Renviron

@@ -83,22 +83,28 @@ export function constantTimeCompare(a: string, b: string): boolean {
   return crypto.timingSafeEqual(Buffer.from(a), Buffer.from(b))
 }
 
+function hashToken(token: string): string {
+  return crypto.createHash('sha256').update(token).digest('hex')
+}
+
 export async function createSession(
   userId: string,
   role: string,
   companyId: string | null
-): Promise<Session> {
+): Promise<{ token: string; session: Session }> {
   const sessionId = crypto.randomUUID()
   const token = await generateToken(userId, sessionId, role, companyId)
   const expiresAt = new Date(Date.now() + SESSION_DURATION_HOURS * 60 * 60 * 1000)
 
-  return prisma.session.create({
+  const session = await prisma.session.create({
     data: {
       userId,
-      token,
+      token: hashToken(token),
       expiresAt,
     },
   })
+
+  return { token, session }
 }
 
 export async function validateSession(token: string): Promise<AuthUser | null> {
@@ -106,7 +112,7 @@ export async function validateSession(token: string): Promise<AuthUser | null> {
   if (!decoded) return null
 
   const session = await prisma.session.findUnique({
-    where: { token },
+    where: { token: hashToken(token) },
     include: { user: true },
   })
 
@@ -123,19 +129,67 @@ export async function validateSession(token: string): Promise<AuthUser | null> {
   }
 }
 
-export async function login(email: string, password: string): Promise<LoginResult> {
+const DUMMY_HASH = '$2a$12$aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
+
+const LOCKOUT_MAX_ATTEMPTS = 5
+const LOCKOUT_DURATION_MS = 15 * 60 * 1000
+
+const loginAttempts = new Map<string, { count: number; lockedUntil: number }>()
+
+function getLockoutKey(email: string, ip: string): string {
+  return `${email}:${ip}`
+}
+
+function isAccountLocked(email: string, ip: string): boolean {
+  const key = getLockoutKey(email, ip)
+  const record = loginAttempts.get(key)
+  if (!record) return false
+  if (record.lockedUntil && Date.now() < record.lockedUntil) return true
+  if (record.lockedUntil && Date.now() >= record.lockedUntil) {
+    loginAttempts.delete(key)
+    return false
+  }
+  return false
+}
+
+function recordFailedAttempt(email: string, ip: string): void {
+  const key = getLockoutKey(email, ip)
+  const record = loginAttempts.get(key) ?? { count: 0, lockedUntil: 0 }
+  record.count++
+  if (record.count >= LOCKOUT_MAX_ATTEMPTS) {
+    record.lockedUntil = Date.now() + LOCKOUT_DURATION_MS
+  }
+  loginAttempts.set(key, record)
+}
+
+function clearFailedAttempts(email: string, ip: string): void {
+  loginAttempts.delete(getLockoutKey(email, ip))
+}
+
+export async function login(email: string, password: string, ip?: string): Promise<LoginResult> {
+  const clientIp = ip ?? 'unknown'
+
+  if (isAccountLocked(email, clientIp)) {
+    return { success: false, error: 'Account temporarily locked due to too many failed attempts' }
+  }
+
   const user = await prisma.user.findUnique({ where: { email } })
 
   if (!user || !user.passwordHash) {
+    await verifyPassword(password, DUMMY_HASH)
+    recordFailedAttempt(email, clientIp)
     return { success: false, error: 'Invalid credentials' }
   }
 
   const isValid = await verifyPassword(password, user.passwordHash)
   if (!isValid) {
+    recordFailedAttempt(email, clientIp)
     return { success: false, error: 'Invalid credentials' }
   }
 
-  const session = await createSession(user.id, user.role, user.companyId)
+  clearFailedAttempts(email, clientIp)
+
+  const { token, session: _session } = await createSession(user.id, user.role, user.companyId)
 
   return {
     success: true,
@@ -146,12 +200,12 @@ export async function login(email: string, password: string): Promise<LoginResul
       role: user.role,
       companyId: user.companyId,
     },
-    token: session.token,
+    token,
   }
 }
 
 export async function logout(token: string): Promise<void> {
-  await prisma.session.deleteMany({ where: { token } })
+  await prisma.session.deleteMany({ where: { token: hashToken(token) } })
 }
 
 export function hasPermission(userRole: string, requiredRoles: string[]): boolean {

@@ -1,6 +1,16 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { NextRequest } from 'next/server'
 
+vi.mock('@/lib/api/auth-helpers', () => ({
+  getAuthUser: vi.fn().mockResolvedValue({
+    id: 'test-user-id',
+    email: 'test@example.com',
+    name: 'Test User',
+    role: 'USER',
+    companyId: 'company-1',
+  }),
+}))
+
 describe('Chat API', () => {
   beforeEach(() => {
     vi.clearAllMocks()

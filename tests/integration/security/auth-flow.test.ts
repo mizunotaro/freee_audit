@@ -142,11 +142,14 @@ describe('Authentication Flow Security', () => {
         token: 'valid-token',
       })
       vi.mocked(createSession).mockResolvedValue({
-        id: 'session-1',
-        userId: mockUser.id,
         token: 'valid-token',
-        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
-        createdAt: new Date(),
+        session: {
+          id: 'session-1',
+          userId: mockUser.id,
+          token: 'hashed-token',
+          expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+          createdAt: new Date(),
+        },
       })
 
       const result = await login('test@example.com', 'password123')
