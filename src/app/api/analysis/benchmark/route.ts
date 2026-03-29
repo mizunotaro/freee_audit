@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { getAuthUser } from '@/lib/api/auth-helpers'
 import { compareWithBenchmark, createBenchmarkService } from '@/services/benchmark'
 import { CONFIG_VERSION } from '../config/constants'
 import { validateWithSchema, parseJsonSafely } from '../utils/validation'
@@ -56,6 +57,13 @@ import { addSecurityHeaders } from '../middleware/security-headers'
 async function handlePost(
   request: NextRequest
 ): Promise<NextResponse<ApiResponse<BenchmarkOutput>>> {
+  const user = await getAuthUser(request)
+  if (!user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 }) as unknown as NextResponse<
+      ApiResponse<BenchmarkOutput>
+    >
+  }
+
   const startTime = Date.now()
   const requestId = generateRequestId()
 
@@ -217,6 +225,10 @@ export async function POST(
   return addSecurityHeaders(response as NextResponse<ApiResponse<BenchmarkOutput>>)
 }
 
-export async function GET(): Promise<NextResponse> {
+export async function GET(request: NextRequest): Promise<NextResponse> {
+  const user = await getAuthUser(request)
+  if (!user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
   return handleGet()
 }

@@ -19,6 +19,7 @@ const AUTH_PATTERNS = [
   'getAuthenticatedUser',
   'requireRole',
   'requireCompanyAccess',
+  'requireAuth',
 ]
 
 async function findRouteFiles(dir: string, files: string[] = []): Promise<string[]> {

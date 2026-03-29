@@ -1,9 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { getAuthUser } from '@/lib/api/auth-helpers'
 import { ValuationQAService, ValuationQARequest } from '@/services/valuation/qa'
 import type { ValuationQAResult } from '@/services/valuation/qa'
 import { createAIProviderFromEnv } from '@/lib/integrations/ai'
 
 export async function POST(request: NextRequest) {
+  const user = await getAuthUser(request)
+  if (!user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
   const body = (await request.json()) as ValuationQARequest
 
   if (!body.calculationType || !body.inputs || !body.result || !body.steps) {

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { getAuthUser } from '@/lib/api/auth-helpers'
 import { analyzeFinancials } from '@/services/ai/analyzers'
 import { analyzeRatios } from '@/services/ai/analyzers/ratio-analyzer'
 import { compareWithBenchmark } from '@/services/benchmark'
@@ -90,6 +91,13 @@ interface GenerateReportResult {
 }
 
 async function handlePost(request: NextRequest): Promise<NextResponse<ApiResponse<ReportOutput>>> {
+  const user = await getAuthUser(request)
+  if (!user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 }) as unknown as NextResponse<
+      ApiResponse<ReportOutput>
+    >
+  }
+
   const startTime = Date.now()
   const requestId = generateRequestId()
 
