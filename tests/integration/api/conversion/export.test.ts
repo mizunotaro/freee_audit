@@ -18,43 +18,51 @@ vi.mock('@/lib/db', () => ({
 }))
 
 vi.mock('@/lib/conversion/exporters/pdf-exporter', () => ({
-  PDFExporter: vi.fn().mockImplementation(() => ({
-    export: vi.fn().mockResolvedValue({
-      buffer: Buffer.from('<html>test</html>'),
-      fileName: 'test.html',
-      mimeType: 'text/html',
-    }),
-  })),
+  PDFExporter: vi.fn().mockImplementation(function () {
+    return {
+      export: vi.fn().mockResolvedValue({
+        buffer: Buffer.from('<html>test</html>'),
+        fileName: 'test.html',
+        mimeType: 'text/html',
+      }),
+    }
+  }),
 }))
 
 vi.mock('@/lib/conversion/exporters/excel-exporter', () => ({
-  ExcelExporter: vi.fn().mockImplementation(() => ({
-    export: vi.fn().mockResolvedValue({
-      buffer: Buffer.from('csv,data'),
-      fileName: 'test.csv',
-      mimeType: 'text/csv',
-    }),
-  })),
+  ExcelExporter: vi.fn().mockImplementation(function () {
+    return {
+      export: vi.fn().mockResolvedValue({
+        buffer: Buffer.from('csv,data'),
+        fileName: 'test.csv',
+        mimeType: 'text/csv',
+      }),
+    }
+  }),
 }))
 
 vi.mock('@/lib/conversion/exporters/csv-exporter', () => ({
-  CSVExporter: vi.fn().mockImplementation(() => ({
-    export: vi.fn().mockResolvedValue({
-      buffer: Buffer.from('record_type,account_code'),
-      fileName: 'test.csv',
-      mimeType: 'text/csv',
-    }),
-  })),
+  CSVExporter: vi.fn().mockImplementation(function () {
+    return {
+      export: vi.fn().mockResolvedValue({
+        buffer: Buffer.from('record_type,account_code'),
+        fileName: 'test.csv',
+        mimeType: 'text/csv',
+      }),
+    }
+  }),
 }))
 
 vi.mock('@/lib/conversion/exporters/json-exporter', () => ({
-  JSONExporter: vi.fn().mockImplementation(() => ({
-    export: vi.fn().mockResolvedValue({
-      buffer: Buffer.from('{"test": true}'),
-      fileName: 'test.json',
-      mimeType: 'application/json',
-    }),
-  })),
+  JSONExporter: vi.fn().mockImplementation(function () {
+    return {
+      export: vi.fn().mockResolvedValue({
+        buffer: Buffer.from('{"test": true}'),
+        fileName: 'test.json',
+        mimeType: 'application/json',
+      }),
+    }
+  }),
 }))
 
 describe('Conversion Export API Integration', () => {

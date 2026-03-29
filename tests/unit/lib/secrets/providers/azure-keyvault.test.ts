@@ -1,4 +1,19 @@
+vi.mock('@azure/identity', () => ({
+  DefaultAzureCredential: class {},
+}))
+vi.mock('@azure/keyvault-secrets', () => ({
+  SecretClient: class {},
+}))
+
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+
+vi.mock('@azure/identity', () => ({
+  DefaultAzureCredential: class {},
+}))
+vi.mock('@azure/keyvault-secrets', () => ({
+  SecretClient: class {},
+}))
+
 import { AzureKeyVaultProvider } from '@/lib/secrets/providers/azure-keyvault'
 import type { AzureKeyVaultConfig, SecretValue } from '@/lib/secrets/types'
 

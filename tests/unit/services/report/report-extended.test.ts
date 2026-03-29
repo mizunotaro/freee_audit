@@ -11,12 +11,15 @@ import {
 } from '@/services/report/periodic-report'
 import type { MonthlyReport } from '@/types'
 
-const mockCompany = {
-  id: 'company-1',
-  name: 'Test Company',
-  createdAt: new Date(),
-  updatedAt: new Date(),
-}
+const { mockCompany } = vi.hoisted(() => {
+  const mockCompany = {
+    id: 'company-1',
+    name: 'Test Company',
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  }
+  return { mockCompany }
+})
 
 vi.mock('@/lib/db', () => ({
   prisma: {

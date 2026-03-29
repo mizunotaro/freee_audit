@@ -2,6 +2,8 @@ import { defineConfig } from 'vitest/config'
 import react from '@vitejs/plugin-react'
 import path from 'path'
 
+const emptyModulePath = path.resolve(__dirname, './tests/stubs/empty-module.ts')
+
 export default defineConfig({
   plugins: [react()],
   test: {
@@ -41,6 +43,10 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
+      '@google-cloud/secret-manager': emptyModulePath,
+      '@aws-sdk/client-secrets-manager': emptyModulePath,
+      '@azure/identity': emptyModulePath,
+      '@azure/keyvault-secrets': emptyModulePath,
     },
   },
 })

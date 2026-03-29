@@ -6,14 +6,17 @@ import {
   getMultiMonthReport,
 } from '@/services/report/monthly-report'
 
-const mockCompany = {
-  id: 'company-1',
-  name: 'テスト株式会社',
-  freeeCompanyId: 'freee-1',
-  fiscalYearStart: 4,
-  createdAt: new Date(),
-  updatedAt: new Date(),
-}
+const { mockCompany } = vi.hoisted(() => {
+  const mockCompany = {
+    id: 'company-1',
+    name: 'テスト株式会社',
+    freeeCompanyId: 'freee-1',
+    fiscalYearStart: 4,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  }
+  return { mockCompany }
+})
 
 vi.mock('@/lib/db', () => ({
   prisma: {

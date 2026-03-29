@@ -1,4 +1,20 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+
+vi.mock('@google-cloud/secret-manager', () => ({
+  SecretManagerServiceClient: class {},
+}))
+vi.mock('@aws-sdk/client-secrets-manager', () => ({
+  SecretsManagerClient: class {},
+  GetSecretValueCommand: class {},
+  ListSecretsCommand: class {},
+}))
+vi.mock('@azure/identity', () => ({
+  DefaultAzureCredential: class {},
+}))
+vi.mock('@azure/keyvault-secrets', () => ({
+  SecretClient: class {},
+}))
+
 import {
   SecretsManager,
   EnvSecretProvider,
