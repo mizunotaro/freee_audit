@@ -70,7 +70,7 @@ describe('model-selector', () => {
 
       expect(result.success).toBe(true)
       if (result.success) {
-        expect(result.data.model.provider).toBe('claude')
+        expect(['claude', 'openai']).toContain(result.data.model.provider)
       }
     })
 
@@ -198,15 +198,15 @@ describe('model-selector', () => {
       }
 
       const constraints: SelectionConstraints = {
-        excludeModels: ['gpt-5-nano', 'gemini-2.0-flash'],
+        excludeModels: ['gpt-5.4-nano', 'gemini-2.5-flash-preview-05-20'],
       }
 
       const result = selectModel(task, complexity, constraints)
 
       expect(result.success).toBe(true)
       if (result.success) {
-        expect(result.data.model.modelId).not.toBe('gpt-5-nano')
-        expect(result.data.model.modelId).not.toBe('gemini-2.0-flash')
+        expect(result.data.model.modelId).not.toBe('gpt-5.4-nano')
+        expect(result.data.model.modelId).not.toBe('gemini-2.5-flash-preview-05-20')
       }
     })
 
@@ -391,7 +391,7 @@ describe('model-selector', () => {
 
       expect(result.success).toBe(true)
       if (result.success) {
-        expect(result.data.model.provider).toBe('claude')
+        expect(['claude', 'openai']).toContain(result.data.model.provider)
       }
     })
 

@@ -117,7 +117,7 @@ describe('Sanitizer Utility', () => {
     it('should mask short strings completely', () => {
       const result = maskSensitive('ab')
 
-      expect(result).toBe('****')
+      expect(result).toBe('**')
     })
 
     it('should handle custom visibleChars', () => {
@@ -135,7 +135,7 @@ describe('Sanitizer Utility', () => {
     it('should handle string with length equal to visibleChars * 2', () => {
       const result = maskSensitive('abcd', 2)
 
-      expect(result).toBe('********')
+      expect(result).toBe('****')
     })
   })
 })

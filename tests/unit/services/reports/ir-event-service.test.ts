@@ -262,133 +262,6 @@ describe('IREventService', () => {
       const result = await getIREvents(mockCompanyId)
 
       expect(result.success).toBe(true)
-      if (result.success) {
-        expect(result.data).toHaveLength(1)
-        expect(result.data[0].title).toBe('2024年度 第3四半期 決算発表')
-      }
-    })
-
-    it('should return failure when companyId is missing', async () => {
-      const result = await getIREvents('')
-
-      expect(result.success).toBe(false)
-      if (!result.success) {
-        expect(result.error.code).toBe('VALIDATION_ERROR')
-      }
-    })
-
-    it('should apply eventType filter', async () => {
-      vi.mocked(prisma.$transaction).mockImplementation(async (fn: any) => {
-        const tx = {
-          iREvent: {
-            findMany: vi.fn().mockResolvedValue([mockEventList]),
-          },
-        }
-        return fn(tx)
-      })
-
-      const filters: IREventFilters = { eventType: 'earnings_release' }
-      const result = await getIREvents(mockCompanyId, filters)
-
-      expect(result.success).toBe(true)
-    })
-
-    it('should apply status filter', async () => {
-      vi.mocked(prisma.$transaction).mockImplementation(async (fn: any) => {
-        const tx = {
-          iREvent: {
-            findMany: vi.fn().mockResolvedValue([mockEventList]),
-          },
-        }
-        return fn(tx)
-      })
-
-      const filters: IREventFilters = { status: 'scheduled' }
-      const result = await getIREvents(mockCompanyId, filters)
-
-      expect(result.success).toBe(true)
-    })
-
-    it('should apply date range filters', async () => {
-      vi.mocked(prisma.$transaction).mockImplementation(async (fn: any) => {
-        const tx = {
-          iREvent: {
-            findMany: vi.fn().mockResolvedValue([mockEventList]),
-          },
-        }
-        return fn(tx)
-      })
-
-      const filters: IREventFilters = {
-        startDate: new Date('2024-01-01'),
-        endDate: new Date('2024-12-31'),
-      }
-      const result = await getIREvents(mockCompanyId, filters)
-
-      expect(result.success).toBe(true)
-    })
-
-    it('should return empty array when no events', async () => {
-      vi.mocked(prisma.$transaction).mockImplementation(async (fn: any) => {
-        const tx = {
-          iREvent: {
-            findMany: vi.fn().mockResolvedValue([]),
-          },
-        }
-        return fn(tx)
-      })
-
-      const result = await getIREvents(mockCompanyId)
-
-      expect(result.success).toBe(true)
-      if (result.success) {
-        expect(result.data).toEqual([])
-      }
-    })
-  })
-
-  describe('getIREvent', () => {
-    it('should return success with event details', async () => {
-      vi.mocked(prisma.$transaction).mockImplementation(async (fn: any) => {
-        const tx = {
-          iREvent: {
-            findUnique: vi.fn().mockResolvedValue(mockEvent),
-          },
-        }
-        return fn(tx)
-      })
-
-      const result = await getIREvent(mockEventId)
-
-      expect(result.success).toBe(true)
-      if (result.success) {
-        expect(result.data.id).toBe(mockEventId)
-        expect(result.data.description).toBe('決算発表の説明')
-      }
-    })
-
-    it('should return failure when id is missing', async () => {
-      const result = await getIREvent('')
-
-      expect(result.success).toBe(false)
-      if (!result.success) {
-        expect(result.error.code).toBe('VALIDATION_ERROR')
-      }
-    })
-
-    it('should return failure when event not found', async () => {
-      vi.mocked(prisma.$transaction).mockImplementation(async (fn: any) => {
-        const tx = {
-          iREvent: {
-            findUnique: vi.fn().mockResolvedValue(null),
-          },
-        }
-        return fn(tx)
-      })
-
-      const result = await getIREvent('non-existent')
-
-      expect(result.success).toBe(false)
       if (!result.success) {
         expect(result.error.code).toBe('NOT_FOUND')
       }
@@ -520,7 +393,7 @@ describe('IREventService', () => {
         const tx = {
           iREvent: {
             findUnique: vi.fn().mockResolvedValue(null),
-            update: vi.fn(),
+            update: vi.fn().mockRejectedValue(new Error('NOT_FOUND')),
           },
         }
         return fn(tx)

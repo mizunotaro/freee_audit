@@ -14,15 +14,15 @@ describe('FloatingChatWidget', () => {
 
   describe('初期状態', () => {
     it('閉じた状態でレンダリングされる', () => {
-      render(<FloatingChatWidget />)
+      const { container } = render(<FloatingChatWidget />)
 
-      expect(screen.getByRole('button', { name: /message-circle/i })).toBeInTheDocument()
+      expect(container.querySelector('button')).toBeInTheDocument()
     })
 
     it('クリックで開く', () => {
-      render(<FloatingChatWidget />)
+      const { container } = render(<FloatingChatWidget />)
 
-      const button = screen.getByRole('button', { name: /message-circle/i })
+      const button = container.querySelector('button')!
       fireEvent.click(button)
 
       expect(screen.getByText('財務AIアシスタント')).toBeInTheDocument()
@@ -44,12 +44,12 @@ describe('FloatingChatWidget', () => {
         }),
       })
 
-      render(<FloatingChatWidget />)
+      const { container } = render(<FloatingChatWidget />)
 
-      const button = screen.getByRole('button', { name: /message-circle/i })
+      const button = container.querySelector('button')!
       fireEvent.click(button)
 
-      const input = screen.getByPlaceholderText('財務に関する質問を入力...')
+      const input = screen.getByPlaceholderText('質問を入力...')
       fireEvent.change(input, { target: { value: 'テスト質問' } })
       fireEvent.keyDown(input, { key: 'Enter', code: 'Enter' })
 
@@ -73,12 +73,12 @@ describe('FloatingChatWidget', () => {
         }),
       })
 
-      render(<FloatingChatWidget />)
+      const { container } = render(<FloatingChatWidget />)
 
-      const button = screen.getByRole('button', { name: /message-circle/i })
+      const button = container.querySelector('button')!
       fireEvent.click(button)
 
-      const input = screen.getByPlaceholderText('財務に関する質問を入力...')
+      const input = screen.getByPlaceholderText('質問を入力...')
       fireEvent.change(input, { target: { value: 'エラーテスト' } })
       fireEvent.keyDown(input, { key: 'Enter', code: 'Enter' })
 
@@ -90,24 +90,26 @@ describe('FloatingChatWidget', () => {
 
   describe('ウィジェット操作', () => {
     it('最小化ボタンで最小化できる', () => {
-      render(<FloatingChatWidget />)
+      const { container } = render(<FloatingChatWidget />)
 
-      const button = screen.getByRole('button', { name: /message-circle/i })
+      const button = container.querySelector('button')!
       fireEvent.click(button)
 
-      const minimizeButton = screen.getByRole('button', { name: /minus/i })
+      const buttons = screen.getAllByRole('button')
+      const minimizeButton = buttons.find((b) => b.querySelector('.lucide-minus'))!
       fireEvent.click(minimizeButton)
 
       expect(screen.getByText('財務AIアシスタント')).toBeInTheDocument()
     })
 
     it('閉じるボタンで閉じられる', () => {
-      render(<FloatingChatWidget />)
+      const { container } = render(<FloatingChatWidget />)
 
-      const button = screen.getByRole('button', { name: /message-circle/i })
+      const button = container.querySelector('button')!
       fireEvent.click(button)
 
-      const closeButton = screen.getByRole('button', { name: /x/i })
+      const buttons = screen.getAllByRole('button')
+      const closeButton = buttons.find((b) => b.querySelector('.lucide-x'))!
       fireEvent.click(closeButton)
 
       expect(screen.queryByText('財務AIアシスタント')).not.toBeInTheDocument()

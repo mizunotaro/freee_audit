@@ -102,7 +102,7 @@ describe('OpenAIProvider', () => {
 
       expect(mockCreate).toHaveBeenCalledWith(
         expect.objectContaining({
-          model: 'gpt-5-nano',
+          model: 'gpt-5.4-nano',
           max_tokens: 1024,
           temperature: 0.1,
           response_format: { type: 'json_object' },
@@ -425,7 +425,7 @@ describe('OpenAIProvider', () => {
 
       expect(mockCreate).toHaveBeenCalledWith(
         expect.objectContaining({
-          model: 'gpt-5-nano',
+          model: 'gpt-5.4-nano',
           messages: expect.arrayContaining([
             expect.objectContaining({
               role: 'system',

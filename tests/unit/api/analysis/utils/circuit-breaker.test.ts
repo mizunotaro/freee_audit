@@ -54,7 +54,9 @@ describe('Circuit Breaker', () => {
         }
       }
 
-      await expect(circuitBreaker.execute(operation)).rejects.toThrow('Circuit breaker is open')
+      await expect(circuitBreaker.execute(operation)).rejects.toThrow(
+        'Service temporarily unavailable due to repeated failures'
+      )
       expect(operation).toHaveBeenCalledTimes(2)
     })
   })
@@ -75,7 +77,9 @@ describe('Circuit Breaker', () => {
         // Expected error - testing half-open state transition
       }
 
-      await expect(circuitBreaker.execute(failOperation)).rejects.toThrow('Circuit breaker is open')
+      await expect(circuitBreaker.execute(failOperation)).rejects.toThrow(
+        /Service temporarily unavailable/
+      )
 
       vi.advanceTimersByTime(1000)
 

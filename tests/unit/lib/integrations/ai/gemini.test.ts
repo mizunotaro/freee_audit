@@ -46,7 +46,7 @@ describe('GeminiProvider', () => {
       const p = new GeminiProvider({ provider: 'gemini', apiKey: 'key' })
       expect(p).toBeDefined()
       expect(p.name).toBe('gemini')
-      expect(p.getModel()).toBe('gemini-2.0-flash')
+      expect(p.getModel()).toBe('gemini-2.5-flash-preview-05-20')
     })
 
     it('should create instance with optional config', () => {
@@ -63,7 +63,7 @@ describe('GeminiProvider', () => {
 
     it('should use gemini-2.0-flash as default model', () => {
       const p = new GeminiProvider({ provider: 'gemini', apiKey: 'key' })
-      expect(p.getModel()).toBe('gemini-2.0-flash')
+      expect(p.getModel()).toBe('gemini-2.5-flash-preview-05-20')
     })
 
     it('should accept custom safety settings', () => {

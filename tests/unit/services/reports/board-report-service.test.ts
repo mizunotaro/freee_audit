@@ -11,32 +11,8 @@ import {
 } from '@/services/reports/board-report-service'
 import type { ProfitLoss, BalanceSheet, CashFlowStatement } from '@/types'
 
-vi.mock('@/lib/db', () => ({
-  prisma: {
-    $transaction: vi.fn(async (fn: any) => {
-      const tx = {
-        boardReport: {
-          findMany: vi.fn(),
-          findUnique: vi.fn(),
-          create: vi.fn(),
-          update: vi.fn(),
-          delete: vi.fn(),
-        },
-        boardReportSection: {
-          update: vi.fn(),
-        },
-        debt: {
-          findMany: vi.fn(),
-        },
-        budget: {
-          findFirst: vi.fn(),
-        },
-        budgetItem: {
-          findMany: vi.fn(),
-        },
-      }
-      return fn(tx)
-    }),
+vi.mock('@/lib/db', () => {
+  const prismaMocks = {
     boardReport: {
       findMany: vi.fn(),
       findUnique: vi.fn(),
@@ -56,8 +32,17 @@ vi.mock('@/lib/db', () => ({
     budgetItem: {
       findMany: vi.fn(),
     },
-  },
-}))
+  }
+
+  return {
+    prisma: {
+      $transaction: vi.fn(async (fn: any) => {
+        return fn(prismaMocks)
+      }),
+      ...prismaMocks,
+    },
+  }
+})
 
 vi.mock('@/services/budget/detailed-actual-vs-budget', () => ({
   calculateDetailedActualVsBudget: vi.fn().mockResolvedValue({

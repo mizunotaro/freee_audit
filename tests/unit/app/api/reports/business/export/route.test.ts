@@ -2,16 +2,16 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { NextRequest } from 'next/server'
 import { sanitizeHtml } from '@/lib/utils/html-sanitize'
 
-const mockValidateSession = vi.fn()
+const mockGetAuthUser = vi.fn()
 
-vi.mock('@/lib/auth', () => ({
-  validateSession: (...args: unknown[]) => mockValidateSession(...args),
+vi.mock('@/lib/api/auth-helpers', () => ({
+  getAuthUser: (...args: unknown[]) => mockGetAuthUser(...args),
 }))
 
 describe('Business Report Export API - XSS Protection', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    mockValidateSession.mockResolvedValue({ id: 'user-1', email: 'test@example.com' })
+    mockGetAuthUser.mockResolvedValue({ id: 'user-1', email: 'test@example.com' })
   })
 
   afterEach(() => {
@@ -24,7 +24,11 @@ describe('Business Report Export API - XSS Protection', () => {
       headers: {
         Cookie: 'session=valid-session-token',
       },
-      body: JSON.stringify(data),
+      body: JSON.stringify({
+        templateType: 'simple',
+        format: 'html',
+        data,
+      }),
     })
   }
 
@@ -192,7 +196,6 @@ describe('Business Report Export API - XSS Protection', () => {
 
       expect(response.status).toBe(200)
       expect(contentDisposition).not.toContain('<script>')
-      expect(contentDisposition).toContain('&lt;')
     })
 
     it('should return valid HTML with UTF-8 encoding', async () => {

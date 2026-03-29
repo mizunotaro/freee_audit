@@ -139,7 +139,7 @@ describe('OpenRouterProvider', () => {
 
       expect(mockCreate).toHaveBeenCalledWith(
         expect.objectContaining({
-          model: 'openai/gpt-5-nano',
+          model: 'openai/gpt-5.4-nano',
           max_tokens: 1024,
           temperature: 0.1,
           response_format: { type: 'json_object' },
@@ -518,7 +518,7 @@ describe('OpenRouterProvider', () => {
 
       expect(mockCreate).toHaveBeenCalledWith(
         expect.objectContaining({
-          model: 'openai/gpt-5-nano',
+          model: 'openai/gpt-5.4-nano',
           response_format: { type: 'json_object' },
           provider: { zdr: true },
         })

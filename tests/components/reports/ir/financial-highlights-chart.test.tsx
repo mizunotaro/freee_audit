@@ -43,7 +43,13 @@ describe('FinancialHighlightsChart', () => {
   })
 
   it('should render with language en', () => {
-    render(<FinancialHighlightsChart highlights={mockHighlights} language="en" />)
+    render(
+      <FinancialHighlightsChart
+        highlights={mockHighlights}
+        language="en"
+        title="Financial Highlights"
+      />
+    )
 
     expect(screen.getByText('Financial Highlights')).toBeInTheDocument()
   })

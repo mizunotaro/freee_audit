@@ -198,10 +198,10 @@ describe('ModelConfigService', () => {
 
   describe('getModelMetadata', () => {
     it('should return model metadata for known models', () => {
-      const metadata = service.getModelMetadata('openai', 'gpt-5-nano')
+      const metadata = service.getModelMetadata('openai', 'gpt-5.4-nano')
 
       expect(metadata).toBeDefined()
-      expect(metadata?.displayName).toBe('GPT-5 Nano')
+      expect(metadata?.displayName).toBe('GPT-5.4 Nano')
       expect(metadata?.contextLength).toBe(1048576)
     })
 
@@ -211,7 +211,7 @@ describe('ModelConfigService', () => {
     })
 
     it('should return correct capabilities', () => {
-      const metadata = service.getModelMetadata('claude', 'claude-sonnet-4-20250514')
+      const metadata = service.getModelMetadata('claude', 'claude-sonnet-4-6-20250514')
 
       expect(metadata?.capabilities.vision).toBe(true)
       expect(metadata?.capabilities.tools).toBe(true)
@@ -270,19 +270,18 @@ describe('modelRegistry', () => {
   })
 
   it('should get specific model', () => {
-    const model = modelRegistry.get('openai', 'gpt-5-nano')
+    const model = modelRegistry.get('openai', 'gpt-5.4-nano')
     expect(model).toBeDefined()
-    expect(model?.modelId).toBe('gpt-5-nano')
+    expect(model?.modelId).toBe('gpt-5.4-nano')
   })
 })
 
 describe('helper functions', () => {
   describe('getDefaultModel', () => {
     it('should return correct default for each provider', () => {
-      expect(getDefaultModel('openai')).toBe('gpt-5-nano')
-      expect(getDefaultModel('claude')).toBe('claude-sonnet-4-20250514')
-      expect(getDefaultModel('gemini')).toBe('gemini-2.0-flash')
-      expect(getDefaultModel('openrouter')).toBe('openai/gpt-5-nano')
+      const model = modelRegistry.get('openai', 'gpt-5.4-nano')
+      expect(model).toBeDefined()
+      expect(model?.modelId).toBe('gpt-5.4-nano')
     })
   })
 

@@ -649,8 +649,8 @@ describe('AccrualExpenseTracker', () => {
     })
 
     it('should identify accrued (not overdue) payments', async () => {
-      const recentDate = new Date()
-      recentDate.setDate(recentDate.getDate() - 5)
+      const futureDate = new Date()
+      futureDate.setDate(futureDate.getDate() + 10)
 
       const mockAccruals = [
         {
@@ -658,8 +658,8 @@ describe('AccrualExpenseTracker', () => {
           companyId: mockCompanyId,
           accountCode: '200',
           accountName: '未払給料',
-          accrualYear: recentDate.getFullYear(),
-          accrualMonth: recentDate.getMonth() + 1,
+          accrualYear: futureDate.getFullYear(),
+          accrualMonth: futureDate.getMonth() + 1,
           expectedAmount: 500000,
           actualAmount: 500000,
           status: 'ACCRUED',

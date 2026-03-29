@@ -118,13 +118,19 @@ describe('IssueDetector', () => {
         { row: 2, data: { amount: 10000 } },
         { row: 3, data: { amount: 11000 } },
         { row: 4, data: { amount: 10500 } },
-        { row: 5, data: { amount: 10000000 } }, // Anomaly
+        { row: 5, data: { amount: 10200 } },
+        { row: 6, data: { amount: 10800 } },
+        { row: 7, data: { amount: 9900 } },
+        { row: 8, data: { amount: 11200 } },
+        { row: 9, data: { amount: 10100 } },
+        { row: 10, data: { amount: 10700 } },
+        { row: 11, data: { amount: 10000000 } },
       ]
 
       const issues = detector.detectAmountAnomalies(rows, 'amount')
 
-      expect(issues.some((i) => i.row === 5)).toBe(true)
-      expect(issues.find((i) => i.row === 5)?.type).toBe('unusual_amount')
+      expect(issues.some((i) => i.row === 11)).toBe(true)
+      expect(issues.find((i) => i.row === 11)?.type).toBe('unusual_amount')
     })
 
     it('should not flag normal amounts', () => {
@@ -143,12 +149,18 @@ describe('IssueDetector', () => {
       const rows = [
         { row: 2, data: { amount: '10,000' } },
         { row: 3, data: { amount: '11,000' } },
-        { row: 4, data: { amount: '1,000,000' } },
+        { row: 4, data: { amount: '10,500' } },
+        { row: 5, data: { amount: '10,200' } },
+        { row: 6, data: { amount: '9,800' } },
+        { row: 7, data: { amount: '10,700' } },
+        { row: 8, data: { amount: '10,100' } },
+        { row: 9, data: { amount: '10,300' } },
+        { row: 10, data: { amount: '500,000,000' } },
       ]
 
       const issues = detector.detectAmountAnomalies(rows, 'amount')
 
-      expect(issues.some((i) => i.row === 4)).toBe(true)
+      expect(issues.some((i) => i.row === 10)).toBe(true)
     })
 
     it('should return empty array for less than 3 rows', () => {
@@ -220,7 +232,7 @@ describe('IssueDetector', () => {
     })
 
     it('should accept correct tax calculations', () => {
-      const rows = [{ row: 2, data: { amount: 110000, taxAmount: 10000, taxType: '課税10%' } }]
+      const rows = [{ row: 2, data: { amount: 110000, taxAmount: 11000, taxType: '課税10%' } }]
 
       const issues = detector.detectTaxIssues(rows, 'amount', 'taxAmount', 'taxType')
 
