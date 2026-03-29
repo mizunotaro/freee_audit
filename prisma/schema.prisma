@@ -167,17 +167,19 @@ model AuditResult {
 }
 
 model AuditLog {
-  id         String   @id @default(cuid())
-  userId     String?  @map("user_id")
-  user       User?    @relation(fields: [userId], references: [id])
-  action     String
-  resource   String
-  resourceId String?  @map("resource_id")
-  ipAddress  String?  @map("ip_address")
-  userAgent  String?  @map("user_agent")
-  details    String?
-  result     String
-  createdAt  DateTime @default(now()) @map("created_at")
+  id           String   @id @default(cuid())
+  userId       String?  @map("user_id")
+  user         User?    @relation(fields: [userId], references: [id])
+  action       String
+  resource     String
+  resourceId   String?  @map("resource_id")
+  ipAddress    String?  @map("ip_address")
+  userAgent    String?  @map("user_agent")
+  details      String?
+  result       String
+  contentHash  String?  @map("content_hash")
+  previousHash String?  @map("previous_hash")
+  createdAt    DateTime @default(now()) @map("created_at")
 
   @@index([userId])
   @@index([action])

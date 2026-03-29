@@ -7,6 +7,7 @@ process.env.NEXTAUTH_URL = 'http://localhost:3000'
 process.env.JWT_SECRET = 'test-jwt-secret-for-testing'
 process.env.ENCRYPTION_KEY = '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef'
 process.env.CSRF_SECRET = 'test-csrf-secret-for-testing-320'
+process.env.AUDIT_HASH_SECRET = 'test-audit-hash-secret-for-testing-min-32-chars'
 
 beforeAll(() => {
   ;(process.env as Record<string, string | undefined>).NODE_ENV = 'test'

@@ -1,8 +1,12 @@
 export {
   createCsrfToken,
   validateCsrfToken,
+  consumeCsrfToken,
+  isTokenConsumed,
+  attachNewCsrfToken,
   withCsrfProtection,
   csrfMiddleware,
+  NEW_CSRF_HEADER,
 } from './csrf-protection'
 
 export {

@@ -1,4 +1,7 @@
+import crypto from 'crypto'
 import { prisma } from '@/lib/db'
+
+const VERSION = '2.0.0'
 
 export interface AuditLogInput {
   userId?: string
@@ -23,19 +26,104 @@ export interface ApiCallLogInput {
   userId?: string
 }
 
+export interface IntegrityVerificationResult {
+  valid: boolean
+  totalEntries: number
+  brokenEntries: Array<{
+    id: string
+    index: number
+    expectedHash: string
+    actualHash: string | null
+  }>
+}
+
+function computeEntryHash(
+  entry: {
+    id: string
+    userId: string | null
+    action: string
+    resource: string
+    resourceId: string | null
+    ipAddress: string | null
+    userAgent: string | null
+    details: string | null
+    result: string
+    createdAt: Date
+    previousHash: string | null
+  },
+  secret: string
+): string {
+  const payload = JSON.stringify({
+    id: entry.id,
+    userId: entry.userId,
+    action: entry.action,
+    resource: entry.resource,
+    resourceId: entry.resourceId,
+    ipAddress: entry.ipAddress,
+    userAgent: entry.userAgent,
+    details: entry.details,
+    result: entry.result,
+    createdAt: entry.createdAt.toISOString(),
+    previousHash: entry.previousHash,
+  })
+
+  return crypto.createHmac('sha256', secret).update(payload).digest('hex')
+}
+
+function getAuditHashSecret(): string {
+  const secret = process.env.AUDIT_HASH_SECRET
+  if (!secret || secret.length < 32) {
+    throw new Error('AUDIT_HASH_SECRET must be set and at least 32 characters')
+  }
+  return secret
+}
+
+async function getPreviousHash(): Promise<string | null> {
+  const lastEntry = await prisma.auditLog.findFirst({
+    orderBy: { createdAt: 'desc' },
+    select: { contentHash: true },
+  })
+  return lastEntry?.contentHash ?? null
+}
+
 class AuditLogger {
   async log(input: AuditLogInput): Promise<void> {
     try {
+      const previousHash = await getPreviousHash()
+      const secret = getAuditHashSecret()
+
+      const entryData = {
+        userId: input.userId ?? null,
+        action: input.action,
+        resource: input.resource,
+        resourceId: input.resourceId ?? null,
+        ipAddress: input.ipAddress ?? null,
+        userAgent: input.userAgent ?? null,
+        details: input.details ? JSON.stringify(input.details) : null,
+        result: input.result,
+        previousHash,
+      }
+
+      const tempEntry = {
+        ...entryData,
+        id: 'pending',
+        createdAt: new Date(),
+      }
+
+      const contentHash = computeEntryHash(tempEntry, secret)
+
       await prisma.auditLog.create({
         data: {
-          userId: input.userId,
-          action: input.action,
-          resource: input.resource,
-          resourceId: input.resourceId,
-          ipAddress: input.ipAddress,
-          userAgent: input.userAgent,
-          details: input.details ? JSON.stringify(input.details) : null,
-          result: input.result,
+          userId: entryData.userId,
+          action: entryData.action,
+          resource: entryData.resource,
+          resourceId: entryData.resourceId,
+          ipAddress: entryData.ipAddress,
+          userAgent: entryData.userAgent,
+          details: entryData.details,
+          result: entryData.result,
+          previousHash: entryData.previousHash,
+          contentHash,
         },
       })
     } catch (error) {
@@ -45,23 +133,20 @@ class AuditLogger {
 
   async logApiCall(input: ApiCallLogInput): Promise<void> {
     try {
-      await prisma.auditLog.create({
-        data: {
-          userId: input.userId,
-          action: `API_CALL:${input.provider}`,
-          resource: `${input.method} ${input.endpoint}`,
-          resourceId: undefined,
-          details: JSON.stringify({
-            provider: input.provider,
-            endpoint: input.endpoint,
-            method: input.method,
-            statusCode: input.statusCode,
-            durationMs: input.durationMs,
-            requestData: input.requestData,
-            error: input.error,
-          }),
-          result: input.statusCode >= 200 && input.statusCode < 400 ? 'SUCCESS' : 'FAILURE',
+      await this.log({
+        userId: input.userId,
+        action: `API_CALL:${input.provider}`,
+        resource: `${input.method} ${input.endpoint}`,
+        details: {
+          provider: input.provider,
+          endpoint: input.endpoint,
+          method: input.method,
+          statusCode: input.statusCode,
+          durationMs: input.durationMs,
+          requestData: input.requestData,
+          error: input.error,
         },
+        result: input.statusCode >= 200 && input.statusCode < 400 ? 'SUCCESS' : 'FAILURE',
       })
     } catch (error) {
       console.error('[AuditLogger] Failed to write API call log:', error)
@@ -195,6 +280,36 @@ class AuditLogger {
       take: limit,
     })
   }
+
+  async verifyIntegrity(limit = 10000): Promise<IntegrityVerificationResult> {
+    const secret = getAuditHashSecret()
+    const entries = await prisma.auditLog.findMany({
+      orderBy: { createdAt: 'asc' },
+      take: limit,
+    })
+
+    const brokenEntries: IntegrityVerificationResult['brokenEntries'] = []
+
+    for (let i = 0; i < entries.length; i++) {
+      const entry = entries[i]
+      const expectedHash = computeEntryHash(entry, secret)
+
+      if (entry.contentHash !== expectedHash) {
+        brokenEntries.push({
+          id: entry.id,
+          index: i,
+          expectedHash,
+          actualHash: entry.contentHash,
+        })
+      }
+    }
+
+    return {
+      valid: brokenEntries.length === 0,
+      totalEntries: entries.length,
+      brokenEntries,
+    }
+  }
 }
 
 export const auditLogger = new AuditLogger()
@@ -236,3 +351,5 @@ async function withApiLoggingAsync<T>(
       .catch(console.error)
   }
 }
+
+export { VERSION, computeEntryHash }

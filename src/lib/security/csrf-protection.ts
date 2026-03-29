@@ -12,10 +12,31 @@ function getRequiredEnvVar(name: string): string {
   return value
 }
 
+const VERSION = '2.0.0'
+
 const CSRF_SECRET: string = getRequiredEnvVar('CSRF_SECRET')
 const CSRF_TOKEN_EXPIRY = 60 * 60 * 1000
 const CSRF_HEADER = 'x-csrf-token'
 const CSRF_COOKIE = 'csrf-token'
+const NEW_CSRF_HEADER = 'x-new-csrf-token'
+
+const consumedTokens = new Map<string, number>()
+const CLEANUP_INTERVAL = 5 * 60 * 1000
+const MAX_CONSUMED_CACHE = 10000
+
+let lastCleanup = Date.now()
+
+function cleanupConsumedTokens(): void {
+  const now = Date.now()
+  if (now - lastCleanup < CLEANUP_INTERVAL && consumedTokens.size < MAX_CONSUMED_CACHE) return
+  lastCleanup = now
+  const expiryThreshold = now - CSRF_TOKEN_EXPIRY
+  for (const [token, consumedAt] of consumedTokens) {
+    if (consumedAt < expiryThreshold) {
+      consumedTokens.delete(token)
+    }
+  }
+}
 
 interface CsrfTokenData {
   token: string
@@ -63,8 +84,35 @@ export function validateCsrfToken(token: string): boolean {
   return verified !== null
 }
 
+export function consumeCsrfToken(token: string): boolean {
+  cleanupConsumedTokens()
+
+  if (consumedTokens.has(token)) {
+    return false
+  }
+
+  const verified = verifySignedToken(token)
+  if (verified === null) {
+    return false
+  }
+
+  consumedTokens.set(token, Date.now())
+  return true
+}
+
+export function isTokenConsumed(token: string): boolean {
+  return consumedTokens.has(token)
+}
+
 export function getCsrfTokenFromRequest(req: NextRequest): string | null {
   return req.headers.get(CSRF_HEADER)
+}
+
+export function attachNewCsrfToken(response: NextResponse): NextResponse {
+  const newToken = createCsrfToken()
+  response.headers.set(NEW_CSRF_HEADER, newToken.token)
+  setCsrfCookie(response, newToken.token)
+  return response
 }
 
 export function withCsrfProtection(
@@ -80,11 +128,15 @@ export function withCsrfProtection(
       return NextResponse.json({ success: false, error: 'CSRF token missing' }, { status: 403 })
     }
 
-    if (!validateCsrfToken(token)) {
-      return NextResponse.json({ success: false, error: 'Invalid CSRF token' }, { status: 403 })
+    if (!consumeCsrfToken(token)) {
+      return NextResponse.json(
+        { success: false, error: 'Invalid or reused CSRF token' },
+        { status: 403 }
+      )
     }
 
-    return handler(req)
+    const response = await handler(req)
+    return attachNewCsrfToken(response)
   }
 }
 
@@ -101,6 +153,7 @@ export function setCsrfCookie(response: NextResponse, token: string): void {
 export function csrfMiddleware(): {
   generateToken: () => CsrfTokenData
   validate: (token: string) => boolean
+  consume: (token: string) => boolean
   protect: (
     handler: (req: NextRequest) => Promise<NextResponse>
   ) => (req: NextRequest) => Promise<NextResponse>
@@ -108,6 +161,9 @@ export function csrfMiddleware(): {
   return {
     generateToken: createCsrfToken,
     validate: validateCsrfToken,
+    consume: consumeCsrfToken,
     protect: withCsrfProtection,
   }
 }
+
+export { NEW_CSRF_HEADER, VERSION }

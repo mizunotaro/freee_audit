@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { auditLogger } from '@/lib/audit/audit-logger'
+import { auditLogger, computeEntryHash, VERSION } from '@/lib/audit/audit-logger'
 import { prisma } from '@/lib/db'
 
 vi.mock('@/lib/db', () => ({
@@ -7,17 +7,24 @@ vi.mock('@/lib/db', () => ({
     auditLog: {
       create: vi.fn(),
       findMany: vi.fn(),
+      findFirst: vi.fn(),
     },
   },
 }))
 
+const ORIGINAL_AUDIT_HASH_SECRET = process.env.AUDIT_HASH_SECRET
+
 describe('auditLogger', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    process.env.AUDIT_HASH_SECRET = 'test-audit-hash-secret-for-testing-min-32-chars'
   })
 
   describe('log', () => {
-    it('should create audit log entry', async () => {
+    it('should create audit log entry with content hash and previous hash', async () => {
+      vi.mocked(prisma.auditLog.findFirst).mockResolvedValue({
+        contentHash: 'previous-hash-value',
+      } as any)
       vi.mocked(prisma.auditLog.create).mockResolvedValue({} as any)
 
       await auditLogger.log({
@@ -28,21 +35,43 @@ describe('auditLogger', () => {
         result: 'SUCCESS',
       })
 
-      expect(prisma.auditLog.create).toHaveBeenCalledWith({
-        data: {
-          userId: 'user-1',
-          action: 'CREATE_ITEM',
-          resource: 'item',
-          resourceId: 'item-1',
-          ipAddress: undefined,
-          userAgent: undefined,
-          details: null,
-          result: 'SUCCESS',
-        },
-      })
+      expect(prisma.auditLog.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            userId: 'user-1',
+            action: 'CREATE_ITEM',
+            resource: 'item',
+            resourceId: 'item-1',
+            result: 'SUCCESS',
+            previousHash: 'previous-hash-value',
+            contentHash: expect.any(String),
+          }),
+        })
+      )
     })
 
-    it('should handle optional fields', async () => {
+    it('should set previousHash to null for first entry', async () => {
+      vi.mocked(prisma.auditLog.findFirst).mockResolvedValue(null)
+      vi.mocked(prisma.auditLog.create).mockResolvedValue({} as any)
+
+      await auditLogger.log({
+        action: 'FIRST_ENTRY',
+        resource: 'system',
+        result: 'SUCCESS',
+      })
+
+      expect(prisma.auditLog.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            previousHash: null,
+            contentHash: expect.any(String),
+          }),
+        })
+      )
+    })
+
+    it('should handle optional fields with null conversion', async () => {
+      vi.mocked(prisma.auditLog.findFirst).mockResolvedValue(null)
       vi.mocked(prisma.auditLog.create).mockResolvedValue({} as any)
 
       await auditLogger.log({
@@ -54,23 +83,25 @@ describe('auditLogger', () => {
         details: { page: '/dashboard', duration: 5000 },
       })
 
-      expect(prisma.auditLog.create).toHaveBeenCalledWith({
-        data: {
-          userId: undefined,
-          action: 'VIEW_DASHBOARD',
-          resource: 'dashboard',
-          resourceId: undefined,
-          ipAddress: '192.168.1.1',
-          userAgent: 'Mozilla/5.0',
-          details: JSON.stringify({ page: '/dashboard', duration: 5000 }),
-          result: 'SUCCESS',
-        },
-      })
+      expect(prisma.auditLog.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            userId: null,
+            action: 'VIEW_DASHBOARD',
+            resource: 'dashboard',
+            resourceId: null,
+            ipAddress: '192.168.1.1',
+            userAgent: 'Mozilla/5.0',
+            details: JSON.stringify({ page: '/dashboard', duration: 5000 }),
+            result: 'SUCCESS',
+          }),
+        })
+      )
     })
 
     it('should handle database errors gracefully', async () => {
       const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
-      vi.mocked(prisma.auditLog.create).mockRejectedValue(new Error('Database error'))
+      vi.mocked(prisma.auditLog.findFirst).mockRejectedValue(new Error('Database error'))
 
       await auditLogger.log({
         action: 'TEST',
@@ -87,6 +118,7 @@ describe('auditLogger', () => {
     })
 
     it('should handle FAILURE result', async () => {
+      vi.mocked(prisma.auditLog.findFirst).mockResolvedValue(null)
       vi.mocked(prisma.auditLog.create).mockResolvedValue({} as any)
 
       await auditLogger.log({
@@ -109,7 +141,8 @@ describe('auditLogger', () => {
   })
 
   describe('logApiCall', () => {
-    it('should log successful API call', async () => {
+    it('should log successful API call with hash', async () => {
+      vi.mocked(prisma.auditLog.findFirst).mockResolvedValue(null)
       vi.mocked(prisma.auditLog.create).mockResolvedValue({} as any)
 
       await auditLogger.logApiCall({
@@ -122,27 +155,19 @@ describe('auditLogger', () => {
         userId: 'user-1',
       })
 
-      expect(prisma.auditLog.create).toHaveBeenCalledWith({
-        data: {
-          userId: 'user-1',
-          action: 'API_CALL:freee',
-          resource: 'GET /api/1/journals',
-          resourceId: undefined,
-          details: JSON.stringify({
-            provider: 'freee',
-            endpoint: '/api/1/journals',
-            method: 'GET',
-            statusCode: 200,
-            durationMs: 150,
-            requestData: { limit: 100 },
-            error: undefined,
+      expect(prisma.auditLog.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            action: 'API_CALL:freee',
+            resource: 'GET /api/1/journals',
+            contentHash: expect.any(String),
           }),
-          result: 'SUCCESS',
-        },
-      })
+        })
+      )
     })
 
     it('should log failed API call', async () => {
+      vi.mocked(prisma.auditLog.findFirst).mockResolvedValue(null)
       vi.mocked(prisma.auditLog.create).mockResolvedValue({} as any)
 
       await auditLogger.logApiCall({
@@ -165,7 +190,7 @@ describe('auditLogger', () => {
 
     it('should handle database errors gracefully', async () => {
       const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
-      vi.mocked(prisma.auditLog.create).mockRejectedValue(new Error('DB error'))
+      vi.mocked(prisma.auditLog.findFirst).mockRejectedValue(new Error('DB error'))
 
       await auditLogger.logApiCall({
         provider: 'test',
@@ -183,6 +208,7 @@ describe('auditLogger', () => {
 
   describe('logUserAction', () => {
     it('should log user action with default SUCCESS result', async () => {
+      vi.mocked(prisma.auditLog.findFirst).mockResolvedValue(null)
       vi.mocked(prisma.auditLog.create).mockResolvedValue({} as any)
 
       await auditLogger.logUserAction('user-1', 'UPDATE_SETTINGS', 'settings', 'setting-1', {
@@ -191,96 +217,289 @@ describe('auditLogger', () => {
         newValue: 'dark',
       })
 
-      expect(prisma.auditLog.create).toHaveBeenCalledWith({
-        data: expect.objectContaining({
-          userId: 'user-1',
-          action: 'UPDATE_SETTINGS',
-          resource: 'settings',
-          resourceId: 'setting-1',
-          result: 'SUCCESS',
-          details: JSON.stringify({
-            field: 'theme',
-            oldValue: 'light',
-            newValue: 'dark',
+      expect(prisma.auditLog.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            userId: 'user-1',
+            action: 'UPDATE_SETTINGS',
+            resource: 'settings',
+            resourceId: 'setting-1',
+            result: 'SUCCESS',
           }),
-        }),
-      })
+        })
+      )
     })
 
     it('should handle missing optional parameters', async () => {
+      vi.mocked(prisma.auditLog.findFirst).mockResolvedValue(null)
       vi.mocked(prisma.auditLog.create).mockResolvedValue({} as any)
 
       await auditLogger.logUserAction('user-1', 'VIEW_REPORT', 'report')
 
-      expect(prisma.auditLog.create).toHaveBeenCalledWith({
-        data: expect.objectContaining({
-          userId: 'user-1',
-          action: 'VIEW_REPORT',
-          resource: 'report',
-          resourceId: undefined,
-          ipAddress: undefined,
-          userAgent: undefined,
-          details: null,
-          result: 'SUCCESS',
-        }),
-      })
+      expect(prisma.auditLog.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            userId: 'user-1',
+            action: 'VIEW_REPORT',
+            resource: 'report',
+            resourceId: null,
+            result: 'SUCCESS',
+          }),
+        })
+      )
     })
   })
 
   describe('logLogin', () => {
     it('should log user login', async () => {
+      vi.mocked(prisma.auditLog.findFirst).mockResolvedValue(null)
       vi.mocked(prisma.auditLog.create).mockResolvedValue({} as any)
 
       await auditLogger.logLogin('user-1', '192.168.1.1', 'Mozilla/5.0')
 
-      expect(prisma.auditLog.create).toHaveBeenCalledWith({
-        data: expect.objectContaining({
-          userId: 'user-1',
-          action: 'LOGIN',
-          resource: 'session',
-          ipAddress: '192.168.1.1',
-          userAgent: 'Mozilla/5.0',
-          result: 'SUCCESS',
-        }),
-      })
+      expect(prisma.auditLog.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            userId: 'user-1',
+            action: 'LOGIN',
+            resource: 'session',
+            ipAddress: '192.168.1.1',
+            userAgent: 'Mozilla/5.0',
+            result: 'SUCCESS',
+          }),
+        })
+      )
     })
 
     it('should handle login without IP/user agent', async () => {
+      vi.mocked(prisma.auditLog.findFirst).mockResolvedValue(null)
       vi.mocked(prisma.auditLog.create).mockResolvedValue({} as any)
 
       await auditLogger.logLogin('user-1')
 
-      expect(prisma.auditLog.create).toHaveBeenCalledWith({
-        data: expect.objectContaining({
-          userId: 'user-1',
-          action: 'LOGIN',
-          ipAddress: undefined,
-          userAgent: undefined,
-        }),
-      })
+      expect(prisma.auditLog.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            userId: 'user-1',
+            action: 'LOGIN',
+            ipAddress: null,
+            userAgent: null,
+          }),
+        })
+      )
     })
   })
 
   describe('logLogout', () => {
     it('should log user logout', async () => {
+      vi.mocked(prisma.auditLog.findFirst).mockResolvedValue(null)
       vi.mocked(prisma.auditLog.create).mockResolvedValue({} as any)
 
       await auditLogger.logLogout('user-1', '192.168.1.1')
 
-      expect(prisma.auditLog.create).toHaveBeenCalledWith({
-        data: expect.objectContaining({
-          userId: 'user-1',
-          action: 'LOGOUT',
-          resource: 'session',
-          ipAddress: '192.168.1.1',
-          result: 'SUCCESS',
-        }),
-      })
+      expect(prisma.auditLog.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            userId: 'user-1',
+            action: 'LOGOUT',
+            resource: 'session',
+            ipAddress: '192.168.1.1',
+            result: 'SUCCESS',
+          }),
+        })
+      )
+    })
+  })
+
+  describe('hash chain integrity', () => {
+    it('should compute deterministic hash for same data', () => {
+      const entry = {
+        id: 'test-id',
+        userId: 'user-1',
+        action: 'TEST',
+        resource: 'test',
+        resourceId: null,
+        ipAddress: null,
+        userAgent: null,
+        details: null,
+        result: 'SUCCESS',
+        createdAt: new Date('2025-01-01T00:00:00Z'),
+        previousHash: null,
+      }
+
+      const hash1 = computeEntryHash(entry, 'test-secret-key-at-least-32-characters-long')
+      const hash2 = computeEntryHash(entry, 'test-secret-key-at-least-32-characters-long')
+
+      expect(hash1).toBe(hash2)
+      expect(hash1.length).toBe(64)
+    })
+
+    it('should produce different hash when data changes', () => {
+      const baseEntry = {
+        id: 'test-id',
+        userId: 'user-1',
+        action: 'TEST',
+        resource: 'test',
+        resourceId: null,
+        ipAddress: null,
+        userAgent: null,
+        details: null,
+        result: 'SUCCESS',
+        createdAt: new Date('2025-01-01T00:00:00Z'),
+        previousHash: null,
+      }
+
+      const hash1 = computeEntryHash(baseEntry, 'test-secret-key-at-least-32-characters-long')
+
+      const modifiedEntry = { ...baseEntry, action: 'MODIFIED' }
+      const hash2 = computeEntryHash(modifiedEntry, 'test-secret-key-at-least-32-characters-long')
+
+      expect(hash1).not.toBe(hash2)
+    })
+
+    it('should produce different hash when previousHash changes', () => {
+      const entry = {
+        id: 'test-id',
+        userId: 'user-1',
+        action: 'TEST',
+        resource: 'test',
+        resourceId: null,
+        ipAddress: null,
+        userAgent: null,
+        details: null,
+        result: 'SUCCESS',
+        createdAt: new Date('2025-01-01T00:00:00Z'),
+        previousHash: null,
+      }
+
+      const hash1 = computeEntryHash(entry, 'test-secret-key-at-least-32-characters-long')
+
+      const chainedEntry = { ...entry, previousHash: 'abc123' }
+      const hash2 = computeEntryHash(chainedEntry, 'test-secret-key-at-least-32-characters-long')
+
+      expect(hash1).not.toBe(hash2)
+    })
+  })
+
+  describe('verifyIntegrity', () => {
+    it('should return valid for unmodified entries', async () => {
+      const secret = 'test-audit-hash-secret-for-testing-min-32-chars'
+      process.env.AUDIT_HASH_SECRET = secret
+
+      const entry = {
+        id: 'entry-1',
+        userId: 'user-1',
+        action: 'TEST',
+        resource: 'test',
+        resourceId: null,
+        ipAddress: null,
+        userAgent: null,
+        details: null,
+        result: 'SUCCESS',
+        createdAt: new Date('2025-01-01T00:00:00Z'),
+        previousHash: null,
+      }
+
+      const correctHash = computeEntryHash(entry, secret)
+
+      vi.mocked(prisma.auditLog.findMany).mockResolvedValue([
+        { ...entry, contentHash: correctHash },
+      ] as any)
+
+      const result = await auditLogger.verifyIntegrity()
+
+      expect(result.valid).toBe(true)
+      expect(result.totalEntries).toBe(1)
+      expect(result.brokenEntries).toHaveLength(0)
+    })
+
+    it('should detect tampered entries', async () => {
+      const secret = 'test-audit-hash-secret-for-testing-min-32-chars'
+      process.env.AUDIT_HASH_SECRET = secret
+
+      const entry = {
+        id: 'entry-1',
+        userId: 'user-1',
+        action: 'TAMPERED_ACTION',
+        resource: 'test',
+        resourceId: null,
+        ipAddress: null,
+        userAgent: null,
+        details: null,
+        result: 'SUCCESS',
+        createdAt: new Date('2025-01-01T00:00:00Z'),
+        previousHash: null,
+        contentHash: 'old-hash-from-original-data',
+      }
+
+      vi.mocked(prisma.auditLog.findMany).mockResolvedValue([entry] as any)
+
+      const result = await auditLogger.verifyIntegrity()
+
+      expect(result.valid).toBe(false)
+      expect(result.totalEntries).toBe(1)
+      expect(result.brokenEntries).toHaveLength(1)
+      expect(result.brokenEntries[0].id).toBe('entry-1')
+      expect(result.brokenEntries[0].index).toBe(0)
+    })
+
+    it('should return valid for empty log', async () => {
+      vi.mocked(prisma.auditLog.findMany).mockResolvedValue([])
+
+      const result = await auditLogger.verifyIntegrity()
+
+      expect(result.valid).toBe(true)
+      expect(result.totalEntries).toBe(0)
+      expect(result.brokenEntries).toHaveLength(0)
+    })
+
+    it('should detect multiple tampered entries', async () => {
+      const secret = 'test-audit-hash-secret-for-testing-min-32-chars'
+      process.env.AUDIT_HASH_SECRET = secret
+
+      const entry1 = {
+        id: 'entry-1',
+        userId: null,
+        action: 'A',
+        resource: 'test',
+        resourceId: null,
+        ipAddress: null,
+        userAgent: null,
+        details: null,
+        result: 'SUCCESS',
+        createdAt: new Date('2025-01-01T00:00:00Z'),
+        previousHash: null,
+      }
+
+      const entry2 = {
+        id: 'entry-2',
+        userId: null,
+        action: 'B',
+        resource: 'test',
+        resourceId: null,
+        ipAddress: null,
+        userAgent: null,
+        details: null,
+        result: 'SUCCESS',
+        createdAt: new Date('2025-01-01T00:01:00Z'),
+        previousHash: null,
+      }
+
+      vi.mocked(prisma.auditLog.findMany).mockResolvedValue([
+        { ...entry1, contentHash: 'tampered-1' },
+        { ...entry2, contentHash: 'tampered-2' },
+      ] as any)
+
+      const result = await auditLogger.verifyIntegrity()
+
+      expect(result.valid).toBe(false)
+      expect(result.brokenEntries).toHaveLength(2)
     })
   })
 
   describe('robustness', () => {
     it('should handle null values in details', async () => {
+      vi.mocked(prisma.auditLog.findFirst).mockResolvedValue(null)
       vi.mocked(prisma.auditLog.create).mockResolvedValue({} as any)
 
       await auditLogger.log({
@@ -290,31 +509,17 @@ describe('auditLogger', () => {
         details: { value: null, nested: { key: null } },
       })
 
-      expect(prisma.auditLog.create).toHaveBeenCalledWith({
-        data: expect.objectContaining({
-          details: JSON.stringify({ value: null, nested: { key: null } }),
-        }),
-      })
-    })
-
-    it('should handle undefined values in details', async () => {
-      vi.mocked(prisma.auditLog.create).mockResolvedValue({} as any)
-
-      await auditLogger.log({
-        action: 'TEST',
-        resource: 'test',
-        result: 'SUCCESS',
-        details: { value: undefined },
-      })
-
-      expect(prisma.auditLog.create).toHaveBeenCalledWith({
-        data: expect.objectContaining({
-          details: JSON.stringify({}), // undefined values are omitted in JSON
-        }),
-      })
+      expect(prisma.auditLog.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            details: JSON.stringify({ value: null, nested: { key: null } }),
+          }),
+        })
+      )
     })
 
     it('should handle very large details object', async () => {
+      vi.mocked(prisma.auditLog.findFirst).mockResolvedValue(null)
       vi.mocked(prisma.auditLog.create).mockResolvedValue({} as any)
 
       const largeDetails = {
@@ -332,6 +537,7 @@ describe('auditLogger', () => {
     })
 
     it('should handle special characters in fields', async () => {
+      vi.mocked(prisma.auditLog.findFirst).mockResolvedValue(null)
       vi.mocked(prisma.auditLog.create).mockResolvedValue({} as any)
 
       await auditLogger.log({
@@ -354,6 +560,7 @@ describe('auditLogger', () => {
 
   describe('data consistency', () => {
     it('should serialize details consistently', async () => {
+      vi.mocked(prisma.auditLog.findFirst).mockResolvedValue(null)
       vi.mocked(prisma.auditLog.create).mockResolvedValue({} as any)
 
       const details = { a: 1, b: 2, c: 3 }

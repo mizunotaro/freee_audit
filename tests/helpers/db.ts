@@ -213,6 +213,7 @@ export async function setupTestDatabase(): Promise<void> {
   process.env.JWT_SECRET = 'test-jwt-secret-for-testing'
   process.env.ENCRYPTION_KEY = '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef'
   process.env.CSRF_SECRET = 'test-csrf-secret-for-testing-320'
+  process.env.AUDIT_HASH_SECRET = 'test-audit-hash-secret-for-testing-min-32-chars'
 }
 
 export async function cleanupTestDatabase(): Promise<void> {}
