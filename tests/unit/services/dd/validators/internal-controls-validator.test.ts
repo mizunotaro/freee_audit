@@ -194,8 +194,8 @@ describe('InternalControlsValidator', () => {
   describe('General controls fallback', () => {
     it('handles unknown rule types via general controls', async () => {
       const rules = [
-        { type: 'DOCUMENTATION' as const, field: 'general_control' },
-        { type: 'RECONCILIATION' as const, field: 'general_check' },
+        { type: 'COMPLETENESS' as const, field: 'general_control' },
+        { type: 'RATIO' as const, field: 'general_check' },
       ]
       const context = makeContext([])
 
@@ -215,7 +215,11 @@ describe('InternalControlsValidator', () => {
       analyticsContext: null as any,
     }
 
-    const result = await validator.validate('IC', [], context)
+    const result = await validator.validate(
+      'IC',
+      [{ type: 'DOCUMENTATION' as const, field: 'test' }],
+      context
+    )
     expect(result.success).toBe(false)
   })
 })

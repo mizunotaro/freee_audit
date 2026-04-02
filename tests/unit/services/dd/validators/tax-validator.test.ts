@@ -70,7 +70,7 @@ describe('TaxValidator', () => {
   describe('AUDIT_HISTORY rule', () => {
     it('detects high audit risk score across multiple years', async () => {
       const journalsByYear: DDJournalData[] = []
-      for (let year = 2020; year <= 2020; year++) {
+      for (let year = 2016; year <= 2020; year++) {
         journalsByYear.push(
           makeJournal({
             entryDate: new Date(`${year}-06-15`),
@@ -84,7 +84,7 @@ describe('TaxValidator', () => {
         )
       }
       const context = makeContext(journalsByYear, 2020)
-      context.analyticsContext.fiscalYears = [2020]
+      context.analyticsContext.fiscalYears = [2016, 2017, 2018, 2019, 2020]
       context.analyticsContext.journals = journalsByYear
       const rules = [{ type: 'AUDIT_HISTORY' as const, field: 'tax_audits', lookback: 5 }]
 
@@ -169,13 +169,13 @@ describe('TaxValidator', () => {
       const journals = [
         makeJournal({
           debitAccount: '法人税',
-          creditAccount: '法人税等',
+          creditAccount: '現金',
           amount: 100000,
           description: '税額',
         }),
         makeJournal({
           debitAccount: '法人税',
-          creditAccount: '未払法人税',
+          creditAccount: '現金',
           amount: 10000,
           description: '未払',
         }),
