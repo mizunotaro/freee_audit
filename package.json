@@ -30,7 +30,7 @@
     "db:reset": "prisma migrate reset --force",
     "audit:check": "pnpm audit --audit-level=moderate || true",
     "security:scan": "npx better-npm-audit audit",
-    "prepare": "husky"
+    "prepare": "husky || true"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.78.0",
