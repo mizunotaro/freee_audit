@@ -69,7 +69,7 @@ jobs:
       DATABASE_URL: 'file:./test.db'
       JWT_SECRET: 'test-jwt-secret'
       ENCRYPTION_KEY: '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef'
-      CSRF_SECRET: 'test-csrf-secret'
+      CSRF_SECRET: 'test-csrf-secret-key-for-ci-environment-32chars'
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -107,7 +107,7 @@ jobs:
       DATABASE_URL: 'file:./test.db'
       JWT_SECRET: 'test-jwt-secret'
       ENCRYPTION_KEY: '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef'
-      CSRF_SECRET: 'test-csrf-secret'
+      CSRF_SECRET: 'test-csrf-secret-key-for-ci-environment-32chars'
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -139,7 +139,11 @@ jobs:
       DATABASE_URL: 'file:./test.db'
       JWT_SECRET: 'test-jwt-secret'
       ENCRYPTION_KEY: '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef'
-      CSRF_SECRET: 'test-csrf-secret'
+      CSRF_SECRET: 'test-csrf-secret-key-for-ci-environment-32chars'
+      FREEE_MOCK_MODE: 'true'
+      AI_MOCK_MODE: 'true'
+      NEXT_PUBLIC_APP_NAME: 'freee_audit'
+      NODE_ENV: 'test'
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -209,6 +213,15 @@ jobs:
     name: Build
     runs-on: ubuntu-latest
     needs: [lint, typecheck, unit-tests, security-audit]
+    env:
+      DATABASE_URL: 'file:./test.db'
+      JWT_SECRET: 'test-jwt-secret'
+      ENCRYPTION_KEY: '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef'
+      CSRF_SECRET: 'test-csrf-secret-key-for-ci-environment-32chars'
+      FREEE_MOCK_MODE: 'true'
+      AI_MOCK_MODE: 'true'
+      NEXT_PUBLIC_APP_NAME: 'freee_audit'
+      NODE_ENV: 'production'
     steps:
       - name: Checkout
         uses: actions/checkout@v4
