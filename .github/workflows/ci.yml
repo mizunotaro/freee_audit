@@ -92,13 +92,8 @@ jobs:
         run: pnpm db:generate
 
       - name: Run Unit Tests
-        run: pnpm test:coverage
-
-      - name: Upload Coverage
-        uses: codecov/codecov-action@v4
-        with:
-          files: ./coverage/lcov.info
-          fail_ci_if_error: false
+        run: pnpm test --reporter=verbose
+        timeout-minutes: 10
 
   integration-tests:
     name: Integration Tests
@@ -173,6 +168,7 @@ jobs:
 
       - name: Run E2E Tests
         run: pnpm e2e
+        timeout-minutes: 5
 
       - name: Upload Playwright Report
         uses: actions/upload-artifact@v4
