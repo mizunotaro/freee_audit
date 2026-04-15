@@ -419,7 +419,9 @@
       "analysisFailed": "Analysis failed",
       "invalidFileType": "Unsupported file type",
       "fileTooLarge": "File size too large",
-      "noProposals": "Could not generate journal proposals"
+      "noProposals": "Could not generate journal proposals",
+      "regenerateFailed": "Failed to regenerate proposal",
+      "exportFailed": "Failed to transfer to freee"
     },
     "fallback": {
       "title": "Manual Input",

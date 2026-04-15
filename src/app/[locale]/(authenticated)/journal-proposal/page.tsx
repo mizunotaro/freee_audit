@@ -363,17 +363,33 @@ export default function JournalProposalPage() {
       )}
 
       {state.viewMode === 'upload' && (
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-          <div className="lg:col-span-1">
-            <ReceiptUploader onUpload={handleUpload} isProcessing={state.isProcessing} />
-            {state.showFallback && (
-              <div className="mt-4">
-                <FallbackInput onSubmit={handleFallbackSubmit} isProcessing={state.isProcessing} />
-              </div>
-            )}
-          </div>
-          <div className="lg:col-span-2">
-            <ProposalList proposals={mockProposals} onSelectProposal={handleSelectProposal} />
+        <div className="space-y-6">
+          <Alert>
+            <AlertTitle>使い方</AlertTitle>
+            <AlertDescription className="space-y-1">
+              <p>① 領収書・請求書のPDF/画像をアップロード → OCRで自動読取</p>
+              <p>② AIが勘定科目・税区分を含む仕訳を提案 → 内容を確認・編集</p>
+              <p>③「承認」後に「freeeへ転送」で仕訳データを自動登録</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                ※ OCRサーバーまたはAI APIキーが未設定の場合は手動入力モードに切り替わります
+              </p>
+            </AlertDescription>
+          </Alert>
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+            <div className="lg:col-span-1">
+              <ReceiptUploader onUpload={handleUpload} isProcessing={state.isProcessing} />
+              {state.showFallback && (
+                <div className="mt-4">
+                  <FallbackInput
+                    onSubmit={handleFallbackSubmit}
+                    isProcessing={state.isProcessing}
+                  />
+                </div>
+              )}
+            </div>
+            <div className="lg:col-span-2">
+              <ProposalList proposals={mockProposals} onSelectProposal={handleSelectProposal} />
+            </div>
           </div>
         </div>
       )}

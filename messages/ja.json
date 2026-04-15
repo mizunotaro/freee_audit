@@ -419,7 +419,9 @@
       "analysisFailed": "分析に失敗しました",
       "invalidFileType": "対応していないファイル形式です",
       "fileTooLarge": "ファイルサイズが大きすぎます",
-      "noProposals": "仕訳提案を生成できませんでした"
+      "noProposals": "仕訳提案を生成できませんでした",
+      "regenerateFailed": "再生成に失敗しました",
+      "exportFailed": "freeeへの転送に失敗しました"
     },
     "fallback": {
       "title": "手動入力",
