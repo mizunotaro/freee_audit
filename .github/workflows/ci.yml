@@ -229,8 +229,7 @@ jobs:
       CSRF_SECRET: 'test-csrf-secret-key-for-ci-environment-32chars'
       FREEE_MOCK_MODE: 'true'
       AI_MOCK_MODE: 'true'
-      NEXT_PUBLIC_APP_NAME: 'freee_audit'
-      NODE_ENV: 'production'
+      NEXT_PUBLIC_APP_NAME: '管理部門支援システム'
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -248,12 +247,16 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+        env:
+          NODE_ENV: development
 
       - name: Generate Prisma Client
         run: pnpm db:generate
 
       - name: Build Application
         run: pnpm build
+        env:
+          NODE_ENV: production
 
       - name: Upload Build Artifact
         uses: actions/upload-artifact@v4
