@@ -96,7 +96,7 @@ export function useChat(options: UseChatOptions = {}): UseChatReturn {
         }
       } catch (err) {
         clearTimeout(timeoutId)
-        if (err instanceof Error && err.name === 'AbortError') {
+        if ((err as { name?: string })?.name === 'AbortError') {
           return
         }
         const error = err instanceof Error ? err : new Error('Unknown error')
@@ -179,45 +179,43 @@ export function useChat(options: UseChatOptions = {}): UseChatReturn {
 
           for (const line of lines) {
             if (line.startsWith('data: ')) {
+              let chunk: StreamChunk
               try {
-                const chunk: StreamChunk = JSON.parse(line.slice(6))
-                onStreamChunk?.(chunk)
+                chunk = JSON.parse(line.slice(6))
+              } catch {
+                continue
+              }
 
-                if (chunk.type === 'intent') {
-                  const data = chunk.data as { sessionId?: string }
-                  if (data.sessionId) {
-                    setSessionId(data.sessionId)
-                  }
-                }
+              onStreamChunk?.(chunk)
 
-                if (chunk.type === 'persona_complete') {
-                  const data = chunk.data as { persona: string; conclusion: string }
-                  setMessages((prev) => [
-                    ...prev,
-                    {
-                      role: 'assistant',
-                      content: `[${data.persona}] ${data.conclusion}`,
-                      timestamp: new Date(),
-                    },
-                  ])
+              if (chunk.type === 'intent') {
+                const data = chunk.data as { sessionId?: string }
+                if (data.sessionId) {
+                  setSessionId(data.sessionId)
                 }
+              }
 
-                if (chunk.type === 'error') {
-                  const data = chunk.data as { message: string }
-                  throw new Error(data.message)
-                }
-              } catch (parseError) {
-                if (parseError instanceof Error && parseError.message !== 'error') {
-                  console.warn('Failed to parse chunk:', parseError)
-                } else {
-                  throw parseError
-                }
+              if (chunk.type === 'persona_complete') {
+                const data = chunk.data as { persona: string; conclusion: string }
+                setMessages((prev) => [
+                  ...prev,
+                  {
+                    role: 'assistant',
+                    content: `[${data.persona}] ${data.conclusion}`,
+                    timestamp: new Date(),
+                  },
+                ])
+              }
+
+              if (chunk.type === 'error') {
+                const data = chunk.data as { message: string }
+                throw new Error(data.message)
               }
             }
           }
         }
       } catch (err) {
-        if (err instanceof Error && err.name === 'AbortError') {
+        if ((err as { name?: string })?.name === 'AbortError') {
           return
         }
         const error = err instanceof Error ? err : new Error('Unknown error')

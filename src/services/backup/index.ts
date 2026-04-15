@@ -3,6 +3,29 @@ import { failure, createAppError, tryCatch, type Result, type AppError } from '@
 import * as fs from 'fs'
 import * as path from 'path'
 
+const ALLOWED_BACKUP_DIR = path.resolve(process.cwd(), 'backups')
+const ALLOWED_EXPORT_DIR = path.resolve(process.cwd(), 'exports')
+
+function validateOutputDir(requestedDir: string | undefined, allowedBase: string): string {
+  const resolved = path.resolve(requestedDir ?? allowedBase)
+  if (!resolved.startsWith(allowedBase)) {
+    throw new Error(`Path traversal detected: output must be under ${allowedBase}`)
+  }
+  return resolved
+}
+
+function sanitizeCsvValue(value: unknown): string {
+  if (value === null || value === undefined) return ''
+  let str = String(value)
+  if (/^[=+\-@\t\r]/.test(str)) {
+    str = `'${str}`
+  }
+  if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+    return `"${str.replace(/"/g, '""')}"`
+  }
+  return str
+}
+
 export interface BackupOptions {
   companyId?: string
   backupType: 'full' | 'database' | 'documents' | 'settings'
@@ -33,11 +56,9 @@ export async function createDatabaseBackup(
   return tryCatch(async () => {
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)
     const fileName = `backup_${options.backupType}_${timestamp}.json`
-    const outputDir = options.outputDir ?? path.join(process.cwd(), 'backups')
+    const outputDir = validateOutputDir(options.outputDir, ALLOWED_BACKUP_DIR)
 
-    if (!fs.existsSync(outputDir)) {
-      fs.mkdirSync(outputDir, { recursive: true })
-    }
+    await fs.promises.mkdir(outputDir, { recursive: true })
 
     const filePath = path.join(outputDir, fileName)
 
@@ -50,8 +71,8 @@ export async function createDatabaseBackup(
       tables,
     }
 
-    fs.writeFileSync(filePath, JSON.stringify(backupData, null, 2), 'utf-8')
-    const stats = fs.statSync(filePath)
+    await fs.promises.writeFile(filePath, JSON.stringify(backupData, null, 2), 'utf-8')
+    const stats = await fs.promises.stat(filePath)
 
     const record = await prisma.backupRecord.create({
       data: {
@@ -59,7 +80,7 @@ export async function createDatabaseBackup(
         backupType: options.backupType,
         fileName,
         filePath,
-        fileSize: stats.size,
+        fileSize: Number(stats.size),
         destination: options.destination,
         status: 'completed',
       },
@@ -69,7 +90,7 @@ export async function createDatabaseBackup(
       id: record.id,
       fileName,
       filePath,
-      fileSize: stats.size,
+      fileSize: Number(stats.size),
       destination: options.destination,
     }
   }, 'DATABASE_ERROR')
@@ -77,13 +98,23 @@ export async function createDatabaseBackup(
 
 async function collectDatabaseData(companyId?: string): Promise<Record<string, unknown[]>> {
   const tables: Record<string, unknown[]> = {}
-
   tables.companies = companyId
     ? await prisma.company.findMany({ where: { id: companyId } })
     : await prisma.company.findMany()
-  tables.users = companyId
-    ? await prisma.user.findMany({ where: { companyId } })
-    : await prisma.user.findMany()
+
+  tables.users = await prisma.user.findMany({
+    ...(companyId ? { where: { companyId } } : {}),
+    select: {
+      id: true,
+      email: true,
+      name: true,
+      role: true,
+      companyId: true,
+      createdAt: true,
+      updatedAt: true,
+    },
+  })
+
   tables.journals = companyId
     ? await prisma.journal.findMany({ where: { companyId } })
     : await prisma.journal.findMany()
@@ -104,9 +135,7 @@ async function collectDatabaseData(companyId?: string): Promise<Record<string, u
   return tables
 }
 
-export async function getBackupHistory(
-  companyId?: string
-): Promise<
+export async function getBackupHistory(companyId?: string): Promise<
   Result<
     Array<{
       id: string
@@ -155,20 +184,50 @@ export async function restoreFromBackup(
       throw new Error('Backup record not found')
     }
 
-    if (!fs.existsSync(record.filePath)) {
-      throw new Error(`Backup file not found: ${record.filePath}`)
+    const resolvedPath = path.resolve(record.filePath)
+    if (!resolvedPath.startsWith(ALLOWED_BACKUP_DIR)) {
+      throw new Error('Invalid backup file path')
     }
 
-    const content = fs.readFileSync(record.filePath, 'utf-8')
+    try {
+      await fs.promises.access(resolvedPath, fs.constants.R_OK)
+    } catch {
+      throw new Error(`Backup file not found: ${record.fileName}`)
+    }
+
+    const content = await fs.promises.readFile(resolvedPath, 'utf-8')
     const backupData = JSON.parse(content) as {
       tables: Record<string, unknown[]>
     }
 
+    if (!backupData.tables || typeof backupData.tables !== 'object') {
+      throw new Error('Invalid backup file format')
+    }
+
     const restoredTables = Object.keys(backupData.tables)
     let recordCount = 0
-    for (const table of restoredTables) {
-      recordCount += (backupData.tables[table] ?? []).length
-    }
+
+    await prisma.$transaction(async (tx) => {
+      for (const tableName of restoredTables) {
+        const tableRows = backupData.tables[tableName]
+        if (!Array.isArray(tableRows) || tableRows.length === 0) continue
+        recordCount += tableRows.length
+
+        const model = (tx as Record<string, unknown>)[tableName]
+        if (model && typeof model === 'object' && 'createMany' in model) {
+          const createMany = (
+            model as {
+              createMany: (args: { data: unknown[]; skipDuplicates: boolean }) => Promise<unknown>
+            }
+          ).createMany
+          try {
+            await createMany({ data: tableRows, skipDuplicates: true })
+          } catch (err) {
+            console.warn(`Skipping restore for table ${tableName}:`, err)
+          }
+        }
+      }
+    })
 
     await prisma.backupRecord.update({
       where: { id: options.backupId },
@@ -190,10 +249,8 @@ export async function exportData(options: {
   }
 
   return tryCatch(async () => {
-    const outputDir = options.outputDir ?? path.join(process.cwd(), 'exports')
-    if (!fs.existsSync(outputDir)) {
-      fs.mkdirSync(outputDir, { recursive: true })
-    }
+    const outputDir = validateOutputDir(options.outputDir, ALLOWED_EXPORT_DIR)
+    await fs.promises.mkdir(outputDir, { recursive: true })
 
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)
     const files: string[] = []
@@ -205,7 +262,7 @@ export async function exportData(options: {
 
       if (options.format === 'json') {
         const filePath = path.join(outputDir, `${tableName}_${timestamp}.json`)
-        fs.writeFileSync(filePath, JSON.stringify(tableData, null, 2), 'utf-8')
+        await fs.promises.writeFile(filePath, JSON.stringify(tableData, null, 2), 'utf-8')
         files.push(filePath)
       } else {
         const filePath = path.join(outputDir, `${tableName}_${timestamp}.csv`)
@@ -213,18 +270,9 @@ export async function exportData(options: {
           const headers = Object.keys(tableData[0] as Record<string, unknown>)
           const rows = tableData.map((row) => {
             const r = row as Record<string, unknown>
-            return headers
-              .map((h) => {
-                const v = r[h]
-                if (v === null || v === undefined) return ''
-                const str = String(v)
-                return str.includes(',') || str.includes('"') || str.includes('\n')
-                  ? `"${str.replace(/"/g, '""')}"`
-                  : str
-              })
-              .join(',')
+            return headers.map((h) => sanitizeCsvValue(r[h])).join(',')
           })
-          fs.writeFileSync(filePath, [headers.join(','), ...rows].join('\n'), 'utf-8')
+          await fs.promises.writeFile(filePath, [headers.join(','), ...rows].join('\n'), 'utf-8')
           files.push(filePath)
         }
       }

@@ -4,6 +4,10 @@ vi.mock('@/lib/db', () => ({
   prisma: {
     budgetPlan: { create: vi.fn(), findUnique: vi.fn(), findMany: vi.fn() },
     budgetVariance: { findFirst: vi.fn(), create: vi.fn(), update: vi.fn(), findMany: vi.fn() },
+    $transaction: vi.fn(async (fn: (tx: Record<string, unknown>) => Promise<unknown>) => {
+      const { prisma: mockPrisma } = await import('@/lib/db')
+      return fn(mockPrisma as unknown as Record<string, unknown>)
+    }),
   },
 }))
 

@@ -106,14 +106,16 @@ export async function calculateVariances(options: {
     return failure(createAppError('VALIDATION_ERROR', 'planId is required'))
   }
 
+  const plan = await prisma.budgetPlan.findUnique({
+    where: { id: options.planId },
+    include: { items: true },
+  })
+
+  if (!plan) {
+    return failure(createAppError('NOT_FOUND', 'Budget plan not found'))
+  }
+
   return tryCatch(async () => {
-    const plan = await prisma.budgetPlan.findUnique({
-      where: { id: options.planId },
-      include: { items: true },
-    })
-
-    if (!plan) throw new Error('Budget plan not found')
-
     const budgetByKey = new Map<string, number>()
     for (const item of plan.items) {
       const key = `${item.accountItem}|${item.month ?? 0}`
@@ -130,6 +132,14 @@ export async function calculateVariances(options: {
     }
 
     const significantVariances: SignificantVariance[] = []
+    const varianceOps: Array<{
+      accountItem: string
+      month: number
+      budget: number
+      actual: number
+      variance: number
+      varianceRate: number
+    }> = []
 
     for (const actual of options.actualData) {
       monthlyActual.set(actual.month, (monthlyActual.get(actual.month) ?? 0) + actual.amount)
@@ -139,51 +149,60 @@ export async function calculateVariances(options: {
       const variance = actual.amount - budget
       const varianceRate = budget !== 0 ? variance / budget : 0
 
-      const existingVariance = await prisma.budgetVariance.findFirst({
-        where: {
-          planId: options.planId,
-          accountItem: actual.accountItem,
-          month: actual.month,
-        },
+      varianceOps.push({
+        accountItem: actual.accountItem,
+        month: actual.month,
+        budget,
+        actual: actual.amount,
+        variance,
+        varianceRate,
       })
-
-      if (existingVariance) {
-        await prisma.budgetVariance.update({
-          where: { id: existingVariance.id },
-          data: {
-            budgetAmount: budget,
-            actualAmount: actual.amount,
-            variance,
-            varianceRate,
-          },
-        })
-      } else {
-        await prisma.budgetVariance.create({
-          data: {
-            planId: options.planId,
-            accountItem: actual.accountItem,
-            month: actual.month,
-            budgetAmount: budget,
-            actualAmount: actual.amount,
-            variance,
-            varianceRate,
-          },
-        })
-      }
-
-      if (Math.abs(varianceRate) >= SIGNIFICANT_VARIANCE_THRESHOLD) {
-        significantVariances.push({
-          accountItem: actual.accountItem,
-          month: actual.month,
-          budget,
-          actual: actual.amount,
-          variance,
-          varianceRate,
-          reason: existingVariance?.reason ?? null,
-          boardReportNote: existingVariance?.boardReportNote ?? null,
-        })
-      }
     }
+
+    await prisma.$transaction(async (tx) => {
+      for (const op of varianceOps) {
+        const existing = await tx.budgetVariance.findFirst({
+          where: { planId: options.planId, accountItem: op.accountItem, month: op.month },
+        })
+
+        if (existing) {
+          await tx.budgetVariance.update({
+            where: { id: existing.id },
+            data: {
+              budgetAmount: op.budget,
+              actualAmount: op.actual,
+              variance: op.variance,
+              varianceRate: op.varianceRate,
+            },
+          })
+        } else {
+          await tx.budgetVariance.create({
+            data: {
+              planId: options.planId,
+              accountItem: op.accountItem,
+              month: op.month,
+              budgetAmount: op.budget,
+              actualAmount: op.actual,
+              variance: op.variance,
+              varianceRate: op.varianceRate,
+            },
+          })
+        }
+
+        if (Math.abs(op.varianceRate) >= SIGNIFICANT_VARIANCE_THRESHOLD) {
+          significantVariances.push({
+            accountItem: op.accountItem,
+            month: op.month,
+            budget: op.budget,
+            actual: op.actual,
+            variance: op.variance,
+            varianceRate: op.varianceRate,
+            reason: existing?.reason ?? null,
+            boardReportNote: existing?.boardReportNote ?? null,
+          })
+        }
+      }
+    })
 
     const allMonths = new Set([...monthlyBudget.keys(), ...monthlyActual.keys()])
     const byMonth: MonthlyVariance[] = [...allMonths]

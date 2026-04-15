@@ -8,7 +8,7 @@ vi.mock('@/lib/db', () => ({
       findMany: vi.fn(),
     },
     procurementDocument: { create: vi.fn() },
-    procurementAlert: { create: vi.fn() },
+    procurementAlert: { create: vi.fn(), deleteMany: vi.fn(), createMany: vi.fn() },
   },
 }))
 

@@ -3,6 +3,7 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import * as fs from 'fs'
+import * as path from 'path'
 
 vi.mock('@/lib/db', () => ({
   prisma: {
@@ -33,10 +34,21 @@ vi.mock('fs', async () => {
     writeFileSync: vi.fn(),
     readFileSync: vi.fn(),
     statSync: vi.fn().mockReturnValue({ size: 1024 }),
+    constants: actual.constants,
+    promises: {
+      mkdir: vi.fn().mockResolvedValue(undefined),
+      writeFile: vi.fn().mockResolvedValue(undefined),
+      readFile: vi.fn().mockResolvedValue('{}'),
+      stat: vi.fn().mockResolvedValue({ size: 1024 }),
+      access: vi.fn().mockResolvedValue(undefined),
+    },
   }
 })
 
 import { createDatabaseBackup, getBackupHistory, exportData } from '@/services/backup'
+
+const backupsDir = path.resolve(process.cwd(), 'backups')
+const exportsDir = path.resolve(process.cwd(), 'exports')
 
 describe('Backup Service', () => {
   beforeEach(() => vi.clearAllMocks())
@@ -46,7 +58,6 @@ describe('Backup Service', () => {
       const result = await createDatabaseBackup({
         backupType: 'full',
         destination: 'local',
-        outputDir: '/tmp/test-backups',
       })
 
       expect(result.success).toBe(true)
@@ -54,7 +65,7 @@ describe('Backup Service', () => {
         expect(result.data.fileName).toContain('backup_full_')
         expect(result.data.destination).toBe('local')
       }
-      expect(fs.writeFileSync).toHaveBeenCalled()
+      expect(fs.promises.writeFile).toHaveBeenCalled()
     })
 
     it('should create a company-scoped backup', async () => {
@@ -62,7 +73,27 @@ describe('Backup Service', () => {
         companyId: 'comp-1',
         backupType: 'database',
         destination: 'local',
-        outputDir: '/tmp/test-backups',
+      })
+
+      expect(result.success).toBe(true)
+    })
+
+    it('should reject path traversal in outputDir', async () => {
+      const result = await createDatabaseBackup({
+        backupType: 'full',
+        destination: 'local',
+        outputDir: '/etc/cron.d',
+      })
+
+      expect(result.success).toBe(false)
+    })
+
+    it('should allow subdirectories under backups/', async () => {
+      const subDir = path.join(backupsDir, '2026', 'april')
+      const result = await createDatabaseBackup({
+        backupType: 'full',
+        destination: 'local',
+        outputDir: subDir,
       })
 
       expect(result.success).toBe(true)
@@ -82,7 +113,6 @@ describe('Backup Service', () => {
         companyId: 'comp-1',
         format: 'json',
         tables: ['journals', 'monthlyBalances'],
-        outputDir: '/tmp/test-exports',
       })
 
       expect(result.success).toBe(true)
@@ -93,6 +123,16 @@ describe('Backup Service', () => {
         companyId: '',
         format: 'json',
         tables: ['journals'],
+      })
+      expect(result.success).toBe(false)
+    })
+
+    it('should reject path traversal in export outputDir', async () => {
+      const result = await exportData({
+        companyId: 'comp-1',
+        format: 'json',
+        tables: ['journals'],
+        outputDir: '/tmp/evil',
       })
       expect(result.success).toBe(false)
     })

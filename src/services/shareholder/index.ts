@@ -188,20 +188,25 @@ export async function createStockOptionGrant(
     return failure(createAppError('VALIDATION_ERROR', 'sharesGranted must be positive'))
   }
 
-  return tryCatch(async () => {
-    const plan = await prisma.stockOptionPlan.findUnique({
-      where: { id: options.planId },
-      include: { grants: true },
-    })
-    if (!plan) throw new Error('Stock option plan not found')
+  const plan = await prisma.stockOptionPlan.findUnique({
+    where: { id: options.planId },
+    include: { grants: true },
+  })
+  if (!plan) {
+    return failure(createAppError('NOT_FOUND', 'Stock option plan not found'))
+  }
 
-    const totalGranted = plan.grants.reduce((sum, g) => sum + g.sharesGranted, 0)
-    if (totalGranted + options.sharesGranted > plan.totalShares) {
-      throw new Error(
+  const totalGranted = plan.grants.reduce((sum, g) => sum + g.sharesGranted, 0)
+  if (totalGranted + options.sharesGranted > plan.totalShares) {
+    return failure(
+      createAppError(
+        'VALIDATION_ERROR',
         `Exceeds plan limit. Available: ${plan.totalShares - totalGranted}, requested: ${options.sharesGranted}`
       )
-    }
+    )
+  }
 
+  return tryCatch(async () => {
     const grant = await prisma.stockOptionGrant.create({
       data: {
         planId: options.planId,

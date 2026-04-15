@@ -140,16 +140,16 @@ export async function checkProcurementConsistency(
     return failure(createAppError('VALIDATION_ERROR', 'caseId is required'))
   }
 
+  const procurement = await prisma.procurementCase.findUnique({
+    where: { id: caseId },
+    include: { documents: true },
+  })
+
+  if (!procurement) {
+    return failure(createAppError('NOT_FOUND', 'Procurement case not found'))
+  }
+
   return tryCatch(async () => {
-    const procurement = await prisma.procurementCase.findUnique({
-      where: { id: caseId },
-      include: { documents: true },
-    })
-
-    if (!procurement) {
-      throw new Error('Procurement case not found')
-    }
-
     const alerts: ProcurementAlertItem[] = []
     const docs = procurement.documents
 
@@ -238,16 +238,18 @@ export async function checkProcurementConsistency(
       })
     }
 
-    for (const alert of alerts) {
-      await prisma.procurementAlert.create({
-        data: {
+    await prisma.procurementAlert.deleteMany({ where: { caseId } })
+
+    if (alerts.length > 0) {
+      await prisma.procurementAlert.createMany({
+        data: alerts.map((alert) => ({
           caseId,
           alertType: alert.alertType,
           severity: alert.severity,
           message: alert.message,
           field1: alert.field1,
           field2: alert.field2,
-        },
+        })),
       })
     }
 
