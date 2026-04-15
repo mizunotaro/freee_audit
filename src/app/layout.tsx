@@ -5,8 +5,8 @@ import './globals.css'
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter' })
 
 export const metadata: Metadata = {
-  title: 'freee_audit - 会計監査システム',
-  description: '会計freee仕訳監査・レポートシステム',
+  title: '管理部門支援システム',
+  description: '経理・財務・IR・補助金管理の統合支援プラットフォーム',
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

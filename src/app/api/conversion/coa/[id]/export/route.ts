@@ -51,7 +51,7 @@ async function getHandler(
 
     if (format === 'excel') {
       const workbook = new ExcelJS.Workbook()
-      workbook.creator = 'freee_audit'
+      workbook.creator = '管理部門支援システム'
       workbook.created = new Date()
 
       const worksheet = workbook.addWorksheet('勘定科目')

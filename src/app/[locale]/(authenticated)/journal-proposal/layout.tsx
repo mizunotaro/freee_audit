@@ -1,8 +1,8 @@
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = {
-  title: 'Journal Proposal | freee_audit',
-  description: 'Auto-generate journal entries from receipts using AI',
+  title: '仕訳提案 | 管理部門支援システム',
+  description: 'AIによる領収書からの仕訳自動生成',
 }
 
 export default function JournalProposalLayout({ children }: { children: React.ReactNode }) {

@@ -49,8 +49,8 @@ export default function LoginPage({ params }: { params: Promise<{ locale: string
     <div className="flex min-h-screen items-center justify-center bg-muted/40 p-4">
       <Card className="w-full max-w-sm">
         <CardHeader className="space-y-1">
-          <CardTitle className="text-2xl font-bold">freee_audit</CardTitle>
-          <CardDescription>Enter your credentials to sign in</CardDescription>
+          <CardTitle className="text-2xl font-bold">管理部門支援システム</CardTitle>
+          <CardDescription>ログイン情報を入力してください</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
