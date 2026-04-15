@@ -162,4 +162,7 @@ async function postHandler(req: AuthenticatedRequest) {
 }
 
 export const GET = withAuth(getHandler, { requireCompany: true })
-export const POST = withAuth(postHandler, { requireCompany: true })
+export const POST = withAuth(postHandler, {
+  requireCompany: true,
+  requiredRoles: ['ADMIN', 'ACCOUNTANT'],
+})

@@ -30,6 +30,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    if (user.role !== 'ADMIN' && user.role !== 'ACCOUNTANT') {
+      return NextResponse.json({ error: 'Forbidden: insufficient permissions' }, { status: 403 })
+    }
+
     const body = await request.json()
     const { meetingDate, meetingType, minutes } = body
 
