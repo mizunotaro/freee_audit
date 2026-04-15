@@ -8,6 +8,8 @@ const defaultLocale = 'ja'
 
 const publicPaths = ['/login']
 const publicApiPaths = ['/api/auth/login', '/api/auth/logout', '/api/health']
+const csrfExemptPaths = ['/api/auth/login', '/api/auth/logout', '/api/health', '/api/chat/stream']
+const CSRF_SAFE_METHODS = ['GET', 'HEAD', 'OPTIONS']
 
 const staticPaths = [
   '/favicon.ico',
@@ -88,10 +90,35 @@ export async function middleware(request: NextRequest) {
       return response
     }
 
+    if (
+      !CSRF_SAFE_METHODS.includes(request.method) &&
+      !csrfExemptPaths.some((p) => pathname === p || pathname.startsWith(`${p}/`))
+    ) {
+      const origin = request.headers.get('origin')
+      const host = request.headers.get('host')
+      if (origin && host) {
+        try {
+          const originUrl = new URL(origin)
+          if (originUrl.host !== host) {
+            return NextResponse.json(
+              { success: false, error: 'CSRF validation failed' },
+              { status: 403 }
+            )
+          }
+        } catch {
+          return NextResponse.json(
+            { success: false, error: 'Invalid origin header' },
+            { status: 403 }
+          )
+        }
+      }
+    }
+
     const response = NextResponse.next()
     response.headers.set('x-user-id', user.id)
     response.headers.set('x-user-role', user.role)
     response.headers.set('x-user-company-id', user.companyId || '')
+    response.headers.set('x-session-token', token)
 
     return response
   }

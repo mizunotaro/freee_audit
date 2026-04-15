@@ -2200,3 +2200,22 @@ model BackupRecord {
   @@index([companyId, createdAt])
   @@map("backup_records")
 }
+
+// ============================
+// Login Attempt Tracking (Security)
+// ============================
+
+model LoginAttempt {
+  id           String    @id @default(cuid())
+  email        String
+  ipAddress    String    @map("ip_address")
+  success      Boolean   @default(false)
+  lockedUntil  DateTime? @map("locked_until")
+  attemptCount Int       @default(1) @map("attempt_count")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  @@unique([email, ipAddress])
+  @@index([email])
+  @@map("login_attempts")
+}

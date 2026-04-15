@@ -133,42 +133,73 @@ const DUMMY_HASH = '$2a$12$aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 const LOCKOUT_MAX_ATTEMPTS = 5
 const LOCKOUT_DURATION_MS = 15 * 60 * 1000
 
-const loginAttempts = new Map<string, { count: number; lockedUntil: number }>()
+const memoryLockout = new Map<string, { count: number; lockedUntil: number }>()
 
 function getLockoutKey(email: string, ip: string): string {
   return `${email}:${ip}`
 }
 
-function isAccountLocked(email: string, ip: string): boolean {
-  const key = getLockoutKey(email, ip)
-  const record = loginAttempts.get(key)
-  if (!record) return false
-  if (record.lockedUntil && Date.now() < record.lockedUntil) return true
-  if (record.lockedUntil && Date.now() >= record.lockedUntil) {
-    loginAttempts.delete(key)
+async function isAccountLocked(email: string, ip: string): Promise<boolean> {
+  try {
+    const record = await prisma.loginAttempt.findUnique({
+      where: { email_ipAddress: { email, ipAddress: ip } },
+    })
+    if (!record) return false
+    if (record.lockedUntil && new Date() < record.lockedUntil) return true
+    if (record.lockedUntil && new Date() >= record.lockedUntil) {
+      await prisma.loginAttempt.delete({
+        where: { email_ipAddress: { email, ipAddress: ip } },
+      })
+      return false
+    }
+    return false
+  } catch {
+    const key = getLockoutKey(email, ip)
+    const record = memoryLockout.get(key)
+    if (!record) return false
+    if (record.lockedUntil && Date.now() < record.lockedUntil) return true
     return false
   }
-  return false
 }
 
-function recordFailedAttempt(email: string, ip: string): void {
-  const key = getLockoutKey(email, ip)
-  const record = loginAttempts.get(key) ?? { count: 0, lockedUntil: 0 }
-  record.count++
-  if (record.count >= LOCKOUT_MAX_ATTEMPTS) {
-    record.lockedUntil = Date.now() + LOCKOUT_DURATION_MS
+async function recordFailedAttempt(email: string, ip: string): Promise<void> {
+  try {
+    const record = await prisma.loginAttempt.upsert({
+      where: { email_ipAddress: { email, ipAddress: ip } },
+      create: { email, ipAddress: ip, attemptCount: 1 },
+      update: { attemptCount: { increment: 1 } },
+    })
+    if (record.attemptCount >= LOCKOUT_MAX_ATTEMPTS) {
+      await prisma.loginAttempt.update({
+        where: { email_ipAddress: { email, ipAddress: ip } },
+        data: { lockedUntil: new Date(Date.now() + LOCKOUT_DURATION_MS) },
+      })
+    }
+  } catch {
+    const key = getLockoutKey(email, ip)
+    const record = memoryLockout.get(key) ?? { count: 0, lockedUntil: 0 }
+    record.count++
+    if (record.count >= LOCKOUT_MAX_ATTEMPTS) {
+      record.lockedUntil = Date.now() + LOCKOUT_DURATION_MS
+    }
+    memoryLockout.set(key, record)
   }
-  loginAttempts.set(key, record)
 }
 
-function clearFailedAttempts(email: string, ip: string): void {
-  loginAttempts.delete(getLockoutKey(email, ip))
+async function clearFailedAttempts(email: string, ip: string): Promise<void> {
+  try {
+    await prisma.loginAttempt.delete({
+      where: { email_ipAddress: { email, ipAddress: ip } },
+    })
+  } catch {
+    memoryLockout.delete(getLockoutKey(email, ip))
+  }
 }
 
 export async function login(email: string, password: string, ip?: string): Promise<LoginResult> {
   const clientIp = ip ?? 'unknown'
 
-  if (isAccountLocked(email, clientIp)) {
+  if (await isAccountLocked(email, clientIp)) {
     return { success: false, error: 'Account temporarily locked due to too many failed attempts' }
   }
 
@@ -176,17 +207,17 @@ export async function login(email: string, password: string, ip?: string): Promi
 
   if (!user || !user.passwordHash) {
     await verifyPassword(password, DUMMY_HASH)
-    recordFailedAttempt(email, clientIp)
+    await recordFailedAttempt(email, clientIp)
     return { success: false, error: 'Invalid credentials' }
   }
 
   const isValid = await verifyPassword(password, user.passwordHash)
   if (!isValid) {
-    recordFailedAttempt(email, clientIp)
+    await recordFailedAttempt(email, clientIp)
     return { success: false, error: 'Invalid credentials' }
   }
 
-  clearFailedAttempts(email, clientIp)
+  await clearFailedAttempts(email, clientIp)
 
   const { token, session: _session } = await createSession(user.id, user.role, user.companyId)
 
