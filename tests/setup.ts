@@ -12,19 +12,23 @@ process.env.AUDIT_HASH_SECRET = 'test-audit-hash-secret-for-testing-min-32-chars
 beforeAll(() => {
   ;(process.env as Record<string, string | undefined>).NODE_ENV = 'test'
 
-  Element.prototype.scrollIntoView = vi.fn()
-
-  class MockIntersectionObserver {
-    observe = vi.fn()
-    unobserve = vi.fn()
-    disconnect = vi.fn()
+  if (typeof Element !== 'undefined') {
+    Element.prototype.scrollIntoView = vi.fn()
   }
 
-  Object.defineProperty(globalThis, 'IntersectionObserver', {
-    writable: true,
-    configurable: true,
-    value: MockIntersectionObserver,
-  })
+  if (typeof globalThis.IntersectionObserver === 'undefined') {
+    class MockIntersectionObserver {
+      observe = vi.fn()
+      unobserve = vi.fn()
+      disconnect = vi.fn()
+    }
+
+    Object.defineProperty(globalThis, 'IntersectionObserver', {
+      writable: true,
+      configurable: true,
+      value: MockIntersectionObserver,
+    })
+  }
 })
 
 vi.mock('next/navigation', () => ({
