@@ -65,3 +65,56 @@ dev.log
 coverage_output.txt
 nul
 trash/
+
+# Security - secrets and credentials (NEVER commit these)
+*.key
+*.cert
+*.p12
+*.pfx
+*.jks
+*.keystore
+credentials.json
+*_credentials.json
+*_secret*.json
+.local/
+secrets/
+!src/lib/secrets/
+!src/services/secrets/
+!tests/unit/lib/secrets/
+
+# Token files
+*_tokens.json
+freee_tokens.json
+google_token.json
+token_store.json
+
+# Claude Code worktrees
+.claude/worktrees/
+
+# Backup files
+*.bak
+*.backup
+*.orig
+
+# Runtime config with secrets
+config/runtime.yaml
+*.local.yaml
+
+# Python service artifacts
+python-service/__pycache__/
+python-service/*.pyc
+python-service/.venv/
+python-service/venv/
+
+# R service artifacts
+r-service/.Rhistory
+r-service/.RData
+
+# OCR server artifacts
+ocr-server/__pycache__/
+ocr-server/*.pyc
+
+# Output files
+outputs/
+*.xlsx.tmp
+.claude/settings.local.json

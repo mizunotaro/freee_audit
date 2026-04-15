@@ -83,6 +83,13 @@ model Company {
   marketDataProviders      MarketDataProvider[]
   businessReports          BusinessReport[]
   businessReportAudits     BusinessReportAudit[]
+  subsidyProjects          SubsidyProject[]
+  procurementCases         ProcurementCase[]
+  shareholderRecords       ShareholderRecord[]
+  stockOptionPlans         StockOptionPlan[]
+  registryRecords          RegistryRecord[]
+  expenseCheckResults      ExpenseCheckResult[]
+  budgetPlans              BudgetPlan[]
   createdAt                DateTime                     @default(now()) @map("created_at")
   updatedAt                DateTime                     @updatedAt @map("updated_at")
 
@@ -1583,19 +1590,19 @@ model FAQ {
 // ============================================
 
 model DDChecklist {
-  id            String          @id @default(cuid())
-  companyId     String          @map("company_id")
-  company       Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  type          String          // IPO_SHORT_REVIEW, MA_FINANCIAL_DD, TAX_DD, COMPREHENSIVE
-  fiscalYear    Int             @map("fiscal_year")
-  status        String          @default("IN_PROGRESS") // IN_PROGRESS, COMPLETED, REVIEWED, APPROVED
-  items         DDChecklistItem[]
-  findings      DDFinding[]
-  materiality   Float?          @map("materiality")
-  overallScore  Int?            @map("overall_score")
-  createdBy     String?         @map("created_by")
-  createdAt     DateTime        @default(now()) @map("created_at")
-  updatedAt     DateTime        @updatedAt @map("updated_at")
+  id           String            @id @default(cuid())
+  companyId    String            @map("company_id")
+  company      Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  type         String // IPO_SHORT_REVIEW, MA_FINANCIAL_DD, TAX_DD, COMPREHENSIVE
+  fiscalYear   Int               @map("fiscal_year")
+  status       String            @default("IN_PROGRESS") // IN_PROGRESS, COMPLETED, REVIEWED, APPROVED
+  items        DDChecklistItem[]
+  findings     DDFinding[]
+  materiality  Float?            @map("materiality")
+  overallScore Int?              @map("overall_score")
+  createdBy    String?           @map("created_by")
+  createdAt    DateTime          @default(now()) @map("created_at")
+  updatedAt    DateTime          @updatedAt @map("updated_at")
 
   @@unique([companyId, type, fiscalYear])
   @@index([companyId, status])
@@ -1603,22 +1610,22 @@ model DDChecklist {
 }
 
 model DDChecklistItem {
-  id             String          @id @default(cuid())
-  checklistId    String          @map("checklist_id")
-  checklist      DDChecklist     @relation(fields: [checklistId], references: [id], onDelete: Cascade)
-  category       String          @map("category")
-  itemCode       String          @map("item_code")
+  id             String      @id @default(cuid())
+  checklistId    String      @map("checklist_id")
+  checklist      DDChecklist @relation(fields: [checklistId], references: [id], onDelete: Cascade)
+  category       String      @map("category")
+  itemCode       String      @map("item_code")
   title          String
   description    String
-  status         String          @default("PENDING") // PENDING, IN_PROGRESS, PASSED, FAILED, N_A
-  severity       String          // CRITICAL, HIGH, MEDIUM, LOW, INFO
+  status         String      @default("PENDING") // PENDING, IN_PROGRESS, PASSED, FAILED, N_A
+  severity       String // CRITICAL, HIGH, MEDIUM, LOW, INFO
   findings       String?
   recommendation String?
   evidence       String?
-  checkedAt      DateTime?       @map("checked_at")
-  checkedBy      String?         @map("checked_by")
-  createdAt      DateTime        @default(now()) @map("created_at")
-  updatedAt      DateTime        @updatedAt @map("updated_at")
+  checkedAt      DateTime?   @map("checked_at")
+  checkedBy      String?     @map("checked_by")
+  createdAt      DateTime    @default(now()) @map("created_at")
+  updatedAt      DateTime    @updatedAt @map("updated_at")
 
   @@index([checklistId, category])
   @@index([checklistId, status])
@@ -1626,27 +1633,27 @@ model DDChecklistItem {
 }
 
 model DDFinding {
-  id              String          @id @default(cuid())
-  companyId       String          @map("company_id")
-  company         Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  checklistId     String?         @map("checklist_id")
-  checklist       DDChecklist?    @relation(fields: [checklistId], references: [id])
+  id              String       @id @default(cuid())
+  companyId       String       @map("company_id")
+  company         Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  checklistId     String?      @map("checklist_id")
+  checklist       DDChecklist? @relation(fields: [checklistId], references: [id])
   category        String
-  severity        String          // CRITICAL, HIGH, MEDIUM, LOW, INFO
+  severity        String // CRITICAL, HIGH, MEDIUM, LOW, INFO
   title           String
   description     String
   impact          String?
-  impactAmount    Float?          @map("impact_amount")
+  impactAmount    Float?       @map("impact_amount")
   recommendation  String?
-  relatedStandard String?         @map("related_standard")
-  status          String          @default("OPEN") // OPEN, IN_PROGRESS, RESOLVED, ACCEPTED
+  relatedStandard String?      @map("related_standard")
+  status          String       @default("OPEN") // OPEN, IN_PROGRESS, RESOLVED, ACCEPTED
   assignee        String?
   deadline        DateTime?
-  resolvedAt      DateTime?       @map("resolved_at")
-  resolvedBy      String?         @map("resolved_by")
+  resolvedAt      DateTime?    @map("resolved_at")
+  resolvedBy      String?      @map("resolved_by")
   resolution      String?
-  createdAt       DateTime        @default(now()) @map("created_at")
-  updatedAt       DateTime        @updatedAt @map("updated_at")
+  createdAt       DateTime     @default(now()) @map("created_at")
+  updatedAt       DateTime     @updatedAt @map("updated_at")
 
   @@index([companyId, status])
   @@index([companyId, severity])
@@ -1654,41 +1661,41 @@ model DDFinding {
 }
 
 model DDReport {
-  id                 String          @id @default(cuid())
-  companyId          String          @map("company_id")
-  company            Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  type               String          // IPO_SHORT_REVIEW, MA_DD, TAX_DD, CONVERSION, COMPREHENSIVE
-  format             String          // PDF, EXCEL, MARKDOWN, CSV
-  fiscalYears        String          @map("fiscal_years")
-  accountingStandard String          @map("accounting_standard")
-  status             String          @default("DRAFT")
-  filePath           String?         @map("file_path")
-  fileSize           Int?            @map("file_size")
-  overallScore       Int?            @map("overall_score")
-  generatedBy        String?         @map("generated_by")
-  generatedAt        DateTime        @default(now()) @map("generated_at")
-  expiresAt          DateTime?       @map("expires_at")
+  id                 String    @id @default(cuid())
+  companyId          String    @map("company_id")
+  company            Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  type               String // IPO_SHORT_REVIEW, MA_DD, TAX_DD, CONVERSION, COMPREHENSIVE
+  format             String // PDF, EXCEL, MARKDOWN, CSV
+  fiscalYears        String    @map("fiscal_years")
+  accountingStandard String    @map("accounting_standard")
+  status             String    @default("DRAFT")
+  filePath           String?   @map("file_path")
+  fileSize           Int?      @map("file_size")
+  overallScore       Int?      @map("overall_score")
+  generatedBy        String?   @map("generated_by")
+  generatedAt        DateTime  @default(now()) @map("generated_at")
+  expiresAt          DateTime? @map("expires_at")
 
   @@index([companyId, type])
   @@map("dd_reports")
 }
 
 model DDConversion {
-  id                  String          @id @default(cuid())
-  companyId           String          @map("company_id")
-  company             Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  sourceStandard      String          @map("source_standard")
-  targetStandard      String          @map("target_standard")
-  fiscalYear          Int             @map("fiscal_year")
-  sourceTrialBalance  String          @map("source_trial_balance")
-  targetTrialBalance  String?         @map("target_trial_balance")
-  adjustments         String?
-  reconciliation      String?
-  conversionNotes     String?         @map("conversion_notes")
-  status              String          @default("PENDING") // PENDING, IN_PROGRESS, COMPLETED, ERROR
-  qualityScore        Int?            @map("quality_score")
-  createdAt           DateTime        @default(now()) @map("created_at")
-  updatedAt           DateTime        @updatedAt @map("updated_at")
+  id                 String   @id @default(cuid())
+  companyId          String   @map("company_id")
+  company            Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  sourceStandard     String   @map("source_standard")
+  targetStandard     String   @map("target_standard")
+  fiscalYear         Int      @map("fiscal_year")
+  sourceTrialBalance String   @map("source_trial_balance")
+  targetTrialBalance String?  @map("target_trial_balance")
+  adjustments        String?
+  reconciliation     String?
+  conversionNotes    String?  @map("conversion_notes")
+  status             String   @default("PENDING") // PENDING, IN_PROGRESS, COMPLETED, ERROR
+  qualityScore       Int?     @map("quality_score")
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
 
   @@unique([companyId, sourceStandard, targetStandard, fiscalYear])
   @@index([companyId, status])
@@ -1700,41 +1707,41 @@ model DDConversion {
 // ============================================
 
 model PeerCompany {
-  id              String   @id @default(cuid())
-  companyId       String   @map("company_id")
-  company         Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  id        String  @id @default(cuid())
+  companyId String  @map("company_id")
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
 
   // 企業情報
-  ticker          String?  @map("ticker")
-  name            String
-  nameEn          String?  @map("name_en")
-  exchange        String?
-  industry        String?
+  ticker   String? @map("ticker")
+  name     String
+  nameEn   String? @map("name_en")
+  exchange String?
+  industry String?
 
   // 財務指標
-  marketCap       Float?   @map("market_cap")
-  revenue         Float?
-  employees       Int?
+  marketCap Float? @map("market_cap")
+  revenue   Float?
+  employees Int?
 
   // バリュエーション指標
-  per             Float?
-  pbr             Float?
-  evEbitda        Float?   @map("ev_ebitda")
-  psr             Float?
-  beta            Float?
+  per      Float?
+  pbr      Float?
+  evEbitda Float? @map("ev_ebitda")
+  psr      Float?
+  beta     Float?
 
   // 類似度スコア
-  similarityScore Float?   @map("similarity_score")
+  similarityScore Float? @map("similarity_score")
 
   // データソース
-  dataSource      String   @default("manual") @map("data_source")
-  sourceUrl       String?  @map("source_url")
+  dataSource String  @default("manual") @map("data_source")
+  sourceUrl  String? @map("source_url")
 
   // 有効フラグ
-  isActive        Boolean  @default(true) @map("is_active")
+  isActive Boolean @default(true) @map("is_active")
 
-  createdAt       DateTime @default(now()) @map("created_at")
-  updatedAt       DateTime @updatedAt @map("updated_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   @@unique([companyId, ticker])
   @@index([companyId])
@@ -1743,52 +1750,52 @@ model PeerCompany {
 }
 
 model MarketDataProvider {
-  id                 String    @id @default(cuid())
-  companyId          String    @map("company_id")
-  company            Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  id        String  @id @default(cuid())
+  companyId String  @map("company_id")
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
 
-  provider           String
+  provider String
 
   // 認証情報（暗号化保存）
-  encryptedEmail     String?   @map("encrypted_email")
-  encryptedPassword  String?   @map("encrypted_password")
-  encryptedApiKey    String?   @map("encrypted_api_key")
+  encryptedEmail    String? @map("encrypted_email")
+  encryptedPassword String? @map("encrypted_password")
+  encryptedApiKey   String? @map("encrypted_api_key")
 
   // 設定
-  enabled            Boolean   @default(true) @map("enabled")
-  priority           Int       @default(10) @map("priority")
-  lastSyncAt         DateTime? @map("last_sync_at")
-  lastError          String?   @map("last_error")
+  enabled    Boolean   @default(true) @map("enabled")
+  priority   Int       @default(10) @map("priority")
+  lastSyncAt DateTime? @map("last_sync_at")
+  lastError  String?   @map("last_error")
 
-  createdAt          DateTime  @default(now()) @map("created_at")
-  updatedAt          DateTime  @updatedAt @map("updated_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   @@unique([companyId, provider])
   @@map("market_data_providers")
 }
 
 model BusinessReport {
-  id             String                 @id @default(cuid())
-  companyId      String                 @map("company_id")
-  company        Company                @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  
-  fiscalYear     Int                    @map("fiscal_year")
-  version        Int                    @default(1)
-  status         String                 @default("draft")
-  
-  templateType   String                 @default("keidanren_standard") @map("template_type")
-  templateVersion String                @default("2022-11-01") @map("template_version")
-  
-  content        String
-  
-  approvedBy     String?                @map("approved_by")
-  approvedAt     DateTime?              @map("approved_at")
-  
-  audits         BusinessReportAudit[]
-  
-  createdAt      DateTime               @default(now()) @map("created_at")
-  updatedAt      DateTime               @updatedAt @map("updated_at")
-  
+  id        String  @id @default(cuid())
+  companyId String  @map("company_id")
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  fiscalYear Int    @map("fiscal_year")
+  version    Int    @default(1)
+  status     String @default("draft")
+
+  templateType    String @default("keidanren_standard") @map("template_type")
+  templateVersion String @default("2022-11-01") @map("template_version")
+
+  content String
+
+  approvedBy String?   @map("approved_by")
+  approvedAt DateTime? @map("approved_at")
+
+  audits BusinessReportAudit[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
   @@unique([companyId, fiscalYear, version])
   @@index([companyId])
   @@index([companyId, fiscalYear])
@@ -1797,26 +1804,26 @@ model BusinessReport {
 }
 
 model BusinessReportAudit {
-  id             String        @id @default(cuid())
-  reportId       String        @map("report_id")
-  report         BusinessReport @relation(fields: [reportId], references: [id], onDelete: Cascade)
-  
-  companyId      String        @map("company_id")
-  company        Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  
-  action         String
-  field          String?
-  oldValue       String?       @map("old_value")
-  newValue       String?       @map("new_value")
-  
-  userId         String?       @map("user_id")
-  ipAddress      String?       @map("ip_address")
-  userAgent      String?       @map("user_agent")
-  
-  metadata       String?
-  
-  createdAt      DateTime      @default(now()) @map("created_at")
-  
+  id       String         @id @default(cuid())
+  reportId String         @map("report_id")
+  report   BusinessReport @relation(fields: [reportId], references: [id], onDelete: Cascade)
+
+  companyId String  @map("company_id")
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  action   String
+  field    String?
+  oldValue String? @map("old_value")
+  newValue String? @map("new_value")
+
+  userId    String? @map("user_id")
+  ipAddress String? @map("ip_address")
+  userAgent String? @map("user_agent")
+
+  metadata String?
+
+  createdAt DateTime @default(now()) @map("created_at")
+
   @@index([reportId])
   @@index([companyId])
   @@index([action])
@@ -1825,22 +1832,371 @@ model BusinessReportAudit {
 }
 
 model BusinessReportApproval {
-  id             String        @id @default(cuid())
-  reportId       String        @map("report_id")
-  
-  step           Int
-  role           String
-  action         String
-  required       Boolean       @default(true)
-  
-  userId         String?       @map("user_id")
-  comment        String?
-  completedAt    DateTime?     @map("completed_at")
-  
-  createdAt      DateTime      @default(now()) @map("created_at")
-  updatedAt      DateTime      @updatedAt @map("updated_at")
-  
+  id       String @id @default(cuid())
+  reportId String @map("report_id")
+
+  step     Int
+  role     String
+  action   String
+  required Boolean @default(true)
+
+  userId      String?   @map("user_id")
+  comment     String?
+  completedAt DateTime? @map("completed_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
   @@unique([reportId, step])
   @@index([reportId])
   @@map("business_report_approvals")
+}
+
+// ============================
+// Subsidy Project Management (AMED/NEDO)
+// ============================
+
+model SubsidyProject {
+  id               String               @id @default(cuid())
+  companyId        String               @map("company_id")
+  company          Company              @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  subsidyType      String               @map("subsidy_type")
+  projectCode      String               @map("project_code")
+  projectName      String               @map("project_name")
+  programName      String               @map("program_name")
+  institution      String
+  piDepartment     String?              @map("pi_department")
+  piName           String               @map("pi_name")
+  workerDepartment String?              @map("worker_department")
+  workerName       String?              @map("worker_name")
+  startDate        DateTime             @map("start_date")
+  endDate          DateTime             @map("end_date")
+  totalBudget      Float                @map("total_budget")
+  subsidyRate      Float                @map("subsidy_rate")
+  indirectCostRate Float                @default(0.1) @map("indirect_cost_rate")
+  status           String               @default("active")
+  journals         SubsidyJournal[]
+  documents        SubsidyDocument[]
+  expenditures     SubsidyExpenditure[]
+  createdAt        DateTime             @default(now()) @map("created_at")
+  updatedAt        DateTime             @updatedAt @map("updated_at")
+
+  @@unique([companyId, projectCode])
+  @@index([companyId])
+  @@map("subsidy_projects")
+}
+
+model SubsidyJournal {
+  id             String         @id @default(cuid())
+  projectId      String         @map("project_id")
+  project        SubsidyProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  date           DateTime
+  workerName     String         @map("worker_name")
+  startTime      String?        @map("start_time")
+  endTime        String?        @map("end_time")
+  excludedHours  Float          @default(0) @map("excluded_hours")
+  amedHours      Float          @map("amed_hours")
+  totalHours     Float          @map("total_hours")
+  activityText   String         @map("activity_text")
+  confidence     Float          @default(1.0)
+  reviewFlags    String         @default("[]") @map("review_flags")
+  sourceEventIds String         @default("[]") @map("source_event_ids")
+  status         String         @default("draft")
+  createdAt      DateTime       @default(now()) @map("created_at")
+  updatedAt      DateTime       @updatedAt @map("updated_at")
+
+  @@index([projectId, date])
+  @@map("subsidy_journals")
+}
+
+model SubsidyDocument {
+  id           String         @id @default(cuid())
+  projectId    String         @map("project_id")
+  project      SubsidyProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  category     String
+  documentType String         @map("document_type")
+  fiscalYear   Int            @map("fiscal_year")
+  quarter      Int?
+  fileName     String         @map("file_name")
+  filePath     String?        @map("file_path")
+  status       String         @default("pending")
+  submittedAt  DateTime?      @map("submitted_at")
+  createdAt    DateTime       @default(now()) @map("created_at")
+  updatedAt    DateTime       @updatedAt @map("updated_at")
+
+  @@index([projectId, fiscalYear])
+  @@map("subsidy_documents")
+}
+
+model SubsidyExpenditure {
+  id              String         @id @default(cuid())
+  projectId       String         @map("project_id")
+  project         SubsidyProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  fiscalYear      Int            @map("fiscal_year")
+  category        String
+  description     String
+  amount          Float
+  taxAmount       Float          @default(0) @map("tax_amount")
+  vendor          String?
+  transactionDate DateTime       @map("transaction_date")
+  receiptDate     DateTime?      @map("receipt_date")
+  paymentDate     DateTime?      @map("payment_date")
+  voucherNumber   String?        @map("voucher_number")
+  journalId       String?        @map("journal_id")
+  status          String         @default("pending")
+  createdAt       DateTime       @default(now()) @map("created_at")
+  updatedAt       DateTime       @updatedAt @map("updated_at")
+
+  @@index([projectId, fiscalYear])
+  @@map("subsidy_expenditures")
+}
+
+// ============================
+// Procurement Management
+// ============================
+
+model ProcurementCase {
+  id                  String                @id @default(cuid())
+  companyId           String                @map("company_id")
+  company             Company               @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  title               String
+  vendor              String?
+  costCategory        String                @map("cost_category")
+  totalAmount         Float                 @map("total_amount")
+  currency            String                @default("JPY")
+  competitionRequired Boolean               @default(false) @map("competition_required")
+  subsidyProjectId    String?               @map("subsidy_project_id")
+  status              String                @default("draft")
+  approvedBy          String?               @map("approved_by")
+  approvedAt          DateTime?             @map("approved_at")
+  documents           ProcurementDocument[]
+  alerts              ProcurementAlert[]
+  createdAt           DateTime              @default(now()) @map("created_at")
+  updatedAt           DateTime              @updatedAt @map("updated_at")
+
+  @@index([companyId])
+  @@map("procurement_cases")
+}
+
+model ProcurementDocument {
+  id              String          @id @default(cuid())
+  caseId          String          @map("case_id")
+  procurementCase ProcurementCase @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  documentType    String          @map("document_type")
+  amount          Float?
+  taxAmount       Float?          @map("tax_amount")
+  date            DateTime?
+  vendorName      String?         @map("vendor_name")
+  description     String?
+  filePath        String?         @map("file_path")
+  fileSource      String?         @map("file_source")
+  verified        Boolean         @default(false)
+  discrepancies   String          @default("[]")
+  createdAt       DateTime        @default(now()) @map("created_at")
+  updatedAt       DateTime        @updatedAt @map("updated_at")
+
+  @@index([caseId])
+  @@map("procurement_documents")
+}
+
+model ProcurementAlert {
+  id              String          @id @default(cuid())
+  caseId          String          @map("case_id")
+  procurementCase ProcurementCase @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  alertType       String          @map("alert_type")
+  severity        String          @default("medium")
+  message         String
+  field1          String?
+  field2          String?
+  resolved        Boolean         @default(false)
+  resolvedAt      DateTime?       @map("resolved_at")
+  resolvedBy      String?         @map("resolved_by")
+  createdAt       DateTime        @default(now()) @map("created_at")
+
+  @@index([caseId])
+  @@map("procurement_alerts")
+}
+
+// ============================
+// Shareholder & Capital Management
+// ============================
+
+model ShareholderRecord {
+  id               String   @id @default(cuid())
+  companyId        String   @map("company_id")
+  company          Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  shareholderName  String   @map("shareholder_name")
+  shareholderType  String   @map("shareholder_type")
+  address          String?
+  sharesHeld       Int      @map("shares_held")
+  shareClass       String   @default("common") @map("share_class")
+  acquisitionDate  DateTime @map("acquisition_date")
+  acquisitionPrice Float?   @map("acquisition_price")
+  votingRights     Float    @default(1.0) @map("voting_rights")
+  notes            String?
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  @@index([companyId])
+  @@map("shareholder_records")
+}
+
+model StockOptionPlan {
+  id                  String             @id @default(cuid())
+  companyId           String             @map("company_id")
+  company             Company            @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  planName            String             @map("plan_name")
+  resolutionDate      DateTime           @map("resolution_date")
+  totalShares         Int                @map("total_shares")
+  exercisePrice       Float              @map("exercise_price")
+  vestingSchedule     String             @default("{}") @map("vesting_schedule")
+  exercisePeriodStart DateTime           @map("exercise_period_start")
+  exercisePeriodEnd   DateTime           @map("exercise_period_end")
+  conditions          String?
+  grants              StockOptionGrant[]
+  createdAt           DateTime           @default(now()) @map("created_at")
+  updatedAt           DateTime           @updatedAt @map("updated_at")
+
+  @@index([companyId])
+  @@map("stock_option_plans")
+}
+
+model StockOptionGrant {
+  id              String          @id @default(cuid())
+  planId          String          @map("plan_id")
+  plan            StockOptionPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+  granteeName     String          @map("grantee_name")
+  granteeTitle    String?         @map("grantee_title")
+  sharesGranted   Int             @map("shares_granted")
+  sharesVested    Int             @default(0) @map("shares_vested")
+  sharesExercised Int             @default(0) @map("shares_exercised")
+  sharesCancelled Int             @default(0) @map("shares_cancelled")
+  grantDate       DateTime        @map("grant_date")
+  status          String          @default("active")
+  createdAt       DateTime        @default(now()) @map("created_at")
+  updatedAt       DateTime        @updatedAt @map("updated_at")
+
+  @@index([planId])
+  @@map("stock_option_grants")
+}
+
+model RegistryRecord {
+  id            String   @id @default(cuid())
+  companyId     String   @map("company_id")
+  company       Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  recordDate    DateTime @map("record_date")
+  category      String
+  description   String
+  previousValue String?  @map("previous_value")
+  newValue      String   @map("new_value")
+  sourceFile    String?  @map("source_file")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  @@index([companyId, recordDate])
+  @@map("registry_records")
+}
+
+// ============================
+// Expense Checking
+// ============================
+
+model ExpenseCheckResult {
+  id           String    @id @default(cuid())
+  companyId    String    @map("company_id")
+  company      Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  checkDate    DateTime  @map("check_date")
+  expenseId    String?   @map("expense_id")
+  employeeName String?   @map("employee_name")
+  checkType    String    @map("check_type")
+  severity     String    @default("warning")
+  message      String
+  details      String?
+  resolved     Boolean   @default(false)
+  resolvedAt   DateTime? @map("resolved_at")
+  resolvedBy   String?   @map("resolved_by")
+  createdAt    DateTime  @default(now()) @map("created_at")
+
+  @@index([companyId, checkDate])
+  @@map("expense_check_results")
+}
+
+// ============================
+// Budget Management (予実管理)
+// ============================
+
+model BudgetPlan {
+  id         String           @id @default(cuid())
+  companyId  String           @map("company_id")
+  company    Company          @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  fiscalYear Int              @map("fiscal_year")
+  name       String
+  version    Int              @default(1)
+  status     String           @default("draft")
+  sourceFile String?          @map("source_file")
+  notes      String?
+  items      BudgetPlanItem[]
+  variances  BudgetVariance[]
+  createdAt  DateTime         @default(now()) @map("created_at")
+  updatedAt  DateTime         @updatedAt @map("updated_at")
+
+  @@unique([companyId, fiscalYear, version])
+  @@index([companyId])
+  @@map("budget_plans")
+}
+
+model BudgetPlanItem {
+  id           String     @id @default(cuid())
+  planId       String     @map("plan_id")
+  plan         BudgetPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+  accountItem  String     @map("account_item")
+  department   String?
+  month        Int?
+  budgetAmount Float      @map("budget_amount")
+  notes        String?
+  createdAt    DateTime   @default(now()) @map("created_at")
+
+  @@index([planId, accountItem])
+  @@map("budget_plan_items")
+}
+
+model BudgetVariance {
+  id              String     @id @default(cuid())
+  planId          String     @map("plan_id")
+  plan            BudgetPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+  accountItem     String     @map("account_item")
+  department      String?
+  month           Int
+  budgetAmount    Float      @map("budget_amount")
+  actualAmount    Float      @map("actual_amount")
+  variance        Float
+  varianceRate    Float      @map("variance_rate")
+  reason          String?
+  actionRequired  Boolean    @default(false) @map("action_required")
+  boardReportNote String?    @map("board_report_note")
+  createdAt       DateTime   @default(now()) @map("created_at")
+  updatedAt       DateTime   @updatedAt @map("updated_at")
+
+  @@index([planId, month])
+  @@map("budget_variances")
+}
+
+// ============================
+// Backup Management
+// ============================
+
+model BackupRecord {
+  id           String    @id @default(cuid())
+  companyId    String?   @map("company_id")
+  backupType   String    @map("backup_type")
+  fileName     String    @map("file_name")
+  filePath     String    @map("file_path")
+  fileSize     Int       @map("file_size")
+  destination  String
+  status       String    @default("completed")
+  errorMessage String?   @map("error_message")
+  restoredAt   DateTime? @map("restored_at")
+  createdAt    DateTime  @default(now()) @map("created_at")
+
+  @@index([companyId, createdAt])
+  @@map("backup_records")
 }
