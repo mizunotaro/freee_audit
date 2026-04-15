@@ -392,7 +392,8 @@ describe('Mappings API', () => {
         mockMapping.sourceItem as any
       )
       vi.mocked(prisma.chartOfAccount.findUnique).mockResolvedValue({ id: 'coa-1' } as any)
-      vi.mocked(prisma.$transaction).mockImplementation(async (fn) => fn(mockTx as any))
+      vi.mocked(prisma.$transaction).mockImplementation((async (fn: (tx: unknown) => unknown) =>
+        fn(mockTx)) as typeof prisma.$transaction)
 
       const req = createAuthenticatedRequestWithBody(
         'http://localhost/api/conversion/mappings/batch',
@@ -426,7 +427,8 @@ describe('Mappings API', () => {
           create: vi.fn(),
         },
       }
-      vi.mocked(prisma.$transaction).mockImplementation(async (fn) => fn(mockTx as any))
+      vi.mocked(prisma.$transaction).mockImplementation((async (fn: (tx: unknown) => unknown) =>
+        fn(mockTx)) as typeof prisma.$transaction)
 
       const req = createAuthenticatedRequestWithBody(
         'http://localhost/api/conversion/mappings/batch',
@@ -452,7 +454,8 @@ describe('Mappings API', () => {
           create: vi.fn(),
         },
       }
-      vi.mocked(prisma.$transaction).mockImplementation(async (fn) => fn(mockTx as any))
+      vi.mocked(prisma.$transaction).mockImplementation((async (fn: (tx: unknown) => unknown) =>
+        fn(mockTx)) as typeof prisma.$transaction)
 
       const req = createAuthenticatedRequestWithBody(
         'http://localhost/api/conversion/mappings/batch',
@@ -477,7 +480,8 @@ describe('Mappings API', () => {
           create: vi.fn(),
         },
       }
-      vi.mocked(prisma.$transaction).mockImplementation(async (fn) => fn(mockTx as any))
+      vi.mocked(prisma.$transaction).mockImplementation((async (fn: (tx: unknown) => unknown) =>
+        fn(mockTx)) as typeof prisma.$transaction)
 
       const req = createAuthenticatedRequestWithBody(
         'http://localhost/api/conversion/mappings/batch',

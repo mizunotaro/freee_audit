@@ -223,7 +223,8 @@ describe('ScheduleManager', () => {
 
       const createCalls = vi.mocked(prisma.socialInsuranceSchedule.create).mock.calls
       const workAccidentCalls = createCalls.filter(
-        (call) => (call[0] as any).data.insuranceType === 'work_accident'
+        (call: unknown[]) =>
+          (call[0] as Record<string, Record<string, string>>).data.insuranceType === 'work_accident'
       )
       expect(workAccidentCalls.length).toBeGreaterThan(0)
     })

@@ -1,6 +1,9 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { prisma } from '@/lib/db'
 import { success, failure, type Result } from '@/types/result'
+
+type TxClient = Parameters<Parameters<typeof prisma.$transaction>[0]>[0]
+
 import type {
   IREvent,
   IREventList,
@@ -55,7 +58,7 @@ async function getIREvents(
     }
 
     const events = await prisma.$transaction(
-      async (tx) => {
+      async (tx: TxClient) => {
         return tx.iREvent.findMany({
           where,
           select: {
@@ -86,7 +89,7 @@ async function getIREvent(id: string): Promise<IREventResult<IREvent>> {
 
   try {
     const event = await prisma.$transaction(
-      async (tx) => {
+      async (tx: TxClient) => {
         return tx.iREvent.findUnique({ where: { id } })
       },
       { maxWait: DB_MAX_WAIT_MS, timeout: DB_TIMEOUT_MS }
@@ -110,7 +113,7 @@ async function createIREvent(data: CreateIREventData): Promise<IREventResult<IRE
 
   try {
     const event = await prisma.$transaction(
-      async (tx) => {
+      async (tx: TxClient) => {
         return tx.iREvent.create({
           data: {
             companyId: data.companyId,
@@ -149,7 +152,7 @@ async function updateIREvent(id: string, data: UpdateIREventData): Promise<IREve
 
   try {
     const event = await prisma.$transaction(
-      async (tx) => {
+      async (tx: TxClient) => {
         return tx.iREvent.update({
           where: { id },
           data,
@@ -175,7 +178,7 @@ async function deleteIREvent(id: string): Promise<IREventResult<void>> {
 
   try {
     await prisma.$transaction(
-      async (tx) => {
+      async (tx: TxClient) => {
         const existing = await tx.iREvent.findUnique({ where: { id } })
         if (!existing) {
           throw new Error('NOT_FOUND')

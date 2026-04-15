@@ -8,6 +8,8 @@ import type {
   ShareholderCategory,
 } from '@/types/ir-report'
 
+type TxClient = Parameters<Parameters<typeof prisma.$transaction>[0]>[0]
+
 type ShareholderServiceError = {
   code: string
   message: string
@@ -36,7 +38,7 @@ async function getShareholders(
 
   try {
     const shareholders = await prisma.$transaction(
-      async (tx) => {
+      async (tx: TxClient) => {
         return tx.shareholderComposition.findMany({
           where: { companyId },
           orderBy: [{ percentage: 'desc' }],
@@ -69,7 +71,7 @@ async function createShareholder(
 
   try {
     const shareholder = await prisma.$transaction(
-      async (tx) => {
+      async (tx: TxClient) => {
         return tx.shareholderComposition.create({
           data: {
             companyId: data.companyId,
@@ -109,7 +111,7 @@ async function updateShareholder(
 
   try {
     const shareholder = await prisma.$transaction(
-      async (tx) => {
+      async (tx: TxClient) => {
         const existing = await tx.shareholderComposition.findUnique({ where: { id } })
         if (!existing) {
           throw new Error('NOT_FOUND')
@@ -139,7 +141,7 @@ async function deleteShareholder(id: string): Promise<ShareholderResult<void>> {
 
   try {
     await prisma.$transaction(
-      async (tx) => {
+      async (tx: TxClient) => {
         const existing = await tx.shareholderComposition.findUnique({ where: { id } })
         if (!existing) {
           throw new Error('NOT_FOUND')
@@ -168,7 +170,7 @@ async function getShareholderSummary(
 
   try {
     const shareholders = await prisma.$transaction(
-      async (tx) => {
+      async (tx: TxClient) => {
         return tx.shareholderComposition.findMany({
           where: { companyId },
         })
@@ -177,7 +179,7 @@ async function getShareholderSummary(
     )
 
     const summary = shareholders.reduce(
-      (acc, s) => {
+      (acc: Record<ShareholderCategory, number>, s: (typeof shareholders)[number]) => {
         const shareholderType = s.shareholderType as ShareholderCategory
         acc[shareholderType] = (acc[shareholderType] || 0) + (s.percentage as number)
         return acc

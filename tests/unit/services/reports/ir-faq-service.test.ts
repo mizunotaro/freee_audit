@@ -3,6 +3,8 @@ import { prisma } from '@/lib/db'
 import { success, failure, type Result } from '@/types/result'
 import type { FAQ, FAQList, CreateFAQData, UpdateFAQData, ReorderFAQsData } from '@/types/ir-report'
 
+type TxClient = Parameters<Parameters<typeof prisma.$transaction>[0]>[0]
+
 type FAQServiceError = {
   code: string
   message: string
@@ -29,7 +31,7 @@ async function getFAQs(companyId: string): Promise<FAQResult<FAQList[]>> {
 
   try {
     const faqs = await prisma.$transaction(
-      async (tx) => {
+      async (tx: TxClient) => {
         return tx.fAQ.findMany({
           where: { companyId },
           select: {
@@ -60,7 +62,7 @@ async function getFAQ(id: string): Promise<FAQResult<FAQ>> {
 
   try {
     const faq = await prisma.$transaction(
-      async (tx) => {
+      async (tx: TxClient) => {
         return tx.fAQ.findUnique({ where: { id } })
       },
       { maxWait: DB_MAX_WAIT_MS, timeout: DB_TIMEOUT_MS }
@@ -92,7 +94,7 @@ async function createFAQ(data: CreateFAQData): Promise<FAQResult<FAQ>> {
 
   try {
     const faq = await prisma.$transaction(
-      async (tx) => {
+      async (tx: TxClient) => {
         return tx.fAQ.create({
           data: {
             companyId: data.companyId,
@@ -133,7 +135,7 @@ async function updateFAQ(id: string, data: UpdateFAQData): Promise<FAQResult<FAQ
 
   try {
     const faq = await prisma.$transaction(
-      async (tx) => {
+      async (tx: TxClient) => {
         const existing = await tx.fAQ.findUnique({ where: { id } })
         if (!existing) {
           throw new Error('NOT_FOUND')
@@ -163,7 +165,7 @@ async function deleteFAQ(id: string): Promise<FAQResult<void>> {
 
   try {
     await prisma.$transaction(
-      async (tx) => {
+      async (tx: TxClient) => {
         const existing = await tx.fAQ.findUnique({ where: { id } })
         if (!existing) {
           throw new Error('NOT_FOUND')
@@ -194,12 +196,12 @@ async function reorderFAQs(companyId: string, data: ReorderFAQsData): Promise<FA
 
   try {
     await prisma.$transaction(
-      async (tx) => {
+      async (tx: TxClient) => {
         const faqs = await tx.fAQ.findMany({
           where: { companyId },
         })
 
-        const faqMap = new Map(faqs.map((f) => [f.id, f]))
+        const faqMap = new Map(faqs.map((f: { id: string; [key: string]: unknown }) => [f.id, f]))
         for (const faqId of data.faqIds) {
           if (!faqMap.has(faqId)) {
             throw new Error(`INVALID_FAQ: ${faqId}`)
