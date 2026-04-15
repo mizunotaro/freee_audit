@@ -1,5 +1,8 @@
 # プロジェクトルール (AGENTS.md)
 
+> **初回アクセス時は必ず [CLAUDE.md](./CLAUDE.md) を先に読むこと。**
+> CLAUDE.md にプロジェクト全体のアーキテクチャ、ディレクトリマップ、API一覧、データベーススキーマ概要が含まれています。
+
 ## 必須参照ドキュメント
 
 全ての**設計・実装・品質管理・品質保証**において、以下のドキュメントを**必ず参照**すること：
@@ -38,13 +41,13 @@
 ### 必須チェック
 ```bash
 # 型チェック（エラー0件）
-pnpm tsc --noEmit
+pnpm typecheck
 
 # リント（エラー0件、警告0件）
-pnpm eslint src/ --max-warnings=0
+pnpm lint
 
-# ユニットテスト（全テストPASS）
-pnpm jest --passWithNoTests
+# テスト（全テストPASS）
+pnpm test
 
 # ビルド確認
 pnpm build
@@ -140,6 +143,7 @@ feat(ai): add expert persona system for financial analysis
 
 ## 参照
 
+- [CLAUDE.md](./CLAUDE.md) - プロジェクト全体像（初回アクセス時に必須）
 - [AI機能ドキュメント](./docs/ai/README.md)
 - [セキュリティガイドライン](./docs/SECURITY.md)
 - [開発ガイド](./docs/DEVELOPMENT.md)
