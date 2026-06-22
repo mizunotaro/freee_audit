@@ -1,5 +1,42 @@
 # 開発ログ (Development Log)
 
+## 2026-04-23 セッション
+
+### 目標
+現行リポジトリの品質ゲート失敗要因を整理し、フロント表示変更・非同期エラー処理・ビルド運用の3系統で復旧計画を作成する。
+
+---
+
+## 現状確認結果
+
+- `pnpm typecheck`: PASS
+- `pnpm lint`: PASS
+- `pnpm test`: FAIL
+- `pnpm build`: FAIL
+
+### 主要な失敗カテゴリ
+
+1. **フロント表示変更**
+   - analysis dashboard 配下のコンポーネントテストで、文言・DOM 構造・重複テキストに起因する失敗を確認
+
+2. **非同期エラー処理**
+   - `AbortError` の扱い、streaming error chunk の処理、retry exhaust ケースでの unhandled rejection を確認
+
+3. **ビルド運用**
+   - `.next` lock 競合と `next.config.js` の Next.js 16 警告を確認
+
+### 対応方針
+
+- unhandled rejection を先に潰して、他テストへの波及を止める
+- UI は「実装が正しいか / テストが古いか」を判定してから修正する
+- build は `.next` lock の再現条件と `next.config.js` の適合性を整理した上で再検証する
+
+### 作成ドキュメント
+
+- [フロント表示・非同期エラー処理・ビルド運用デバッグ計画](../DEBUG_FRONTEND_ASYNC_BUILD_PLAN.md)
+
+---
+
 ## 2026-03-14 セッション
 
 ### 目標

@@ -56,6 +56,7 @@ Thumbs.db
 tmp/
 temp/
 *.tmp
+tmp-test-ls/
 
 # Logs
 *.log
@@ -65,3 +66,21 @@ dev.log
 coverage_output.txt
 nul
 trash/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.pytest_cache/
+
+# R
+renv/library/
+renv/staging/
+renv/cache/
+.Rhistory
+.RData/
+
+# Claude Code / Codex
+.claude/
+.opencode/

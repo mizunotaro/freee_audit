@@ -144,6 +144,8 @@ feat(ai): add expert persona system for financial analysis
 ## 参照
 
 - [CLAUDE.md](./CLAUDE.md) - プロジェクト全体像（初回アクセス時に必須）
+- [START_HERE.md](./START_HERE.md) - 新セッション開始時の初期化プロンプト
+- [MIGRATION_GUIDE.md](./MIGRATION_GUIDE.md) - 新環境セットアップガイド
 - [AI機能ドキュメント](./docs/ai/README.md)
 - [セキュリティガイドライン](./docs/SECURITY.md)
 - [開発ガイド](./docs/DEVELOPMENT.md)

@@ -38,6 +38,79 @@ Analyzer  │  Analyzer    │  API         UI
 
 ---
 
+## 緊急安定化タスク (2026-04-23)
+
+品質ゲート再通過のため、以下の安定化タスクを優先実行する。
+
+### Task S1: フロント表示変更の再整合
+
+| 項目 | 値 |
+|------|-----|
+| 優先度 | P0 |
+| 依存 | なし |
+| 期間 | 0.5-1日 |
+| 対象 | analysis dashboard component tests |
+
+#### 対象テスト
+- `score-gauge.test.tsx`
+- `benchmark-comparison.test.tsx`
+- `trend-charts.test.tsx`
+- `recommendations-panel.test.tsx`
+
+#### 目的
+- 表示仕様変更とテスト期待値の差分を解消
+- loading / empty / interaction の挙動を固定
+
+#### 完了条件
+- 対象テストが単体実行で PASS
+- 実装変更かテスト変更かの判断理由が残っている
+
+---
+
+### Task S2: 非同期エラー処理の安定化
+
+| 項目 | 値 |
+|------|-----|
+| 優先度 | P0 |
+| 依存 | なし |
+| 期間 | 1日 |
+| 対象 | chat hook, timeout utility, retry utility |
+
+#### 対象テスト
+- `use-chat.test.ts`
+- `fetch-with-timeout.test.ts`
+- `market-data/base-provider.test.ts`
+
+#### 目的
+- Abort / timeout / stream error / retry exhaust の扱い統一
+- unhandled rejection を 0 件にする
+
+#### 完了条件
+- 対象テストが単体実行で PASS
+- Vitest 実行時の unhandled errors が 0 件
+
+---
+
+### Task S3: ビルド運用の復旧
+
+| 項目 | 値 |
+|------|-----|
+| 優先度 | P0 |
+| 依存 | Task S1, Task S2 と並行可 |
+| 期間 | 0.5日 |
+| 対象 | `pnpm build`, `.next`, `next.config.js` |
+
+#### 目的
+- `.next` lock 競合の解消
+- Next.js 16 設定警告の整理
+- build 手順の再現性確保
+
+#### 完了条件
+- `pnpm build` PASS
+- build warning の要否が整理されている
+
+---
+
 ## タスク実行フロー
 
 ```

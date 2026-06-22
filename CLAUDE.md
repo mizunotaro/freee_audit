@@ -2,6 +2,9 @@
 
 > This file is the primary entry point for any AI assistant (Claude Code, Cursor, etc.)
 > accessing this repository for the first time. Read this file completely before starting work.
+>
+> **Starting a new session?** See [START_HERE.md](./START_HERE.md) for the initialization prompt.
+> **Setting up a new environment?** See [MIGRATION_GUIDE.md](./MIGRATION_GUIDE.md).
 
 ---
 
@@ -562,6 +565,8 @@ DATABASE_URL="file:./dev.db"
 | `PROJECT.md` | Project scope, constraints, success metrics |
 | `CLAUDE.md` | This file - AI assistant context |
 | `AGENTS.md` | AI agent rules (quality gates, code patterns, commit rules) |
+| `START_HERE.md` | AI assistant session initialization prompt (read first for new sessions) |
+| `MIGRATION_GUIDE.md` | Step-by-step new environment setup guide |
 | `BACKLOG.md` | Backlog and technical debt |
 
 ### Design & Architecture

@@ -13,6 +13,7 @@
 | [QUALITY_STANDARDS.md](./QUALITY_STANDARDS.md) | 品質基準チェックリスト | 設計・実装・テスト時 |
 | [CONSTRAINTS.md](./CONSTRAINTS.md) | 制約・フォーマット定義 | 実装・バリデーション時 |
 | [TASKS.md](./TASKS.md) | タスク分割・依存関係 | 実装計画時 |
+| [DEBUGGING_QUALITY_GUIDE.md](./DEBUGGING_QUALITY_GUIDE.md) | デバッグ・品質保証実務ガイド | 障害調査・品質ゲート復旧時 |
 
 ---
 
