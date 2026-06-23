@@ -118,16 +118,15 @@ jobs:
         # would always fail. Coverage gating moves to a follow-up Phase 1
         # job that merges shards or runs the full suite separately.
         #
-        # `--no-isolate` keeps a single module context across files in the
-        # shard. The vitest default reloads every module per file under
-        # `isolate: true`, which is what drives the per-file memory growth
-        # (jsdom/msw/AI singletons all re-initialise and the old graph stays
-        # reachable for too long). Without isolation, modules are shared and
-        # the heap stays flat. Trade-off: tests must not rely on fresh
-        # module state — current suite passes individually so this is safe.
-        # (`--pool=vmForks` was tried for per-file isolation but breaks on
-        # ESM dependencies of jsdom; reverted.)
-        run: pnpm test -- --shard=${{ matrix.shard }}/64 --no-isolate --logHeapUsage --reporter=verbose
+        # Notes on what we tried and reverted:
+        # - `--pool=vmForks`: breaks ESM deps of jsdom (html-encoding-sniffer)
+        # - `--no-isolate`: lets DOM/document leak between test files in the
+        #   same worker, which broke `getAllByText` length assertions in
+        #   `benchmark-comparison.test.tsx` (12 spans instead of 3 — accumulated
+        #   from earlier renders).
+        # The two files whose per-file memory consumption alone exceeded the
+        # heap are quarantined in vitest.config.ts (see exclude list).
+        run: pnpm test -- --shard=${{ matrix.shard }}/64
 
   unit-tests:
     name: Unit Tests
