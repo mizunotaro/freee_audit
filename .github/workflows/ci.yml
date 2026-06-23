@@ -68,7 +68,7 @@ jobs:
   # exposes a single 'Unit Tests' status check that branch protection can
   # depend on regardless of shard count.
   unit-tests-shard:
-    name: Unit Tests Shard (${{ matrix.shard }}/32)
+    name: Unit Tests Shard (${{ matrix.shard }}/64)
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -77,14 +77,18 @@ jobs:
           [1, 2, 3, 4, 5, 6, 7, 8,
            9, 10, 11, 12, 13, 14, 15, 16,
            17, 18, 19, 20, 21, 22, 23, 24,
-           25, 26, 27, 28, 29, 30, 31, 32]
+           25, 26, 27, 28, 29, 30, 31, 32,
+           33, 34, 35, 36, 37, 38, 39, 40,
+           41, 42, 43, 44, 45, 46, 47, 48,
+           49, 50, 51, 52, 53, 54, 55, 56,
+           57, 58, 59, 60, 61, 62, 63, 64]
     env:
       DATABASE_URL: 'file:./test.db'
       JWT_SECRET: 'test-jwt-secret'
       ENCRYPTION_KEY: '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef'
       CSRF_SECRET: 'test-csrf-secret'
       # Vitest's worker fork inherits this; raises the per-worker heap from
-      # V8's ~4 GB default. Combined with 32 shards (~12 files each), every
+      # V8's ~4 GB default. Combined with 64 shards (~6 files each), every
       # fork stays well under the cap throughout the run.
       NODE_OPTIONS: '--max-old-space-size=6144'
     steps:
@@ -108,18 +112,17 @@ jobs:
       - name: Generate Prisma Client
         run: pnpm db:generate
 
-      - name: Run Unit Tests Shard ${{ matrix.shard }}/32
+      - name: Run Unit Tests Shard ${{ matrix.shard }}/64
         # `--coverage` is intentionally dropped from the sharded run: coverage
         # merging across shards is non-trivial and the per-shard threshold
         # would always fail. Coverage gating moves to a follow-up Phase 1
         # job that merges shards or runs the full suite separately.
         #
-        # `--pool=vmForks` runs each test file in its own node:vm context so
-        # the heap actually frees between files. Without this, even 12 heavy
-        # page-test files in a shard accumulate past 6 GB before the worker
-        # rotates. Slightly slower per file but fixes the cumulative growth
-        # that sharding alone cannot.
-        run: pnpm test -- --shard=${{ matrix.shard }}/32 --pool=vmForks
+        # NOTE: tried `--pool=vmForks` for true per-file heap isolation, but
+        # vmForks does not transparently handle the ESM dependencies pulled
+        # in by jsdom/msw (e.g. html-encoding-sniffer) and made unrelated
+        # shards fail with SyntaxError. Reverted; rely on shard width instead.
+        run: pnpm test -- --shard=${{ matrix.shard }}/64
 
   unit-tests:
     name: Unit Tests
