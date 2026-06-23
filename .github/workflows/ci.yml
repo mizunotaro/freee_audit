@@ -118,11 +118,16 @@ jobs:
         # would always fail. Coverage gating moves to a follow-up Phase 1
         # job that merges shards or runs the full suite separately.
         #
-        # NOTE: tried `--pool=vmForks` for true per-file heap isolation, but
-        # vmForks does not transparently handle the ESM dependencies pulled
-        # in by jsdom/msw (e.g. html-encoding-sniffer) and made unrelated
-        # shards fail with SyntaxError. Reverted; rely on shard width instead.
-        run: pnpm test -- --shard=${{ matrix.shard }}/64
+        # `--no-isolate` keeps a single module context across files in the
+        # shard. The vitest default reloads every module per file under
+        # `isolate: true`, which is what drives the per-file memory growth
+        # (jsdom/msw/AI singletons all re-initialise and the old graph stays
+        # reachable for too long). Without isolation, modules are shared and
+        # the heap stays flat. Trade-off: tests must not rely on fresh
+        # module state — current suite passes individually so this is safe.
+        # (`--pool=vmForks` was tried for per-file isolation but breaks on
+        # ESM dependencies of jsdom; reverted.)
+        run: pnpm test -- --shard=${{ matrix.shard }}/64 --no-isolate
 
   unit-tests:
     name: Unit Tests
