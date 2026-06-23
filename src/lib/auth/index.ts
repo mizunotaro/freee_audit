@@ -18,3 +18,5 @@ export {
   type TokenRotationResult,
   type TokenLifecycleConfig,
 } from './token-lifecycle'
+
+// CodeOwner gate verification probe (no-op).
