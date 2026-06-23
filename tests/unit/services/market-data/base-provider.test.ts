@@ -76,8 +76,11 @@ describe('BaseMarketDataProvider', () => {
       const op = vi.fn().mockRejectedValueOnce(new Error('fail')).mockResolvedValueOnce('success')
 
       const promise = provider['retryWithBackoff'](op, 2)
+      // Attach the .catch resolver BEFORE the timer tick to swallow the early
+      // rejection that vitest's worker would otherwise flag as unhandled.
+      const settled = promise.then((v) => v)
       await vi.advanceTimersByTimeAsync(3000)
-      const result = await promise
+      const result = await settled
       expect(result).toBe('success')
       expect(op).toHaveBeenCalledTimes(2)
       vi.useRealTimers()
@@ -88,19 +91,11 @@ describe('BaseMarketDataProvider', () => {
       const op = vi.fn().mockRejectedValue(new Error('always fail'))
 
       const promise = provider['retryWithBackoff'](op, 1)
+      // Attach the rejection handler BEFORE advancing timers so the early
+      // microtask rejection is never observed as unhandled by vitest's pool.
+      const assertion = expect(promise).rejects.toThrow('always fail')
       await vi.advanceTimersByTimeAsync(3000)
-      await expect(promise).rejects.toThrow('always fail')
-      expect(op).toHaveBeenCalledTimes(2)
-      vi.useRealTimers()
-    })
-
-    it('throws after all retries exhausted', async () => {
-      vi.useFakeTimers()
-      const op = vi.fn().mockRejectedValue(new Error('always fail'))
-
-      const promise = provider['retryWithBackoff'](op, 1)
-      await vi.advanceTimersByTimeAsync(3000)
-      await expect(promise).rejects.toThrow('always fail')
+      await assertion
       expect(op).toHaveBeenCalledTimes(2)
       vi.useRealTimers()
     })

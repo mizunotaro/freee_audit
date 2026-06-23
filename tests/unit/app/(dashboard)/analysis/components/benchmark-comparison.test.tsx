@@ -72,13 +72,16 @@ describe('BenchmarkComparison', () => {
 
   it('should render company value', () => {
     render(<BenchmarkComparison comparisons={mockComparisons} isLoading={false} />)
-    expect(screen.getByText(/貴社:/)).toBeInTheDocument()
+    expect(screen.getAllByText(/貴社:/)).toHaveLength(mockComparisons.length)
   })
 
   it('should render deviation for non-zero deviations', () => {
-    render(<BenchmarkComparison comparisons={mockComparisons} isLoading={false} />)
-    expect(screen.getByText(/\(0\.20\)/)).toBeInTheDocument()
-    expect(screen.getByText(/\(-5\.00\)/)).toBeInTheDocument()
+    const { container } = render(
+      <BenchmarkComparison comparisons={mockComparisons} isLoading={false} />
+    )
+    const text = container.textContent ?? ''
+    expect(text).toMatch(/\(\+0\.20\)/)
+    expect(text).toMatch(/\(-5\.00\)/)
   })
 
   it('should not render deviation for zero deviation', () => {

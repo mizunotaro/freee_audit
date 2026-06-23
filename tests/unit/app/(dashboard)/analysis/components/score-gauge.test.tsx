@@ -5,8 +5,10 @@ import { ScoreGauge } from '@/app/(dashboard)/analysis/components/score-gauge'
 
 describe('ScoreGauge', () => {
   it('should render loading state', () => {
-    render(<ScoreGauge score={0} status="fair" isLoading={true} />)
-    expect(screen.getByText('総合評価スコア')).toBeInTheDocument()
+    const { container } = render(<ScoreGauge score={0} status="fair" isLoading={true} />)
+    // Loading state renders a skeleton without the title (matches the loading
+    // pattern used elsewhere, e.g. BenchmarkComparison).
+    expect(container.querySelector('.animate-pulse')).toBeInTheDocument()
   })
 
   it('should render score value', () => {

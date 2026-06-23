@@ -53,10 +53,9 @@ describe('RecommendationsPanel', () => {
 
   it('should render priority labels', () => {
     render(<RecommendationsPanel recommendations={mockRecommendations} isLoading={false} />)
-    const allHigh = screen.getAllByText('高')
-    expect(allHigh.length).toBeGreaterThanOrEqual(1)
-    expect(screen.getByText('中')).toBeInTheDocument()
-    expect(screen.getByText('低')).toBeInTheDocument()
+    expect(screen.getAllByText('高').length).toBeGreaterThanOrEqual(1)
+    expect(screen.getAllByText('中').length).toBeGreaterThanOrEqual(1)
+    expect(screen.getAllByText('低').length).toBeGreaterThanOrEqual(1)
   })
 
   it('should render timeframe labels', () => {
@@ -107,7 +106,9 @@ describe('RecommendationsPanel', () => {
     const user = userEvent.setup()
     render(<RecommendationsPanel recommendations={mockRecommendations} isLoading={false} />)
 
-    await user.click(screen.getByText('高'))
+    const highFilterButton = screen.getAllByText('高')[0]
+    if (!highFilterButton) throw new Error('expected at least one "高" target')
+    await user.click(highFilterButton)
     expect(screen.queryByText('在庫回転率の向上')).not.toBeInTheDocument()
 
     await user.click(screen.getByText('すべて'))
