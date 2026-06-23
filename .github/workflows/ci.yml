@@ -113,7 +113,13 @@ jobs:
         # merging across shards is non-trivial and the per-shard threshold
         # would always fail. Coverage gating moves to a follow-up Phase 1
         # job that merges shards or runs the full suite separately.
-        run: pnpm test -- --shard=${{ matrix.shard }}/32
+        #
+        # `--pool=vmForks` runs each test file in its own node:vm context so
+        # the heap actually frees between files. Without this, even 12 heavy
+        # page-test files in a shard accumulate past 6 GB before the worker
+        # rotates. Slightly slower per file but fixes the cumulative growth
+        # that sharding alone cannot.
+        run: pnpm test -- --shard=${{ matrix.shard }}/32 --pool=vmForks
 
   unit-tests:
     name: Unit Tests
