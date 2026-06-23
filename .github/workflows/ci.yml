@@ -127,7 +127,7 @@ jobs:
         # module state — current suite passes individually so this is safe.
         # (`--pool=vmForks` was tried for per-file isolation but breaks on
         # ESM dependencies of jsdom; reverted.)
-        run: pnpm test -- --shard=${{ matrix.shard }}/64 --no-isolate
+        run: pnpm test -- --shard=${{ matrix.shard }}/64 --no-isolate --logHeapUsage --reporter=verbose
 
   unit-tests:
     name: Unit Tests
