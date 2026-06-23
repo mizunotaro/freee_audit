@@ -68,20 +68,20 @@ jobs:
   # exposes a single 'Unit Tests' status check that branch protection can
   # depend on regardless of shard count.
   unit-tests-shard:
-    name: Unit Tests Shard (${{ matrix.shard }}/8)
+    name: Unit Tests Shard (${{ matrix.shard }}/16)
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2, 3, 4, 5, 6, 7, 8]
+        shard: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
     env:
       DATABASE_URL: 'file:./test.db'
       JWT_SECRET: 'test-jwt-secret'
       ENCRYPTION_KEY: '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef'
       CSRF_SECRET: 'test-csrf-secret'
       # Vitest's worker fork inherits this; raises the per-worker heap from
-      # V8's ~4 GB default. Combined with 8 shards, each fork stays well
-      # under the cap throughout the run.
+      # V8's ~4 GB default. Combined with 16 shards (~25 files each), every
+      # fork stays well under the cap throughout the run.
       NODE_OPTIONS: '--max-old-space-size=6144'
     steps:
       - name: Checkout
@@ -104,12 +104,12 @@ jobs:
       - name: Generate Prisma Client
         run: pnpm db:generate
 
-      - name: Run Unit Tests Shard ${{ matrix.shard }}/8
+      - name: Run Unit Tests Shard ${{ matrix.shard }}/16
         # `--coverage` is intentionally dropped from the sharded run: coverage
         # merging across shards is non-trivial and the per-shard threshold
         # would always fail. Coverage gating moves to a follow-up Phase 1
         # job that merges shards or runs the full suite separately.
-        run: pnpm test -- --shard=${{ matrix.shard }}/8
+        run: pnpm test -- --shard=${{ matrix.shard }}/16
 
   unit-tests:
     name: Unit Tests
