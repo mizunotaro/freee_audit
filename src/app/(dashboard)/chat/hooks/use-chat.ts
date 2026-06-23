@@ -96,7 +96,9 @@ export function useChat(options: UseChatOptions = {}): UseChatReturn {
         }
       } catch (err) {
         clearTimeout(timeoutId)
-        if (err instanceof Error && err.name === 'AbortError') {
+        // DOMException ('AbortError') does not inherit from Error in browsers or jsdom,
+        // so a plain `instanceof Error` would miss aborts and surface them as user errors.
+        if ((err as { name?: string } | null)?.name === 'AbortError') {
           return
         }
         const error = err instanceof Error ? err : new Error('Unknown error')
@@ -207,7 +209,11 @@ export function useChat(options: UseChatOptions = {}): UseChatReturn {
                   throw new Error(data.message)
                 }
               } catch (parseError) {
-                if (parseError instanceof Error && parseError.message !== 'error') {
+                // JSON.parse failures emit SyntaxError; log + skip the malformed chunk.
+                // Any other thrown error (e.g. an intentional `throw new Error(...)`
+                // for a `chunk.type === 'error'` payload) must propagate so the user
+                // sees the stream error instead of it being silently swallowed.
+                if (parseError instanceof SyntaxError) {
                   console.warn('Failed to parse chunk:', parseError)
                 } else {
                   throw parseError
@@ -217,7 +223,9 @@ export function useChat(options: UseChatOptions = {}): UseChatReturn {
           }
         }
       } catch (err) {
-        if (err instanceof Error && err.name === 'AbortError') {
+        // DOMException ('AbortError') does not inherit from Error in browsers or jsdom,
+        // so a plain `instanceof Error` would miss aborts and surface them as user errors.
+        if ((err as { name?: string } | null)?.name === 'AbortError') {
           return
         }
         const error = err instanceof Error ? err : new Error('Unknown error')
