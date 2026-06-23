@@ -84,3 +84,11 @@ renv/cache/
 # Claude Code / Codex
 .claude/
 .opencode/
+
+# auto-pm operational state (runtime only — LESSON 2; config.toml itself stays tracked)
+.autopm/runtime/
+.autopm/logs/
+records/pm/task_queue.json
+records/pm/prompts/auto/
+records/pm/runtime/
+records/pm/sessions/

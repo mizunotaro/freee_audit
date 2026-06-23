@@ -1,1 +1,18 @@
-pnpm lint-staged
+#!/usr/bin/env sh
+# Pre-commit gate: run lint-staged via pnpm.
+#
+# auto-pm worker forks invoke `git commit` non-interactively; not every
+# environment has `pnpm` on PATH but every supported environment has
+# `corepack` (Node 16.13+). Prefer `pnpm` when present, fall back to
+# `corepack pnpm`, and silence corepack's first-download prompt so a hook
+# never hangs waiting for stdin.
+export COREPACK_ENABLE_DOWNLOAD_PROMPT=0
+
+if command -v pnpm >/dev/null 2>&1; then
+  exec pnpm lint-staged
+elif command -v corepack >/dev/null 2>&1; then
+  exec corepack pnpm lint-staged
+else
+  echo "pre-commit: neither 'pnpm' nor 'corepack' is on PATH" >&2
+  exit 127
+fi

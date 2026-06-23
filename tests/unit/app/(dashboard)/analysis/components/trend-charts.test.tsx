@@ -41,13 +41,12 @@ describe('TrendCharts', () => {
 
   it('should render category names in analysis', () => {
     const data = {
-      categoryAnalyses: [
-        { category: 'liquidity', score: 75, status: 'good', summary: 'Test' },
-      ],
+      categoryAnalyses: [{ category: 'liquidity', score: 75, status: 'good', summary: 'Test' }],
     }
     render(<TrendCharts data={data} isLoading={false} />)
 
-    expect(screen.getByText('流動性')).toBeInTheDocument()
+    // 流動性 is rendered both in the category legend and in the analysis section.
+    expect(screen.getAllByText('流動性').length).toBeGreaterThanOrEqual(2)
   })
 
   it('should render status text', () => {

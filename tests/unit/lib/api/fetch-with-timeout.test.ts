@@ -86,18 +86,15 @@ describe('fetchWithTimeout', () => {
     )
 
     const onTimeout = vi.fn()
-    const promise = fetchWithTimeout('https://example.com/api', {
+    // Pre-attach the rejection handler so the timeout-driven rejection is never
+    // observed as unhandled by vitest's worker pool when timers fire.
+    const settled = fetchWithTimeout('https://example.com/api', {
       timeout: 100,
       onTimeout,
-    })
+    }).catch(() => undefined)
 
     await vi.advanceTimersByTimeAsync(100)
-
-    try {
-      await promise
-    } catch {
-      // Expected to throw
-    }
+    await settled
 
     expect(onTimeout).toHaveBeenCalledTimes(1)
 
