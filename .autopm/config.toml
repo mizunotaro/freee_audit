@@ -1,0 +1,77 @@
+[project]
+name = "freee_audit"
+repo_root     = "C:/dev/freee_audit/project"
+worktree_root = "C:/dev/freee_audit/worktrees"
+
+[git]
+default_branch = "master"
+branch_prefix  = "feature/auto"
+
+# ── 最重要：このドメインの「Class A = 人間レビュー必須・auto-merge 禁止」パス ──
+[risk_classes]
+class_a = [
+  # 財務計算・評価（数値の正当性が監査結論に直結）
+  "python-service/**", "r-service/**",
+  "src/app/api/valuation/**", "src/app/api/tax/**", "src/app/api/kpi/**",
+  "src/app/api/deferred-accrual/**", "src/app/api/debt/**",
+  "src/services/valuation/**", "src/services/tax/**", "src/services/kpi/**",
+  "src/services/deferred-accrual/**", "src/services/debt/**",
+  # 監査判定・仕訳
+  "src/app/api/audit/**", "src/lib/audit/**", "src/services/audit/**",
+  "src/app/api/journal-proposal/**", "src/app/api/journals/**",
+  "src/services/journal-proposal/**",
+  # 会計基準変換（JGAAP↔IFRS/USGAAP）
+  "src/lib/conversion/**", "src/app/api/conversion/**", "src/services/conversion/**",
+  # 認証・認可・暗号・セキュリティ
+  "src/lib/auth*", "src/lib/auth/**", "src/app/api/auth/**", "src/lib/crypto.ts",
+  "src/lib/ai/security/**", "src/lib/api/with-auth.ts", "src/lib/api/auth-helpers.ts",
+  # データ整合性・実データ連携
+  "prisma/schema.prisma", "prisma/migrations/**",
+  "src/app/api/freee/**", "src/services/freee/**", "src/lib/integrations/freee/**",
+]
+class_b = [
+  "src/app/api/**", "src/lib/ai/**", "src/app/api/export/**",
+  "src/lib/api/**", "middleware.ts", "next.config.js",
+]
+# 上記以外（UI components, messages/i18n, docs, tests, styling）は Class C（auto-merge 可）
+
+[checks]
+# GLM が改変してはならない統制ファイル
+protected_paths = [
+  "CLAUDE.md", "AGENTS.md", "PROJECT.md", "START_HERE.md",
+  "docs/ai/QUALITY_STANDARDS.md", "docs/ai/CONSTRAINTS.md",
+  ".github/workflows/**", ".autopm/**",
+  "records/pm/task_queue.json", "records/pm/prompts/**",
+  "prisma/schema.prisma",          # スキーマは Class A かつ改変保護（移行は人間設計）
+]
+# ★TS/JS プロジェクト用の検証に差し替える（既定の pytest/ruff は不適）
+verify_build_script = "scripts/autopm_verify.mjs"   # 後述：監理者が初日に作成
+
+[checks.enabled]
+diff_not_empty          = true
+no_secret_leak          = true
+no_pm_self_modification = true
+pytest = false            # ← TS プロジェクトなので無効（python-service だけ別途）
+ruff   = false
+mypy   = false
+
+[zai]
+endpoint     = "https://api.z.ai/api/anthropic"
+model_opus   = "glm-5.2"     # ★テンプレ既定は glm-5.1 → 5.2 に必ず上書き
+model_sonnet = "glm-5.2"
+model_haiku  = "glm-4.5-air"
+# Off-Peak 1x（〜2026-09-30）: ピーク ET02-06 = JST15-19
+peak_start_et = 2
+peak_end_et   = 6
+peak_action   = "reserve"
+promo_end_iso = "2026-09-30T23:59:59Z"
+
+[plan]
+tier = "pro"
+soft_cap = 0.95
+
+[worker]
+completion_sentinel = "TASK COMPLETE"
+max_open_prs = 5
+# 全 task prompt に付与する freee_audit 共通ルール
+workflow_suffix_file = "docs/auto-sessions/_workflow_suffix.md"

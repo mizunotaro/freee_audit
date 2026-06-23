@@ -1,0 +1,11 @@
+# 財務正当性・監査・セキュリティ・データ整合性は所有者レビュー必須
+/python-service/      @mizunotaro
+/r-service/           @mizunotaro
+/src/lib/auth/        @mizunotaro
+/src/lib/audit/       @mizunotaro
+/src/lib/conversion/  @mizunotaro
+/src/app/api/audit/   @mizunotaro
+/src/app/api/valuation/ @mizunotaro
+/src/app/api/tax/     @mizunotaro
+/src/app/api/freee/   @mizunotaro
+/prisma/              @mizunotaro
