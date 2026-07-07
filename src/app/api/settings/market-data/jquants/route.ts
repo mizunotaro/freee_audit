@@ -1,7 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
 import { prisma } from '@/lib/db'
 import { validateSession } from '@/lib/auth'
 import { encrypt } from '@/lib/crypto'
+
+const saveJquantsSchema = z.object({
+  email: z.string().min(1),
+  password: z.string().min(1),
+})
 
 async function getAuthUser(request: NextRequest) {
   const token = request.cookies.get('session')?.value
@@ -16,15 +22,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
     }
 
-    const body = await request.json()
-    const { email, password } = body
-
-    if (!email || !password) {
+    const parsed = saveJquantsSchema.safeParse(await request.json())
+    if (!parsed.success) {
       return NextResponse.json(
-        { success: false, error: 'Email and password are required' },
+        { success: false, error: 'Validation failed', details: parsed.error.flatten() },
         { status: 400 }
       )
     }
+
+    const { email, password } = parsed.data
 
     const encryptedEmail = encrypt(email)
     const encryptedPassword = encrypt(password)

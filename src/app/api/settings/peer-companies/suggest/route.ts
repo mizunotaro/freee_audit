@@ -1,7 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
 import { validateSession } from '@/lib/auth'
 import { createPeerSelectorAI } from '@/services/peer-companies'
 import { getAIService } from '@/lib/integrations/ai'
+
+const suggestPeersSchema = z.object({
+  industry: z.string().min(1),
+  subIndustry: z.string().optional(),
+  revenue: z.number().optional(),
+  employees: z.number().int().optional(),
+  geography: z.string().optional(),
+  market: z.enum(['JPX', 'NASDAQ', 'NYSE', 'GLOBAL']).optional(),
+  growthStage: z.enum(['seed', 'early', 'growth', 'mature']).optional(),
+  minPeers: z.number().int().min(1).default(3),
+  maxPeers: z.number().int().min(1).default(10),
+  seed: z.union([z.string(), z.number()]).optional(),
+  useAI: z.boolean().default(true),
+})
 
 async function getAuthUser(request: NextRequest) {
   const token = request.cookies.get('session')?.value
@@ -16,7 +31,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
     }
 
-    const body = await request.json()
+    const parsed = suggestPeersSchema.safeParse(await request.json())
+    if (!parsed.success) {
+      return NextResponse.json(
+        { success: false, error: 'Validation failed', details: parsed.error.flatten() },
+        { status: 400 }
+      )
+    }
+
     const {
       industry,
       subIndustry,
@@ -25,15 +47,11 @@ export async function POST(request: NextRequest) {
       geography,
       market,
       growthStage,
-      minPeers = 3,
-      maxPeers = 10,
+      minPeers,
+      maxPeers,
       seed,
-      useAI = true,
-    } = body
-
-    if (!industry) {
-      return NextResponse.json({ success: false, error: 'Industry is required' }, { status: 400 })
-    }
+      useAI,
+    } = parsed.data
 
     const aiService = getAIService()
     const aiProvider = await aiService.getProvider(undefined, {

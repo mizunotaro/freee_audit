@@ -1,6 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
 import { prisma } from '@/lib/db'
 import { validateSession } from '@/lib/auth'
+
+const createProviderSchema = z.object({
+  provider: z.string().min(1),
+  encryptedEmail: z.string().nullable().optional(),
+  encryptedPassword: z.string().nullable().optional(),
+  encryptedApiKey: z.string().nullable().optional(),
+  enabled: z.boolean().optional(),
+  priority: z.number().int().optional(),
+})
 
 async function getAuthUser(request: NextRequest) {
   const token = request.cookies.get('session')?.value
@@ -47,12 +57,16 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
     }
 
-    const body = await request.json()
-    const { provider, encryptedEmail, encryptedPassword, encryptedApiKey, enabled, priority } = body
-
-    if (!provider) {
-      return NextResponse.json({ success: false, error: 'Provider is required' }, { status: 400 })
+    const parsed = createProviderSchema.safeParse(await request.json())
+    if (!parsed.success) {
+      return NextResponse.json(
+        { success: false, error: 'Validation failed', details: parsed.error.flatten() },
+        { status: 400 }
+      )
     }
+
+    const { provider, encryptedEmail, encryptedPassword, encryptedApiKey, enabled, priority } =
+      parsed.data
 
     const existing = await prisma.marketDataProvider.findUnique({
       where: {

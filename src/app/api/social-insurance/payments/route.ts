@@ -1,6 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
 import { validateSession } from '@/lib/auth'
 import { PaymentChecker } from '@/services/social-insurance'
+
+const paymentsQuerySchema = z.object({
+  insuranceType: z.enum(['health', 'pension', 'employment', 'work_accident', 'care']).optional(),
+  year: z.coerce.number().int().min(1900).max(2100).optional(),
+  month: z.coerce.number().int().min(1).max(12).optional(),
+})
+
+const createPaymentSchema = z.object({
+  insuranceType: z.enum(['health', 'pension', 'employment', 'work_accident', 'care']),
+  year: z.coerce.number().int().min(1900).max(2100),
+  month: z.coerce.number().int().min(1).max(12),
+  expectedAmount: z.coerce.number(),
+  actualAmount: z.coerce.number(),
+  dueDate: z.coerce.date(),
+  journalEntryId: z.string().optional(),
+  paymentDate: z.coerce.date().optional(),
+  notes: z.string().optional(),
+})
 
 async function getAuthUser(request: NextRequest) {
   const token = request.cookies.get('session')?.value
@@ -16,14 +35,18 @@ export async function GET(request: NextRequest) {
     }
 
     const { searchParams } = new URL(request.url)
-    const year = searchParams.get('year') ? parseInt(searchParams.get('year')!) : undefined
-    const month = searchParams.get('month') ? parseInt(searchParams.get('month')!) : undefined
-    const insuranceType = searchParams.get('insuranceType') as any
+    const query = paymentsQuerySchema.safeParse(Object.fromEntries(searchParams))
+    if (!query.success) {
+      return NextResponse.json(
+        { error: 'Invalid query parameters', details: query.error.flatten() },
+        { status: 400 }
+      )
+    }
 
     const payments = await PaymentChecker.getPayments(user.companyId, {
-      insuranceType: insuranceType || undefined,
-      year,
-      month,
+      insuranceType: query.data.insuranceType,
+      year: query.data.year,
+      month: query.data.month,
     })
 
     return NextResponse.json(payments)
@@ -40,19 +63,17 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const body = await request.json()
+    const parsed = createPaymentSchema.safeParse(await request.json())
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: 'Validation failed', details: parsed.error.flatten() },
+        { status: 400 }
+      )
+    }
 
     const payment = await PaymentChecker.createPayment({
       companyId: user.companyId,
-      insuranceType: body.insuranceType,
-      year: body.year,
-      month: body.month,
-      expectedAmount: body.expectedAmount,
-      actualAmount: body.actualAmount,
-      dueDate: new Date(body.dueDate),
-      journalEntryId: body.journalEntryId,
-      paymentDate: body.paymentDate ? new Date(body.paymentDate) : undefined,
-      notes: body.notes,
+      ...parsed.data,
     })
 
     return NextResponse.json(payment, { status: 201 })
