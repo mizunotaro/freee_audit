@@ -1,6 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
 import { prisma } from '@/lib/db'
 import { validateSession } from '@/lib/auth'
+
+const updatePeerSchema = z.object({
+  ticker: z.string().nullable().optional(),
+  name: z.string().min(1).optional(),
+  nameEn: z.string().nullable().optional(),
+  exchange: z.string().nullable().optional(),
+  industry: z.string().nullable().optional(),
+  marketCap: z.number().nullable().optional(),
+  revenue: z.number().nullable().optional(),
+  employees: z.number().int().nullable().optional(),
+  per: z.number().nullable().optional(),
+  pbr: z.number().nullable().optional(),
+  evEbitda: z.number().nullable().optional(),
+  psr: z.number().nullable().optional(),
+  beta: z.number().nullable().optional(),
+  similarityScore: z.number().nullable().optional(),
+  isActive: z.boolean().optional(),
+})
 
 async function getAuthUser(request: NextRequest) {
   const token = request.cookies.get('session')?.value
@@ -42,7 +61,14 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     }
 
     const { id } = await params
-    const body = await request.json()
+    const parsed = updatePeerSchema.safeParse(await request.json())
+    if (!parsed.success) {
+      return NextResponse.json(
+        { success: false, error: 'Validation failed', details: parsed.error.flatten() },
+        { status: 400 }
+      )
+    }
+    const body = parsed.data
 
     const existing = await prisma.peerCompany.findFirst({
       where: { id, companyId: user.companyId },

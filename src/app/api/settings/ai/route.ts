@@ -1,7 +1,14 @@
 import { NextResponse } from 'next/server'
+import { z } from 'zod'
 import { withAuth, type AuthenticatedRequest } from '@/lib/api'
 import { prisma } from '@/lib/db'
 import { encrypt } from '@/lib/crypto/encryption'
+
+const saveAiConfigSchema = z.object({
+  provider: z.enum(['openai', 'gemini', 'claude']),
+  apiKey: z.string().min(1),
+  model: z.string().optional(),
+})
 
 async function getHandler(req: AuthenticatedRequest) {
   try {
@@ -51,12 +58,15 @@ async function postHandler(req: AuthenticatedRequest) {
       return NextResponse.json({ error: 'User is not associated with a company' }, { status: 400 })
     }
 
-    const body = await req.json()
-    const { provider, apiKey, model } = body
-
-    if (!provider || !apiKey) {
-      return NextResponse.json({ error: 'provider and apiKey are required' }, { status: 400 })
+    const parsed = saveAiConfigSchema.safeParse(await req.json())
+    if (!parsed.success) {
+      return NextResponse.json(
+        { success: false, error: 'Validation failed', details: parsed.error.flatten() },
+        { status: 400 }
+      )
     }
+
+    const { provider, apiKey, model } = parsed.data
 
     const providerMap: Record<string, string> = {
       openai: 'OPENAI',
@@ -64,7 +74,7 @@ async function postHandler(req: AuthenticatedRequest) {
       claude: 'CLAUDE',
     }
 
-    const dbProvider = providerMap[provider.toLowerCase()]
+    const dbProvider = providerMap[provider]
     if (!dbProvider) {
       return NextResponse.json({ error: 'Invalid provider' }, { status: 400 })
     }

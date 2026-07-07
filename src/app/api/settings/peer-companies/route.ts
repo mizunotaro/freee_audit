@@ -1,6 +1,31 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
 import { prisma } from '@/lib/db'
 import { validateSession } from '@/lib/auth'
+
+const listPeersQuerySchema = z.object({
+  activeOnly: z.string().optional(),
+  industry: z.string().optional(),
+})
+
+const createPeerSchema = z.object({
+  ticker: z.string().nullable().optional(),
+  name: z.string().min(1),
+  nameEn: z.string().nullable().optional(),
+  exchange: z.string().nullable().optional(),
+  industry: z.string().nullable().optional(),
+  marketCap: z.number().nullable().optional(),
+  revenue: z.number().nullable().optional(),
+  employees: z.number().int().nullable().optional(),
+  per: z.number().nullable().optional(),
+  pbr: z.number().nullable().optional(),
+  evEbitda: z.number().nullable().optional(),
+  psr: z.number().nullable().optional(),
+  beta: z.number().nullable().optional(),
+  similarityScore: z.number().nullable().optional(),
+  dataSource: z.string().optional(),
+  sourceUrl: z.string().nullable().optional(),
+})
 
 async function getAuthUser(request: NextRequest) {
   const token = request.cookies.get('session')?.value
@@ -16,8 +41,15 @@ export async function GET(request: NextRequest) {
     }
 
     const { searchParams } = new URL(request.url)
-    const activeOnly = searchParams.get('activeOnly') === 'true'
-    const industry = searchParams.get('industry') ?? undefined
+    const query = listPeersQuerySchema.safeParse(Object.fromEntries(searchParams))
+    if (!query.success) {
+      return NextResponse.json(
+        { success: false, error: 'Invalid query parameters', details: query.error.flatten() },
+        { status: 400 }
+      )
+    }
+    const activeOnly = query.data.activeOnly === 'true'
+    const industry = query.data.industry ?? undefined
 
     const peers = await prisma.peerCompany.findMany({
       where: {
@@ -44,7 +76,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
     }
 
-    const body = await request.json()
+    const parsed = createPeerSchema.safeParse(await request.json())
+    if (!parsed.success) {
+      return NextResponse.json(
+        { success: false, error: 'Validation failed', details: parsed.error.flatten() },
+        { status: 400 }
+      )
+    }
+
     const {
       ticker,
       name,
@@ -62,11 +101,7 @@ export async function POST(request: NextRequest) {
       similarityScore,
       dataSource,
       sourceUrl,
-    } = body
-
-    if (!name) {
-      return NextResponse.json({ success: false, error: 'Name is required' }, { status: 400 })
-    }
+    } = parsed.data
 
     if (ticker) {
       const existing = await prisma.peerCompany.findUnique({

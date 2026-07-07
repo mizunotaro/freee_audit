@@ -1,6 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
 import { validateSession } from '@/lib/auth'
 import { ScheduleManager } from '@/services/social-insurance'
+
+const schedulesQuerySchema = z.object({
+  insuranceType: z.enum(['health', 'pension', 'employment', 'work_accident', 'care']).optional(),
+  status: z.enum(['PENDING', 'COMPLETED', 'OVERDUE']).optional(),
+})
+
+const createScheduleSchema = z.object({
+  insuranceType: z.enum(['health', 'pension', 'employment', 'work_accident', 'care']),
+  taskName: z.string().min(1),
+  dueDate: z.coerce.date(),
+  notes: z.string().optional(),
+})
 
 async function getAuthUser(request: NextRequest) {
   const token = request.cookies.get('session')?.value
@@ -16,12 +29,17 @@ export async function GET(request: NextRequest) {
     }
 
     const { searchParams } = new URL(request.url)
-    const insuranceType = searchParams.get('insuranceType') as any
-    const status = searchParams.get('status') as any
+    const query = schedulesQuerySchema.safeParse(Object.fromEntries(searchParams))
+    if (!query.success) {
+      return NextResponse.json(
+        { error: 'Invalid query parameters', details: query.error.flatten() },
+        { status: 400 }
+      )
+    }
 
     const schedules = await ScheduleManager.getSchedules(user.companyId, {
-      insuranceType: insuranceType || undefined,
-      status: status || undefined,
+      insuranceType: query.data.insuranceType,
+      status: query.data.status,
     })
 
     return NextResponse.json(schedules)
@@ -38,14 +56,17 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const body = await request.json()
+    const parsed = createScheduleSchema.safeParse(await request.json())
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: 'Validation failed', details: parsed.error.flatten() },
+        { status: 400 }
+      )
+    }
 
     const schedule = await ScheduleManager.createSchedule({
       companyId: user.companyId,
-      insuranceType: body.insuranceType,
-      taskName: body.taskName,
-      dueDate: new Date(body.dueDate),
-      notes: body.notes,
+      ...parsed.data,
     })
 
     return NextResponse.json(schedule, { status: 201 })

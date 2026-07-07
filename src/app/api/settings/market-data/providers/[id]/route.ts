@@ -1,6 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
 import { prisma } from '@/lib/db'
 import { validateSession } from '@/lib/auth'
+
+const updateProviderSchema = z.object({
+  enabled: z.boolean().optional(),
+  priority: z.number().int().optional(),
+  lastError: z.string().nullable().optional(),
+})
 
 async function getAuthUser(request: NextRequest) {
   const token = request.cookies.get('session')?.value
@@ -16,7 +23,13 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     }
 
     const { id } = await params
-    const body = await request.json()
+    const parsed = updateProviderSchema.safeParse(await request.json())
+    if (!parsed.success) {
+      return NextResponse.json(
+        { success: false, error: 'Validation failed', details: parsed.error.flatten() },
+        { status: 400 }
+      )
+    }
 
     const existing = await prisma.marketDataProvider.findFirst({
       where: { id, companyId: user.companyId },
@@ -29,9 +42,9 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     const updated = await prisma.marketDataProvider.update({
       where: { id },
       data: {
-        enabled: body.enabled ?? existing.enabled,
-        priority: body.priority ?? existing.priority,
-        lastError: body.lastError !== undefined ? body.lastError : existing.lastError,
+        enabled: parsed.data.enabled ?? existing.enabled,
+        priority: parsed.data.priority ?? existing.priority,
+        lastError: parsed.data.lastError !== undefined ? parsed.data.lastError : existing.lastError,
       },
     })
 
