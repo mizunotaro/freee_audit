@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
 import type { ChatRequest, ChatResponse, PersonaAnalysisResponse } from './types'
 import { createOrchestrator } from '@/lib/ai/orchestrator/orchestrator'
 import { createContextManager } from '@/lib/ai/context/context-manager'
@@ -17,6 +18,30 @@ const PERSONA_NAMES: Record<PersonaType, string> = {
 const RATE_LIMIT_WINDOW_MS = 60 * 1000
 const RATE_LIMIT_MAX_REQUESTS = 30
 const rateLimitStore = new Map<string, { count: number; resetAt: number }>()
+
+const chatRequestSchema = z
+  .object({
+    message: z.string().min(1).max(10000),
+    sessionId: z.string().optional(),
+    context: z
+      .object({
+        companyId: z.string().optional(),
+        language: z.enum(['ja', 'en']).optional(),
+        financialData: z.record(z.string(), z.unknown()).optional(),
+      })
+      .passthrough()
+      .optional(),
+    options: z
+      .object({
+        maxCost: z.number().optional(),
+        maxLatencyMs: z.number().optional(),
+        stream: z.boolean().optional(),
+        preferredPersonas: z.array(z.string()).optional(),
+      })
+      .passthrough()
+      .optional(),
+  })
+  .passthrough()
 
 export async function POST(request: NextRequest): Promise<NextResponse<ChatResponse>> {
   const startTime = Date.now()
@@ -168,22 +193,23 @@ async function parseRequestBody(
 > {
   try {
     const body = await request.json()
+    const parsed = chatRequestSchema.safeParse(body)
 
-    if (!body.message || typeof body.message !== 'string') {
+    if (!parsed.success) {
+      const messageIssue = parsed.error.issues.find((issue) => issue.path[0] === 'message')
+      if (messageIssue?.code === 'too_big') {
+        return {
+          success: false,
+          error: { code: 'message_too_long', message: 'Message exceeds maximum length' },
+        }
+      }
       return {
         success: false,
         error: { code: 'invalid_input', message: 'Message is required' },
       }
     }
 
-    if (body.message.length > 10000) {
-      return {
-        success: false,
-        error: { code: 'message_too_long', message: 'Message exceeds maximum length' },
-      }
-    }
-
-    return { success: true, data: body as ChatRequest }
+    return { success: true, data: parsed.data as ChatRequest }
   } catch {
     return {
       success: false,
