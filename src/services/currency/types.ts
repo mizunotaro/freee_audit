@@ -1,4 +1,4 @@
-import { Result } from '@/types/result'
+import { Result, type AppError } from '@/types/result'
 
 export type CurrencyCode =
   | 'USD'
@@ -151,8 +151,17 @@ export interface CurrencyConversion {
 }
 
 export interface CurrencyConverter {
-  convert(amount: number, from: Currency, to: Currency, rate: ExchangeRate): CurrencyConversion
-  convertWithLatestRate(amount: number, from: Currency, to: Currency): Promise<CurrencyConversion>
+  convert(
+    amount: number,
+    from: Currency,
+    to: Currency,
+    rate: ExchangeRate
+  ): Result<CurrencyConversion, AppError>
+  convertWithLatestRate(
+    amount: number,
+    from: Currency,
+    to: Currency
+  ): Promise<Result<CurrencyConversion, AppError>>
 }
 
 export interface DualCurrencyDisplayProps {
