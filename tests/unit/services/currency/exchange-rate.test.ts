@@ -3,6 +3,7 @@ import {
   BOJExchangeRateService,
   createExchangeRateService,
 } from '@/services/currency/exchange-rate'
+import { exchangeRateCache } from '@/lib/cache'
 
 describe('BOJExchangeRateService', () => {
   let service: BOJExchangeRateService
@@ -26,12 +27,31 @@ describe('BOJExchangeRateService', () => {
     })
 
     it('should return cached rate on subsequent calls', async () => {
-      const date = new Date('2024-01-15')
+      // exchangeRateCache is a module-level singleton; clear it so the first
+      // call below is a guaranteed cache miss regardless of test run order.
+      exchangeRateCache.clear()
+      // getRate stamps createdAt/updatedAt via new Date() on every call (cache
+      // hits included). Freeze the clock or toEqual flakes across an ms boundary.
+      vi.useFakeTimers()
+      vi.setSystemTime(new Date('2024-06-01T00:00:00Z'))
 
-      const rate1 = await service.getRate(date, 'JPY', 'USD')
-      const rate2 = await service.getRate(date, 'JPY', 'USD')
+      const fetchSpy = vi.spyOn(
+        service as unknown as { fetchBOJRate: (...args: unknown[]) => Promise<unknown> },
+        'fetchBOJRate'
+      )
 
-      expect(rate1).toEqual(rate2)
+      try {
+        const date = new Date('2024-01-15')
+
+        const rate1 = await service.getRate(date, 'JPY', 'USD')
+        const rate2 = await service.getRate(date, 'JPY', 'USD')
+
+        // Second call hits the cache: the BOJ fetch runs exactly once.
+        expect(fetchSpy).toHaveBeenCalledTimes(1)
+        expect(rate1).toEqual(rate2)
+      } finally {
+        vi.useRealTimers()
+      }
     })
 
     it('should handle different currency pairs', async () => {
