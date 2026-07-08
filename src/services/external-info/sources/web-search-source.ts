@@ -6,6 +6,7 @@ import type {
   InfoSourceId,
   InfoSourceConfig,
 } from '../types'
+import { type AppError, type Result, createAppError, ERROR_CODES, failure } from '@/types/result'
 
 export type WebSearchProvider = 'openai' | 'serpapi' | 'google' | 'bing'
 
@@ -58,7 +59,11 @@ export class WebSearchInfoSource extends BaseInfoSource {
       )
 
       const latencyMs = Date.now() - startTime
-      this.recordSuccess(latencyMs)
+      if (result.success) {
+        this.recordSuccess(latencyMs)
+      } else {
+        this.recordFailure(result.error?.message ?? 'Web search failed')
+      }
 
       return result
     } catch (error) {
@@ -83,8 +88,23 @@ export class WebSearchInfoSource extends BaseInfoSource {
   private async executeSearch(query: ExternalInfoQuery): Promise<ExternalInfoResult> {
     const startTime = Date.now()
 
-    const items = await this.performSearch(query)
+    const itemsResult = await this.performSearch(query)
+    if (!itemsResult.success) {
+      return {
+        success: false,
+        items: [],
+        totalFound: 0,
+        source: this.sourceId,
+        fetchedAt: new Date(),
+        latencyMs: Date.now() - startTime,
+        error: {
+          code: 'web_search_error',
+          message: itemsResult.error.message,
+        },
+      }
+    }
 
+    const items = itemsResult.data
     return {
       success: true,
       items,
@@ -95,7 +115,9 @@ export class WebSearchInfoSource extends BaseInfoSource {
     }
   }
 
-  private async performSearch(query: ExternalInfoQuery): Promise<ExternalInfoItem[]> {
+  private async performSearch(
+    query: ExternalInfoQuery
+  ): Promise<Result<ExternalInfoItem[], AppError>> {
     switch (this.searchConfig.provider) {
       case 'openai':
         return this.searchWithOpenAI(query)
@@ -106,42 +128,93 @@ export class WebSearchInfoSource extends BaseInfoSource {
       case 'bing':
         return this.searchWithBing(query)
       default:
-        throw new Error(`Unknown search provider: ${this.searchConfig.provider}`)
+        return failure(
+          createAppError(
+            ERROR_CODES.BUSINESS_LOGIC_ERROR,
+            `Unknown search provider: ${this.searchConfig.provider}`
+          )
+        )
     }
   }
 
-  private async searchWithOpenAI(_query: ExternalInfoQuery): Promise<ExternalInfoItem[]> {
+  private async searchWithOpenAI(
+    _query: ExternalInfoQuery
+  ): Promise<Result<ExternalInfoItem[], AppError>> {
     if (!this.searchConfig.apiKey) {
-      throw new Error('OpenAI API key not configured. Set WEB_SEARCH_API_KEY environment variable.')
-    }
-
-    throw new Error('OpenAI web search not implemented. Configure mock source for development.')
-  }
-
-  private async searchWithSerpAPI(_query: ExternalInfoQuery): Promise<ExternalInfoItem[]> {
-    if (!this.searchConfig.apiKey) {
-      throw new Error('SerpAPI key not configured. Set SERPAPI_KEY environment variable.')
-    }
-
-    throw new Error('SerpAPI not implemented. Configure mock source for development.')
-  }
-
-  private async searchWithGoogle(_query: ExternalInfoQuery): Promise<ExternalInfoItem[]> {
-    if (!this.searchConfig.apiKey || !this.searchConfig.searchEngineId) {
-      throw new Error(
-        'Google Custom Search not configured. Set GOOGLE_API_KEY and GOOGLE_SEARCH_ENGINE_ID.'
+      return failure(
+        createAppError(
+          ERROR_CODES.VALIDATION_ERROR,
+          'OpenAI API key not configured. Set WEB_SEARCH_API_KEY environment variable.'
+        )
       )
     }
 
-    throw new Error('Google Custom Search not implemented. Configure mock source for development.')
+    return failure(
+      createAppError(
+        ERROR_CODES.BUSINESS_LOGIC_ERROR,
+        'OpenAI web search not implemented. Configure mock source for development.'
+      )
+    )
   }
 
-  private async searchWithBing(_query: ExternalInfoQuery): Promise<ExternalInfoItem[]> {
+  private async searchWithSerpAPI(
+    _query: ExternalInfoQuery
+  ): Promise<Result<ExternalInfoItem[], AppError>> {
     if (!this.searchConfig.apiKey) {
-      throw new Error('Bing Search API key not configured. Set BING_API_KEY environment variable.')
+      return failure(
+        createAppError(
+          ERROR_CODES.VALIDATION_ERROR,
+          'SerpAPI key not configured. Set SERPAPI_KEY environment variable.'
+        )
+      )
     }
 
-    throw new Error('Bing Search not implemented. Configure mock source for development.')
+    return failure(
+      createAppError(
+        ERROR_CODES.BUSINESS_LOGIC_ERROR,
+        'SerpAPI not implemented. Configure mock source for development.'
+      )
+    )
+  }
+
+  private async searchWithGoogle(
+    _query: ExternalInfoQuery
+  ): Promise<Result<ExternalInfoItem[], AppError>> {
+    if (!this.searchConfig.apiKey || !this.searchConfig.searchEngineId) {
+      return failure(
+        createAppError(
+          ERROR_CODES.VALIDATION_ERROR,
+          'Google Custom Search not configured. Set GOOGLE_API_KEY and GOOGLE_SEARCH_ENGINE_ID.'
+        )
+      )
+    }
+
+    return failure(
+      createAppError(
+        ERROR_CODES.BUSINESS_LOGIC_ERROR,
+        'Google Custom Search not implemented. Configure mock source for development.'
+      )
+    )
+  }
+
+  private async searchWithBing(
+    _query: ExternalInfoQuery
+  ): Promise<Result<ExternalInfoItem[], AppError>> {
+    if (!this.searchConfig.apiKey) {
+      return failure(
+        createAppError(
+          ERROR_CODES.VALIDATION_ERROR,
+          'Bing Search API key not configured. Set BING_API_KEY environment variable.'
+        )
+      )
+    }
+
+    return failure(
+      createAppError(
+        ERROR_CODES.BUSINESS_LOGIC_ERROR,
+        'Bing Search not implemented. Configure mock source for development.'
+      )
+    )
   }
 
   updateSearchConfig(config: Partial<WebSearchConfig>): void {

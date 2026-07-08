@@ -56,6 +56,89 @@ describe('WebSearchInfoSource', () => {
     })
   })
 
+  describe('error branches per provider', () => {
+    it('returns web_search_error with not-configured message for openai without api key', async () => {
+      const source = new WebSearchInfoSource({ enabled: true })
+      const result = await source.fetch({ query: 'test' })
+
+      expect(result.success).toBe(false)
+      if (!result.success && result.error) {
+        expect(result.error.code).toBe('web_search_error')
+        expect(result.error.message).toContain('OpenAI API key not configured')
+      }
+    })
+
+    it('returns web_search_error with not-implemented message for openai with api key', async () => {
+      const source = new WebSearchInfoSource({ enabled: true }, { provider: 'openai', apiKey: 'k' })
+      const result = await source.fetch({ query: 'test' })
+
+      expect(result.success).toBe(false)
+      if (!result.success && result.error) {
+        expect(result.error.code).toBe('web_search_error')
+        expect(result.error.message).toContain('OpenAI web search not implemented')
+      }
+    })
+
+    it('returns web_search_error for serpapi not implemented', async () => {
+      const source = new WebSearchInfoSource(
+        { enabled: true },
+        { provider: 'serpapi', apiKey: 'k' }
+      )
+      const result = await source.fetch({ query: 'test' })
+
+      expect(result.success).toBe(false)
+      if (!result.success && result.error) {
+        expect(result.error.code).toBe('web_search_error')
+        expect(result.error.message).toContain('SerpAPI not implemented')
+      }
+    })
+
+    it('returns web_search_error for google not implemented', async () => {
+      const source = new WebSearchInfoSource(
+        { enabled: true },
+        { provider: 'google', apiKey: 'k', searchEngineId: 'e' }
+      )
+      const result = await source.fetch({ query: 'test' })
+
+      expect(result.success).toBe(false)
+      if (!result.success && result.error) {
+        expect(result.error.code).toBe('web_search_error')
+        expect(result.error.message).toContain('Google Custom Search not implemented')
+      }
+    })
+
+    it('returns web_search_error for bing not implemented', async () => {
+      const source = new WebSearchInfoSource({ enabled: true }, { provider: 'bing', apiKey: 'k' })
+      const result = await source.fetch({ query: 'test' })
+
+      expect(result.success).toBe(false)
+      if (!result.success && result.error) {
+        expect(result.error.code).toBe('web_search_error')
+        expect(result.error.message).toContain('Bing Search not implemented')
+      }
+    })
+
+    it('returns web_search_error for unknown provider', async () => {
+      const source = new WebSearchInfoSource({ enabled: true }, { provider: 'unknown' as never })
+      const result = await source.fetch({ query: 'test' })
+
+      expect(result.success).toBe(false)
+      if (!result.success && result.error) {
+        expect(result.error.code).toBe('web_search_error')
+        expect(result.error.message).toContain('Unknown search provider: unknown')
+      }
+    })
+
+    it('records failure health on error', async () => {
+      const source = new WebSearchInfoSource({ enabled: true })
+      await source.fetch({ query: 'test' })
+
+      const health = source.getHealth()
+      expect(health.status).toBe('degraded')
+      expect(health.consecutiveFailures).toBe(1)
+    })
+  })
+
   describe('WEB_SEARCH_CONFIG', () => {
     it('has correct defaults', () => {
       expect(WEB_SEARCH_CONFIG.id).toBe('web_search')

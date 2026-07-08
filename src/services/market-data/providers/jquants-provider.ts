@@ -7,6 +7,14 @@ import type {
   MarketDataResult,
 } from '../types'
 import { BaseMarketDataProvider } from '../base-provider'
+import {
+  type AppError,
+  type Result,
+  createAppError,
+  ERROR_CODES,
+  failure,
+  success,
+} from '@/types/result'
 
 const JQUANTS_API_BASE = 'https://api.jquants.com/v1'
 
@@ -87,9 +95,18 @@ export class JQuantsProvider extends BaseMarketDataProvider {
   }
 
   async getQuotes(options: MarketDataFetchOptions): Promise<MarketDataResult<StockQuote[]>> {
-    try {
-      await this.ensureToken()
+    const tokenResult = await this.ensureToken()
+    if (!tokenResult.success) {
+      return {
+        success: false,
+        error: {
+          code: 'fetch_failed',
+          message: tokenResult.error.message,
+        },
+      }
+    }
 
+    try {
       const params = new URLSearchParams()
       if (options.tickers?.length) {
         params.set('code', options.tickers.join(','))
@@ -116,9 +133,18 @@ export class JQuantsProvider extends BaseMarketDataProvider {
   }
 
   async getFinancials(ticker: string): Promise<MarketDataResult<FinancialStatement[]>> {
-    try {
-      await this.ensureToken()
+    const tokenResult = await this.ensureToken()
+    if (!tokenResult.success) {
+      return {
+        success: false,
+        error: {
+          code: 'fetch_failed',
+          message: tokenResult.error.message,
+        },
+      }
+    }
 
+    try {
       const url = `${JQUANTS_API_BASE}/fins/statements?code=${ticker}`
       const response = await this.fetchWithAuth<{ statements: JQuantsFinancial[] }>(url)
 
@@ -137,9 +163,18 @@ export class JQuantsProvider extends BaseMarketDataProvider {
   }
 
   async getCompanyInfo(ticker: string): Promise<MarketDataResult<CompanyInfo>> {
-    try {
-      await this.ensureToken()
+    const tokenResult = await this.ensureToken()
+    if (!tokenResult.success) {
+      return {
+        success: false,
+        error: {
+          code: 'fetch_failed',
+          message: tokenResult.error.message,
+        },
+      }
+    }
 
+    try {
       const url = `${JQUANTS_API_BASE}/listed/info?code=${ticker}`
       const response = await this.fetchWithAuth<{ info: JQuantsCompany[] }>(url)
 
@@ -164,9 +199,18 @@ export class JQuantsProvider extends BaseMarketDataProvider {
   }
 
   async searchCompanies(query: string): Promise<MarketDataResult<CompanyInfo[]>> {
-    try {
-      await this.ensureToken()
+    const tokenResult = await this.ensureToken()
+    if (!tokenResult.success) {
+      return {
+        success: false,
+        error: {
+          code: 'fetch_failed',
+          message: tokenResult.error.message,
+        },
+      }
+    }
 
+    try {
       const url = `${JQUANTS_API_BASE}/listed/info?keyword=${encodeURIComponent(query)}`
       const response = await this.fetchWithAuth<{ info: JQuantsCompany[] }>(url)
 
@@ -184,16 +228,21 @@ export class JQuantsProvider extends BaseMarketDataProvider {
     }
   }
 
-  private async ensureToken(): Promise<void> {
-    if (!this.token || new Date() >= this.token.expiresAt) {
-      if (!this.credential) {
-        throw new Error('Not authenticated')
-      }
-      const result = await this.authenticate(this.credential)
-      if (!result.success) {
-        throw new Error(result.error.message)
-      }
+  private async ensureToken(): Promise<Result<void, AppError>> {
+    if (this.token && new Date() < this.token.expiresAt) {
+      return success(undefined)
     }
+
+    if (!this.credential) {
+      return failure(createAppError(ERROR_CODES.UNAUTHORIZED, 'Not authenticated'))
+    }
+
+    const result = await this.authenticate(this.credential)
+    if (!result.success) {
+      return failure(createAppError(ERROR_CODES.UNAUTHORIZED, result.error.message))
+    }
+
+    return success(undefined)
   }
 
   private async fetchWithAuth<T>(url: string): Promise<T> {
