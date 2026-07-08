@@ -1,5 +1,13 @@
 import { SocialInsurancePayment } from '@prisma/client'
 import { prisma } from '@/lib/db'
+import {
+  type AppError,
+  type Result,
+  createAppError,
+  ERROR_CODES,
+  failure,
+  success,
+} from '@/types/result'
 import { InsuranceType } from './schedule-manager'
 
 export interface PaymentCheckResult {
@@ -78,10 +86,14 @@ export class PaymentChecker {
   static async updatePayment(
     id: string,
     data: Partial<CreatePaymentInput>
-  ): Promise<SocialInsurancePayment> {
+  ): Promise<Result<SocialInsurancePayment, AppError>> {
     const existing = await prisma.socialInsurancePayment.findUnique({ where: { id } })
     if (!existing) {
-      throw new Error('Payment not found')
+      return failure(
+        createAppError(ERROR_CODES.NOT_FOUND, 'Payment not found', {
+          details: { id },
+        })
+      )
     }
 
     const status = this.calculateStatus(
@@ -90,13 +102,15 @@ export class PaymentChecker {
       data.dueDate ?? existing.dueDate
     )
 
-    return prisma.socialInsurancePayment.update({
+    const updated = await prisma.socialInsurancePayment.update({
       where: { id },
       data: {
         ...data,
         status,
       },
     })
+
+    return success(updated)
   }
 
   static calculateStatus(actualAmount: number, expectedAmount: number, dueDate: Date): string {

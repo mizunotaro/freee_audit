@@ -417,12 +417,14 @@ describe('BoardMeetingService', () => {
         companyInfo
       )
 
-      expect(result).toContain('決算報告の承認')
-      expect(result).toContain('法的要件')
-      expect(result).toContain('会社法第436条')
+      expect(result.success).toBe(true)
+      if (!result.success) return
+      expect(result.data).toContain('決算報告の承認')
+      expect(result.data).toContain('法的要件')
+      expect(result.data).toContain('会社法第436条')
     })
 
-    it('should throw error when agenda item not found', async () => {
+    it('should return NOT_FOUND failure when agenda item not found', async () => {
       mockPrisma.agendaItem.findUnique.mockResolvedValue(null)
 
       const companyInfo = {
@@ -431,9 +433,15 @@ describe('BoardMeetingService', () => {
         hasInvestors: false,
       }
 
-      await expect(
-        BoardMeetingService.analyzeAgendaItemWithAI(mockAgendaItemId, companyInfo)
-      ).rejects.toThrow('Agenda item not found')
+      const result = await BoardMeetingService.analyzeAgendaItemWithAI(
+        mockAgendaItemId,
+        companyInfo
+      )
+
+      expect(result.success).toBe(false)
+      if (result.success) return
+      expect(result.error.code).toBe('NOT_FOUND')
+      expect(result.error.message).toBe('Agenda item not found')
     })
 
     it('should include investor considerations when applicable', async () => {
@@ -471,7 +479,9 @@ describe('BoardMeetingService', () => {
         companyInfo
       )
 
-      expect(result).toContain('投資家')
+      expect(result.success).toBe(true)
+      if (!result.success) return
+      expect(result.data).toContain('投資家')
     })
 
     it('should handle report type agenda items', async () => {
@@ -508,7 +518,9 @@ describe('BoardMeetingService', () => {
         companyInfo
       )
 
-      expect(result).toContain('報告事項')
+      expect(result.success).toBe(true)
+      if (!result.success) return
+      expect(result.data).toContain('報告事項')
     })
   })
 })

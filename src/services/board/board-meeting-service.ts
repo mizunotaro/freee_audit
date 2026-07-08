@@ -1,4 +1,12 @@
 import { PrismaClient, BoardMeeting, AgendaItem } from '@prisma/client'
+import {
+  type AppError,
+  type Result,
+  createAppError,
+  ERROR_CODES,
+  failure,
+  success,
+} from '@/types/result'
 
 const prisma = new PrismaClient()
 
@@ -176,14 +184,18 @@ export class BoardMeetingService {
       hasInvestors: boolean
       investmentAgreement?: string
     }
-  ): Promise<string> {
+  ): Promise<Result<string, AppError>> {
     const agendaItem = await prisma.agendaItem.findUnique({
       where: { id: agendaItemId },
       include: { boardMeeting: true },
     })
 
     if (!agendaItem) {
-      throw new Error('Agenda item not found')
+      return failure(
+        createAppError(ERROR_CODES.NOT_FOUND, 'Agenda item not found', {
+          details: { agendaItemId },
+        })
+      )
     }
 
     const analysis = this.generateBasicAnalysis(agendaItem, companyInfo)
@@ -193,7 +205,7 @@ export class BoardMeetingService {
       data: { aiAnalysis: analysis },
     })
 
-    return analysis
+    return success(analysis)
   }
 
   private static generateBasicAnalysis(

@@ -191,15 +191,20 @@ describe('PaymentChecker', () => {
         actualAmount: 100000,
       })
 
-      expect(result.actualAmount).toBe(100000)
+      expect(result.success).toBe(true)
+      if (!result.success) return
+      expect(result.data.actualAmount).toBe(100000)
     })
 
-    it('should throw error when payment not found', async () => {
+    it('should return NOT_FOUND failure when payment not found', async () => {
       vi.mocked(prisma.socialInsurancePayment.findUnique).mockResolvedValue(null)
 
-      await expect(
-        PaymentChecker.updatePayment('non-existent', { actualAmount: 100000 })
-      ).rejects.toThrow('Payment not found')
+      const result = await PaymentChecker.updatePayment('non-existent', { actualAmount: 100000 })
+
+      expect(result.success).toBe(false)
+      if (result.success) return
+      expect(result.error.code).toBe('NOT_FOUND')
+      expect(result.error.message).toBe('Payment not found')
     })
 
     it('should recalculate status on update', async () => {
