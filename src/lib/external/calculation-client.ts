@@ -1,6 +1,12 @@
 import type { AccountingStandard } from '@/types/accounting-standard'
 import type { BalanceSheet, ProfitLoss, CashFlowStatement } from '@/types'
 import { calculateCashFlow } from '@/services/cashflow/calculator'
+import {
+  assertOutboundAllowed,
+  outboundRateLimiters,
+  resolveOutboundHost,
+  withOutboundUserAgent,
+} from '@/lib/api/outbound-rate-limiter'
 
 interface ServiceConfig {
   pythonServiceUrl: string
@@ -225,6 +231,7 @@ class CalculationServiceClient {
   private async checkServiceHealth(url: string): Promise<boolean> {
     try {
       const response = await fetch(`${url}/health`, {
+        headers: withOutboundUserAgent(),
         signal: AbortSignal.timeout(5000),
       })
       return response.ok
@@ -238,12 +245,15 @@ class CalculationServiceClient {
     options: RequestInit,
     retries: number = this.config.retries
   ): Promise<Response> {
+    assertOutboundAllowed(outboundRateLimiters.internalService(), resolveOutboundHost(url))
+    const headers = withOutboundUserAgent(options.headers)
     let lastError: Error | null = null
 
     for (let i = 0; i < retries; i++) {
       try {
         const response = await fetch(url, {
           ...options,
+          headers,
           signal: AbortSignal.timeout(this.config.timeout),
         })
 

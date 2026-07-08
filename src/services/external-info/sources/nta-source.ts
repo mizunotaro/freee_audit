@@ -37,6 +37,7 @@ export class NtaInfoSource extends BaseInfoSource {
     }
 
     try {
+      this.assertOutboundRateLimit()
       const result = await this.retryWithBackoff(
         () => this.executeFetch(query),
         this.config.maxRetries,

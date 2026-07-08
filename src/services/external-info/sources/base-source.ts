@@ -6,6 +6,7 @@ import type {
   ExternalInfoQuery,
   ExternalInfoResult,
 } from '../types'
+import { assertOutboundAllowed, outboundRateLimiters } from '@/lib/api/outbound-rate-limiter'
 
 export abstract class BaseInfoSource {
   protected config: InfoSourceConfig
@@ -53,6 +54,16 @@ export abstract class BaseInfoSource {
       clearTimeout(timeoutId)
       throw error
     }
+  }
+
+  /**
+   * Enforce the outbound rate-limit policy (CrystalBall "rate control") before a
+   * source attempts an external call. Defaults to the source id; pass a host when
+   * a concrete source knows its outbound URL. Throws OutboundRateLimitError when
+   * the limit is exceeded, which each source's fetch() maps to its error result.
+   */
+  protected assertOutboundRateLimit(key: string = this.sourceId): void {
+    assertOutboundAllowed(outboundRateLimiters.externalInfo(), key)
   }
 
   protected recordSuccess(latencyMs: number): void {
