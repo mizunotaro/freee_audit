@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { withAdminAuth, type AuthenticatedRequest } from '@/lib/api'
 import { prisma } from '@/lib/db'
 import { encrypt } from '@/lib/crypto'
+import { logRouteAudit } from '@/lib/route-audit'
 import { z } from 'zod'
 
 const providerSchema = z.enum(['openai', 'gemini', 'claude', 'azure', 'aws', 'gcp', 'freee'])
@@ -122,14 +123,12 @@ async function putHandler(
       },
     })
 
-    await prisma.auditLog.create({
-      data: {
-        userId: req.user.id,
-        action: 'API_KEY_UPDATE',
-        resource: 'settings',
-        resourceId: providerKey,
-        result: 'SUCCESS',
-      },
+    await logRouteAudit({
+      request: req,
+      userId: req.user.id,
+      action: 'API_KEY_UPDATE',
+      resource: 'settings',
+      resourceId: providerKey,
     })
 
     return NextResponse.json({
@@ -137,6 +136,14 @@ async function putHandler(
       message: `${providerKey} API key updated`,
     })
   } catch (error) {
+    await logRouteAudit({
+      request: req,
+      userId: req.user.id,
+      action: 'API_KEY_UPDATE',
+      resource: 'settings',
+      result: 'FAILURE',
+      details: { error: error instanceof Error ? error.message : 'Unknown error' },
+    })
     console.error('Failed to update API key:', error)
     return NextResponse.json({ error: 'Failed to update API key' }, { status: 500 })
   }
@@ -172,14 +179,12 @@ async function deleteHandler(
       },
     })
 
-    await prisma.auditLog.create({
-      data: {
-        userId: req.user.id,
-        action: 'API_KEY_DELETE',
-        resource: 'settings',
-        resourceId: providerKey,
-        result: 'SUCCESS',
-      },
+    await logRouteAudit({
+      request: req,
+      userId: req.user.id,
+      action: 'API_KEY_DELETE',
+      resource: 'settings',
+      resourceId: providerKey,
     })
 
     return NextResponse.json({
@@ -187,6 +192,14 @@ async function deleteHandler(
       message: `${providerKey} API key deleted`,
     })
   } catch (error) {
+    await logRouteAudit({
+      request: req,
+      userId: req.user.id,
+      action: 'API_KEY_DELETE',
+      resource: 'settings',
+      result: 'FAILURE',
+      details: { error: error instanceof Error ? error.message : 'Unknown error' },
+    })
     console.error('Failed to delete API key:', error)
     return NextResponse.json({ error: 'Failed to delete API key' }, { status: 500 })
   }
