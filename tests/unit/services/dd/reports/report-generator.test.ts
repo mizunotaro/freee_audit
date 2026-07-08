@@ -112,6 +112,133 @@ describe('DDReportGenerator', () => {
         expect(result.data.appendices[0].id).toBe('appendix-methodology')
       }
     })
+
+    it('should return REPORT_GENERATION_FAILED when generation throws', async () => {
+      const result = await generator.generateReport({
+        ...mockContext,
+        findings: null as unknown as DDFinding[],
+      })
+
+      expect(result.success).toBe(false)
+      if (!result.success) {
+        expect(result.error.code).toBe('REPORT_GENERATION_FAILED')
+      }
+    })
+
+    it('should flag critical and high findings in the executive summary', async () => {
+      const result = await generator.generateReport({
+        ...mockContext,
+        findings: [
+          {
+            id: 'f1',
+            category: 'REVENUE_RECOGNITION' as const,
+            title: '収益認識の重大問題',
+            description: 'd',
+            impact: 'i',
+            recommendation: 'r',
+            severity: 'CRITICAL' as const,
+          },
+          {
+            id: 'f2',
+            category: 'ACCOUNTS_RECEIVABLE' as const,
+            title: '売掛金の注意点',
+            description: 'd',
+            impact: 'i',
+            recommendation: 'r',
+            severity: 'HIGH' as const,
+          },
+        ],
+      })
+
+      expect(result.success).toBe(true)
+      if (result.success) {
+        expect(result.data.executiveSummary).toContain('重要')
+        expect(result.data.executiveSummary).toContain('要注意')
+      }
+    })
+
+    it('should show the no-major-issues message when only low-severity findings exist', async () => {
+      const result = await generator.generateReport({
+        ...mockContext,
+        findings: [
+          {
+            id: 'f1',
+            category: 'INVENTORY' as const,
+            title: '軽微な指摘',
+            description: 'd',
+            impact: 'i',
+            recommendation: 'r',
+            severity: 'LOW' as const,
+          },
+        ],
+      })
+
+      expect(result.success).toBe(true)
+      if (result.success) {
+        expect(result.data.executiveSummary).toContain('重大な指摘事項はございません')
+      }
+    })
+
+    it('should collect referenced standards into the methodology appendix', async () => {
+      const result = await generator.generateReport({
+        ...mockContext,
+        findings: [
+          {
+            id: 'f1',
+            category: 'REVENUE_RECOGNITION' as const,
+            title: 't',
+            description: 'd',
+            impact: 'i',
+            recommendation: 'r',
+            severity: 'HIGH' as const,
+            relatedStandard: 'ASBJ Statement No.29',
+          },
+          {
+            id: 'f2',
+            category: 'INVENTORY' as const,
+            title: 't',
+            description: 'd',
+            impact: 'i',
+            recommendation: 'r',
+            severity: 'MEDIUM' as const,
+            relatedStandard: 'ASBJ Statement No.9',
+          },
+        ],
+      })
+
+      expect(result.success).toBe(true)
+      if (result.success) {
+        const methodology = result.data.appendices.find((a) => a.id === 'appendix-methodology')
+        expect(methodology).toBeDefined()
+        const standards = (methodology!.content as { standards: string[] }).standards
+        expect(standards).toContain('ASBJ Statement No.29')
+        expect(standards).toContain('ASBJ Statement No.9')
+      }
+    })
+
+    it('should default generatedBy to "system" when omitted', async () => {
+      const result = await generator.generateReport({ ...mockContext, generatedBy: undefined })
+
+      expect(result.success).toBe(true)
+      if (result.success) {
+        expect(result.data.metadata.generatedBy).toBe('system')
+      }
+    })
+
+    it('should default accountingStandard to JGAAP when omitted', async () => {
+      const result = await generator.generateReport({
+        ...mockContext,
+        accountingStandard: undefined,
+      })
+
+      expect(result.success).toBe(true)
+      if (result.success) {
+        const overview = result.data.sections.find((s) => s.id === 'overview')
+        expect((overview!.content as { accountingStandard: string }).accountingStandard).toBe(
+          'JGAAP'
+        )
+      }
+    })
   })
 
   describe('generateMarkdown', () => {

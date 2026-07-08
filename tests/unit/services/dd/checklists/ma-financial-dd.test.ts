@@ -89,10 +89,10 @@ describe('MA_FINANCIAL_DD_CHECKLIST', () => {
     }
   })
 
-  it('is frozen (readonly)', () => {
-    expect(
-      Object.isFrozen(MA_FINANCIAL_DD_CHECKLIST) || Array.isArray(MA_FINANCIAL_DD_CHECKLIST)
-    ).toBe(true)
+  it('every item exposes a non-empty English title (titleEn)', () => {
+    for (const item of MA_FINANCIAL_DD_CHECKLIST) {
+      expect(item.titleEn).toBeTruthy()
+    }
   })
 
   it('contains expected item count (at least 15)', () => {

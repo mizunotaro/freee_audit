@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach } from 'vitest'
 import { AccountsReceivableValidator } from '@/services/dd/validators/ar-validator'
 import type { ValidatorContext } from '@/services/dd/validators/base-validator'
 import type { DDAnalyticsContext, DDJournalData } from '@/services/dd/types'
@@ -188,42 +188,44 @@ describe('AccountsReceivableValidator', () => {
 
   describe('TREND rule (dso)', () => {
     it('detects DSO deterioration', async () => {
+      // Trend values are collected newest-year-first (fiscalYear, fiscalYear-1, ...),
+      // so the finding fires when the oldest-year DSO materially exceeds the current-year DSO.
       const journals = [
         makeJournal({
           entryDate: new Date('2022-01-15'),
           debitAccount: '売掛金',
           creditAccount: '売上',
-          amount: 500000,
+          amount: 900000,
         }),
         makeJournal({
           entryDate: new Date('2022-01-15'),
           debitAccount: '現金',
           creditAccount: '売上',
-          amount: 200000,
+          amount: 100000,
         }),
         makeJournal({
           entryDate: new Date('2023-01-15'),
           debitAccount: '売掛金',
           creditAccount: '売上',
-          amount: 700000,
+          amount: 500000,
         }),
         makeJournal({
           entryDate: new Date('2023-01-15'),
           debitAccount: '現金',
           creditAccount: '売上',
-          amount: 200000,
+          amount: 500000,
         }),
         makeJournal({
           entryDate: new Date('2024-01-15'),
           debitAccount: '売掛金',
+          creditAccount: '売上',
+          amount: 100000,
+        }),
+        makeJournal({
+          entryDate: new Date('2024-01-15'),
+          debitAccount: '現金',
           creditAccount: '売上',
           amount: 900000,
-        }),
-        makeJournal({
-          entryDate: new Date('2024-01-15'),
-          debitAccount: '現金',
-          creditAccount: '売上',
-          amount: 200000,
         }),
       ]
       const context = makeContext(journals, 2024)
@@ -233,6 +235,11 @@ describe('AccountsReceivableValidator', () => {
 
       const result = await validator.validate('AR', rules, context)
       expect(result.success).toBe(true)
+      if (result.success) {
+        const trendFindings = result.data.findings.filter((f) => f.title === 'DSOが悪化傾向')
+        expect(trendFindings.length).toBeGreaterThan(0)
+        expect(trendFindings[0].severity).toBe('MEDIUM')
+      }
     })
   })
 

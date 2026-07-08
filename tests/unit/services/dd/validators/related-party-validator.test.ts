@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { RelatedPartyValidator } from '@/services/dd/validators/related-party-validator'
 import type { ValidatorContext } from '@/services/dd/validators/base-validator'
-import type { DDAnalyticsContext, DDJournalData } from '@/services/dd/types'
+import type { DDJournalData } from '@/services/dd/types'
 
 vi.mock('@/services/dd/validators/validation-engine', () => ({
   ddValidationEngine: {
@@ -135,6 +135,8 @@ describe('RelatedPartyValidator', () => {
       expect(result.success).toBe(true)
       if (result.success) {
         expect(result.data.evidence.some((e) => e.type === 'DOCUMENT')).toBe(true)
+        expect(result.data.findings.length).toBeGreaterThan(0)
+        expect(result.data.findings.some((f) => f.title === '関連当事者開示の確認')).toBe(true)
       }
     })
 
