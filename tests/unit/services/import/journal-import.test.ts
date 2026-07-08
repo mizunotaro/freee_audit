@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import {
   parseJournalCsv,
   validateJournalRows,
@@ -87,45 +87,59 @@ describe('parseJournalCsv', () => {
     const csv = `日付,摘要,借方科目,貸方科目,金額,税額,税区分
 2024-01-15,売上計上,普通預金,売上高,110000,10000,課税10%`
 
-    const rows = parseJournalCsv(csv)
+    const result = parseJournalCsv(csv)
+    expect(result.success).toBe(true)
+    if (!result.success) return
 
-    expect(rows).toHaveLength(1)
-    expect(rows[0].entryDate).toBe('2024-01-15')
-    expect(rows[0].description).toBe('売上計上')
-    expect(rows[0].amount).toBe(110000)
+    expect(result.data).toHaveLength(1)
+    expect(result.data[0].entryDate).toBe('2024-01-15')
+    expect(result.data[0].description).toBe('売上計上')
+    expect(result.data[0].amount).toBe(110000)
   })
 
-  it('should throw for CSV with no data rows', function () {
+  it('should return failure for CSV with no data rows', function () {
     const csv = '日付,摘要,借方科目,貸方科目,金額'
 
-    expect(() => parseJournalCsv(csv)).toThrow('ヘッダー行とデータ行が必要です')
+    const result = parseJournalCsv(csv)
+
+    expect(result.success).toBe(false)
+    if (result.success) return
+    expect(result.error.message).toBe('CSVファイルにはヘッダー行とデータ行が必要です')
   })
 
-  it('should throw for missing required headers', function () {
+  it('should return failure for missing required headers', function () {
     const csv = `日付,摘要
 2024-01-15,test`
 
-    expect(() => parseJournalCsv(csv)).toThrow('必須ヘッダーが不足しています')
+    const result = parseJournalCsv(csv)
+
+    expect(result.success).toBe(false)
+    if (result.success) return
+    expect(result.error.message).toContain('必須ヘッダーが不足しています')
   })
 
   it('should handle Japanese header mappings', function () {
     const csv = `伝票日付,摘要,借方,貸方,金額
 2024-02-01,Test,現金,売上,50000`
 
-    const rows = parseJournalCsv(csv)
+    const result = parseJournalCsv(csv)
+    expect(result.success).toBe(true)
+    if (!result.success) return
 
-    expect(rows).toHaveLength(1)
-    expect(rows[0].debitAccount).toBe('現金')
+    expect(result.data).toHaveLength(1)
+    expect(result.data[0].debitAccount).toBe('現金')
   })
 
   it('should handle comma-separated values with quotes', function () {
     const csv = `日付,摘要,借方科目,貸方科目,金額
 2024-01-15,"Test, with comma",現金,売上,50000`
 
-    const rows = parseJournalCsv(csv)
+    const result = parseJournalCsv(csv)
+    expect(result.success).toBe(true)
+    if (!result.success) return
 
-    expect(rows).toHaveLength(1)
-    expect(rows[0].description).toBe('Test, with comma')
+    expect(result.data).toHaveLength(1)
+    expect(result.data[0].description).toBe('Test, with comma')
   })
 })
 

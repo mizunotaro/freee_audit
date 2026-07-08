@@ -134,17 +134,19 @@ describe('Monthly Report Service', () => {
         fiscalYear: 2024,
         month: 3,
       })
+      expect(result.success).toBe(true)
+      if (!result.success) return
 
-      expect(result.fiscalYear).toBe(2024)
-      expect(result.month).toBe(3)
-      expect(result.companyName).toBe('Test Company')
-      expect(result.balanceSheet).toBeDefined()
-      expect(result.profitLoss).toBeDefined()
-      expect(result.cashFlow).toBeDefined()
-      expect(result.cashPosition).toBeDefined()
-      expect(result.kpis).toBeDefined()
-      expect(result.budget).toBeDefined()
-      expect(result.runway).toBeDefined()
+      expect(result.data.fiscalYear).toBe(2024)
+      expect(result.data.month).toBe(3)
+      expect(result.data.companyName).toBe('Test Company')
+      expect(result.data.balanceSheet).toBeDefined()
+      expect(result.data.profitLoss).toBeDefined()
+      expect(result.data.cashFlow).toBeDefined()
+      expect(result.data.cashPosition).toBeDefined()
+      expect(result.data.kpis).toBeDefined()
+      expect(result.data.budget).toBeDefined()
+      expect(result.data.runway).toBeDefined()
     })
 
     it('should use sample data when no balances found', async () => {
@@ -153,9 +155,11 @@ describe('Monthly Report Service', () => {
         fiscalYear: 2024,
         month: 6,
       })
+      expect(result.success).toBe(true)
+      if (!result.success) return
 
-      expect(result.balanceSheet.totalAssets).toBeGreaterThan(0)
-      expect(result.profitLoss.revenue.length).toBeGreaterThan(0)
+      expect(result.data.balanceSheet.totalAssets).toBeGreaterThan(0)
+      expect(result.data.profitLoss.revenue.length).toBeGreaterThan(0)
     })
 
     it('should handle month boundaries correctly', async () => {
@@ -164,8 +168,10 @@ describe('Monthly Report Service', () => {
         fiscalYear: 2024,
         month: 1,
       })
+      expect(resultJan.success).toBe(true)
+      if (!resultJan.success) return
 
-      expect(resultJan.month).toBe(1)
+      expect(resultJan.data.month).toBe(1)
     })
   })
 
@@ -330,32 +336,40 @@ describe('Monthly Report Service', () => {
   describe('getMultiMonthReport', () => {
     it('should generate multi-month report', async () => {
       const result = await getMultiMonthReport('company-1', 2024, 6, 3)
+      expect(result.success).toBe(true)
+      if (!result.success) return
 
-      expect(result.fiscalYear).toBe(2024)
-      expect(result.endMonth).toBe(6)
-      expect(result.monthCount).toBe(3)
-      expect(result.months).toHaveLength(3)
-      expect(result.sections).toHaveLength(4)
+      expect(result.data.fiscalYear).toBe(2024)
+      expect(result.data.endMonth).toBe(6)
+      expect(result.data.monthCount).toBe(3)
+      expect(result.data.months).toHaveLength(3)
+      expect(result.data.sections).toHaveLength(4)
     })
 
     it('should generate 6-month report', async () => {
       const result = await getMultiMonthReport('company-1', 2024, 12, 6)
+      expect(result.success).toBe(true)
+      if (!result.success) return
 
-      expect(result.monthCount).toBe(6)
-      expect(result.months).toHaveLength(6)
+      expect(result.data.monthCount).toBe(6)
+      expect(result.data.months).toHaveLength(6)
     })
 
     it('should generate 12-month report', async () => {
       const result = await getMultiMonthReport('company-1', 2024, 12, 12)
+      expect(result.success).toBe(true)
+      if (!result.success) return
 
-      expect(result.monthCount).toBe(12)
-      expect(result.months).toHaveLength(12)
+      expect(result.data.monthCount).toBe(12)
+      expect(result.data.months).toHaveLength(12)
     })
 
     it('should include all required sections', async () => {
       const result = await getMultiMonthReport('company-1', 2024, 6, 3)
+      expect(result.success).toBe(true)
+      if (!result.success) return
 
-      const sectionTypes = result.sections.map((s) => s.type)
+      const sectionTypes = result.data.sections.map((s) => s.type)
       expect(sectionTypes).toContain('bs')
       expect(sectionTypes).toContain('pl')
       expect(sectionTypes).toContain('cf')

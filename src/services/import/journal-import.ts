@@ -1,5 +1,13 @@
 import { prisma } from '@/lib/db'
 import { z } from 'zod'
+import {
+  type AppError,
+  type Result,
+  ERROR_CODES,
+  createAppError,
+  failure,
+  success,
+} from '@/types/result'
 
 export const JournalImportSchema = z.object({
   entryDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, '日付形式はYYYY-MM-DDで入力してください'),
@@ -42,10 +50,12 @@ const HEADER_MAPPINGS: Record<string, string> = {
   消費税区分: 'taxType',
 }
 
-export function parseJournalCsv(csvContent: string): JournalImportRow[] {
+export function parseJournalCsv(csvContent: string): Result<JournalImportRow[], AppError> {
   const lines = csvContent.trim().split('\n')
   if (lines.length < 2) {
-    throw new Error('CSVファイルにはヘッダー行とデータ行が必要です')
+    return failure(
+      createAppError(ERROR_CODES.VALIDATION_ERROR, 'CSVファイルにはヘッダー行とデータ行が必要です')
+    )
   }
 
   const rawHeaders = lines[0].split(',').map((h) => h.trim().replace(/^"|"$/g, ''))
@@ -53,7 +63,13 @@ export function parseJournalCsv(csvContent: string): JournalImportRow[] {
 
   const missingHeaders = REQUIRED_HEADERS.filter((h) => !headers.includes(h))
   if (missingHeaders.length > 0) {
-    throw new Error(`必須ヘッダーが不足しています: ${missingHeaders.join(', ')}`)
+    return failure(
+      createAppError(
+        ERROR_CODES.VALIDATION_ERROR,
+        `必須ヘッダーが不足しています: ${missingHeaders.join(', ')}`,
+        { details: { missingHeaders } }
+      )
+    )
   }
 
   const rows: JournalImportRow[] = []
@@ -76,7 +92,7 @@ export function parseJournalCsv(csvContent: string): JournalImportRow[] {
     }
   }
 
-  return rows
+  return success(rows)
 }
 
 function parseCsvLine(line: string): string[] {

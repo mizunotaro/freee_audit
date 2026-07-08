@@ -5,6 +5,7 @@ import {
   formatReportForExport,
   getMultiMonthReport,
 } from '@/services/report/monthly-report'
+import { prisma } from '@/lib/db'
 
 const { mockCompany } = vi.hoisted(() => {
   const mockCompany = {
@@ -117,13 +118,15 @@ describe('monthly-report', () => {
         fiscalYear: 2024,
         month: 12,
       })
+      expect(result.success).toBe(true)
+      if (!result.success) return
 
-      expect(result.fiscalYear).toBe(2024)
-      expect(result.month).toBe(12)
-      expect(result.companyName).toBe('テスト株式会社')
-      expect(result.balanceSheet).toBeDefined()
-      expect(result.profitLoss).toBeDefined()
-      expect(result.cashFlow).toBeDefined()
+      expect(result.data.fiscalYear).toBe(2024)
+      expect(result.data.month).toBe(12)
+      expect(result.data.companyName).toBe('テスト株式会社')
+      expect(result.data.balanceSheet).toBeDefined()
+      expect(result.data.profitLoss).toBeDefined()
+      expect(result.data.cashFlow).toBeDefined()
     })
 
     it('should use sample data when no balances found', async () => {
@@ -132,9 +135,31 @@ describe('monthly-report', () => {
         fiscalYear: 2024,
         month: 12,
       })
+      expect(result.success).toBe(true)
+      if (!result.success) return
 
-      expect(result.balanceSheet.totalAssets).toBeGreaterThan(0)
-      expect(result.profitLoss.revenue.length).toBeGreaterThan(0)
+      expect(result.data.balanceSheet.totalAssets).toBeGreaterThan(0)
+      expect(result.data.profitLoss.revenue.length).toBeGreaterThan(0)
+    })
+
+    it('should return failure when company is not found', async () => {
+      vi.mocked(prisma.$transaction).mockImplementationOnce((callback) =>
+        callback({
+          company: { findFirst: vi.fn().mockResolvedValue(null) },
+          monthlyBalance: { findMany: vi.fn().mockResolvedValue([]) },
+        } as never)
+      )
+
+      const result = await generateMonthlyReport({
+        companyId: 'missing',
+        fiscalYear: 2024,
+        month: 12,
+      })
+
+      expect(result.success).toBe(false)
+      if (result.success) return
+      expect(result.error.code).toBe('NOT_FOUND')
+      expect(result.error.message).toBe('Company not found')
     })
   })
 
@@ -285,32 +310,40 @@ describe('monthly-report', () => {
   describe('getMultiMonthReport', () => {
     it('should generate multi-month report', async () => {
       const result = await getMultiMonthReport('company-1', 2024, 12, 3)
+      expect(result.success).toBe(true)
+      if (!result.success) return
 
-      expect(result.fiscalYear).toBe(2024)
-      expect(result.endMonth).toBe(12)
-      expect(result.monthCount).toBe(3)
-      expect(result.months).toHaveLength(3)
-      expect(result.sections.length).toBeGreaterThan(0)
+      expect(result.data.fiscalYear).toBe(2024)
+      expect(result.data.endMonth).toBe(12)
+      expect(result.data.monthCount).toBe(3)
+      expect(result.data.months).toHaveLength(3)
+      expect(result.data.sections.length).toBeGreaterThan(0)
     })
 
     it('should generate 6-month report', async () => {
       const result = await getMultiMonthReport('company-1', 2024, 12, 6)
+      expect(result.success).toBe(true)
+      if (!result.success) return
 
-      expect(result.monthCount).toBe(6)
-      expect(result.months).toHaveLength(6)
+      expect(result.data.monthCount).toBe(6)
+      expect(result.data.months).toHaveLength(6)
     })
 
     it('should generate 12-month report', async () => {
       const result = await getMultiMonthReport('company-1', 2024, 12, 12)
+      expect(result.success).toBe(true)
+      if (!result.success) return
 
-      expect(result.monthCount).toBe(12)
-      expect(result.months).toHaveLength(12)
+      expect(result.data.monthCount).toBe(12)
+      expect(result.data.months).toHaveLength(12)
     })
 
     it('should include BS, PL, CF, and KPI sections', async () => {
       const result = await getMultiMonthReport('company-1', 2024, 12, 3)
+      expect(result.success).toBe(true)
+      if (!result.success) return
 
-      const sectionTypes = result.sections.map((s) => s.type)
+      const sectionTypes = result.data.sections.map((s) => s.type)
       expect(sectionTypes).toContain('bs')
       expect(sectionTypes).toContain('pl')
       expect(sectionTypes).toContain('cf')
