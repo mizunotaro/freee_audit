@@ -13,6 +13,8 @@ import {
   ReferenceLine,
 } from 'recharts'
 import { formatCurrency } from '@/lib/utils'
+import { ChartState } from '@/components/charts/chart-state'
+import { resolveChartStatus } from '@/components/charts/resolve-chart-status'
 
 interface CashFlowData {
   month: string
@@ -27,9 +29,29 @@ interface CashFlowChartProps {
   data: CashFlowData[]
   height?: number
   showCumulative?: boolean
+  loading?: boolean
+  error?: string | null
 }
 
-export function CashFlowChart({ data, height = 400, showCumulative = true }: CashFlowChartProps) {
+export function CashFlowChart({
+  data,
+  height = 400,
+  showCumulative = true,
+  loading = false,
+  error = null,
+}: CashFlowChartProps) {
+  const resolution = resolveChartStatus({
+    loading,
+    error: error ?? null,
+    dataLength: data.length,
+  })
+  if (resolution.success && resolution.data !== 'ready') {
+    return <ChartState status={resolution.data} error={error ?? undefined} />
+  }
+  if (!resolution.success) {
+    return <ChartState status="error" error={error ?? undefined} />
+  }
+
   const formattedData = data.map((item) => ({
     ...item,
     operatingFormatted: formatCurrency(item.operating),
@@ -116,9 +138,28 @@ interface CashFlowWaterfallChartProps {
     type: 'positive' | 'negative' | 'total'
   }[]
   height?: number
+  loading?: boolean
+  error?: string | null
 }
 
-export function CashFlowWaterfallChart({ data, height = 400 }: CashFlowWaterfallChartProps) {
+export function CashFlowWaterfallChart({
+  data,
+  height = 400,
+  loading = false,
+  error = null,
+}: CashFlowWaterfallChartProps) {
+  const resolution = resolveChartStatus({
+    loading,
+    error: error ?? null,
+    dataLength: data.length,
+  })
+  if (resolution.success && resolution.data !== 'ready') {
+    return <ChartState status={resolution.data} error={error ?? undefined} />
+  }
+  if (!resolution.success) {
+    return <ChartState status="error" error={error ?? undefined} />
+  }
+
   let cumulative = 0
   const processedData = data.map((item) => {
     const start = cumulative

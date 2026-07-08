@@ -30,6 +30,32 @@ describe('FinancialHighlightsChart', () => {
     expect(screen.getByText('データがありません')).toBeInTheDocument()
   })
 
+  it('shows the English empty message for language en', () => {
+    render(<FinancialHighlightsChart highlights={[]} language="en" />)
+
+    expect(screen.getByText('No data available')).toBeInTheDocument()
+  })
+
+  it('renders the loading skeleton when loading is true', () => {
+    const { container } = render(<FinancialHighlightsChart highlights={mockHighlights} loading />)
+
+    expect(screen.getByRole('status')).toHaveAttribute('aria-busy', 'true')
+    expect(container.querySelectorAll('.animate-pulse').length).toBeGreaterThan(0)
+  })
+
+  it('renders the error message when error is provided', () => {
+    render(<FinancialHighlightsChart highlights={mockHighlights} error="取得に失敗しました" />)
+
+    expect(screen.getByRole('alert')).toHaveTextContent('取得に失敗しました')
+  })
+
+  it('prefers loading over error when both are set', () => {
+    render(<FinancialHighlightsChart highlights={mockHighlights} loading error="boom" />)
+
+    expect(screen.getByRole('status')).toBeInTheDocument()
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+
   it('should display custom title when provided', () => {
     render(<FinancialHighlightsChart highlights={mockHighlights} title="Custom Title" />)
 

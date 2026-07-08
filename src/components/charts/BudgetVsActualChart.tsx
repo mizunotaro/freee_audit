@@ -12,6 +12,8 @@ import {
   ReferenceLine,
 } from 'recharts'
 import { formatCurrency, formatPercent } from '@/lib/utils'
+import { ChartState } from '@/components/charts/chart-state'
+import { resolveChartStatus } from '@/components/charts/resolve-chart-status'
 
 interface BudgetVsActualData {
   name: string
@@ -24,13 +26,29 @@ interface BudgetVsActualChartProps {
   data: BudgetVsActualData[]
   height?: number
   showVariance?: boolean
+  loading?: boolean
+  error?: string | null
 }
 
 export function BudgetVsActualChart({
   data,
   height = 400,
   showVariance = true,
+  loading = false,
+  error = null,
 }: BudgetVsActualChartProps) {
+  const resolution = resolveChartStatus({
+    loading,
+    error: error ?? null,
+    dataLength: data.length,
+  })
+  if (resolution.success && resolution.data !== 'ready') {
+    return <ChartState status={resolution.data} error={error ?? undefined} />
+  }
+  if (!resolution.success) {
+    return <ChartState status="error" error={error ?? undefined} />
+  }
+
   const formattedData = data.map((item) => ({
     ...item,
     budgetFormatted: formatCurrency(item.budget),
@@ -86,12 +104,28 @@ export function BudgetVsActualChart({
 interface BudgetVsActualHorizontalChartProps {
   data: BudgetVsActualData[]
   height?: number
+  loading?: boolean
+  error?: string | null
 }
 
 export function BudgetVsActualHorizontalChart({
   data,
   height = 400,
+  loading = false,
+  error = null,
 }: BudgetVsActualHorizontalChartProps) {
+  const resolution = resolveChartStatus({
+    loading,
+    error: error ?? null,
+    dataLength: data.length,
+  })
+  if (resolution.success && resolution.data !== 'ready') {
+    return <ChartState status={resolution.data} error={error ?? undefined} />
+  }
+  if (!resolution.success) {
+    return <ChartState status="error" error={error ?? undefined} />
+  }
+
   const formattedData = data.map((item) => ({
     ...item,
     budgetFormatted: formatCurrency(item.budget),

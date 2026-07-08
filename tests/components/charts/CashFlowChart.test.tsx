@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
 import { formatCurrency } from '@/lib/utils'
 
 const capture = vi.hoisted(() => ({
@@ -112,10 +112,33 @@ describe('CashFlowChart', () => {
     expect(capture.renderLog.filter((n) => n === 'Bar').length).toBe(3)
   })
 
-  it('renders without crashing for empty data', () => {
+  it('renders the empty state when data is empty', () => {
     render(<CashFlowChart data={[]} />)
 
-    expect(capture.data?.data).toEqual([])
+    expect(screen.getByText('データがありません')).toBeInTheDocument()
+    expect(capture.data).toBeNull()
+  })
+
+  it('renders the loading skeleton when loading is true', () => {
+    const { container } = render(<CashFlowChart data={sampleCashFlow} loading />)
+
+    expect(screen.getByRole('status')).toHaveAttribute('aria-busy', 'true')
+    expect(container.querySelectorAll('.animate-pulse').length).toBeGreaterThan(0)
+    expect(capture.data).toBeNull()
+  })
+
+  it('renders the error message when error is provided', () => {
+    render(<CashFlowChart data={sampleCashFlow} error="通信エラー" />)
+
+    expect(screen.getByRole('alert')).toHaveTextContent('通信エラー')
+    expect(capture.data).toBeNull()
+  })
+
+  it('prefers loading over error when both are set', () => {
+    render(<CashFlowChart data={sampleCashFlow} loading error="boom" />)
+
+    expect(screen.getByRole('status')).toBeInTheDocument()
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   })
 })
 
@@ -167,9 +190,25 @@ describe('CashFlowWaterfallChart', () => {
     expect(processed[1].color).toBe('#ef4444')
   })
 
-  it('renders without crashing for empty data', () => {
+  it('renders the empty state when data is empty', () => {
     render(<CashFlowWaterfallChart data={[]} />)
 
-    expect(capture.data?.data).toEqual([])
+    expect(screen.getByText('データがありません')).toBeInTheDocument()
+    expect(capture.data).toBeNull()
+  })
+
+  it('renders the loading skeleton when loading is true', () => {
+    const { container } = render(<CashFlowWaterfallChart data={waterfallData} loading />)
+
+    expect(screen.getByRole('status')).toHaveAttribute('aria-busy', 'true')
+    expect(container.querySelectorAll('.animate-pulse').length).toBeGreaterThan(0)
+    expect(capture.data).toBeNull()
+  })
+
+  it('renders the error message when error is provided', () => {
+    render(<CashFlowWaterfallChart data={waterfallData} error="取得失敗" />)
+
+    expect(screen.getByRole('alert')).toHaveTextContent('取得失敗')
+    expect(capture.data).toBeNull()
   })
 })

@@ -12,13 +12,34 @@ import {
 } from 'recharts'
 import type { MonthlyTrend } from '@/types'
 import { formatCurrency } from '@/lib/utils'
+import { ChartState } from '@/components/charts/chart-state'
+import { resolveChartStatus } from '@/components/charts/resolve-chart-status'
 
 interface MonthlyTrendChartProps {
   data: MonthlyTrend[]
   height?: number
+  loading?: boolean
+  error?: string | null
 }
 
-export function MonthlyTrendChart({ data, height = 400 }: MonthlyTrendChartProps) {
+export function MonthlyTrendChart({
+  data,
+  height = 400,
+  loading = false,
+  error = null,
+}: MonthlyTrendChartProps) {
+  const resolution = resolveChartStatus({
+    loading,
+    error: error ?? null,
+    dataLength: data.length,
+  })
+  if (resolution.success && resolution.data !== 'ready') {
+    return <ChartState status={resolution.data} error={error ?? undefined} />
+  }
+  if (!resolution.success) {
+    return <ChartState status="error" error={error ?? undefined} />
+  }
+
   const formattedData = data.map((item) => ({
     ...item,
     revenueFormatted: formatCurrency(item.revenue),

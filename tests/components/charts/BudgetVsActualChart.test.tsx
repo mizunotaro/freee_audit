@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
 import { formatCurrency } from '@/lib/utils'
 
 const capture = vi.hoisted(() => ({
@@ -116,10 +116,33 @@ describe('BudgetVsActualChart', () => {
     expect(bars).toBe(2)
   })
 
-  it('renders without crashing for empty data', () => {
+  it('renders the empty state when data is empty', () => {
     render(<BudgetVsActualChart data={[]} />)
 
-    expect(capture.data?.data).toEqual([])
+    expect(screen.getByText('データがありません')).toBeInTheDocument()
+    expect(capture.data).toBeNull()
+  })
+
+  it('renders the loading skeleton when loading is true', () => {
+    const { container } = render(<BudgetVsActualChart data={sampleData} loading />)
+
+    expect(screen.getByRole('status')).toHaveAttribute('aria-busy', 'true')
+    expect(container.querySelectorAll('.animate-pulse').length).toBeGreaterThan(0)
+    expect(capture.data).toBeNull()
+  })
+
+  it('renders the error message when error is provided', () => {
+    render(<BudgetVsActualChart data={sampleData} error="読み込みエラー" />)
+
+    expect(screen.getByRole('alert')).toHaveTextContent('読み込みエラー')
+    expect(capture.data).toBeNull()
+  })
+
+  it('prefers loading over error when both are set', () => {
+    render(<BudgetVsActualChart data={sampleData} loading error="boom" />)
+
+    expect(screen.getByRole('status')).toBeInTheDocument()
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   })
 })
 
@@ -135,9 +158,25 @@ describe('BudgetVsActualHorizontalChart', () => {
     expect(formatted[0].budgetFormatted).toBe(formatCurrency(100000))
   })
 
-  it('renders without crashing for empty data', () => {
+  it('renders the empty state when data is empty', () => {
     render(<BudgetVsActualHorizontalChart data={[]} />)
 
-    expect(capture.data?.data).toEqual([])
+    expect(screen.getByText('データがありません')).toBeInTheDocument()
+    expect(capture.data).toBeNull()
+  })
+
+  it('renders the loading skeleton when loading is true', () => {
+    const { container } = render(<BudgetVsActualHorizontalChart data={sampleData} loading />)
+
+    expect(screen.getByRole('status')).toHaveAttribute('aria-busy', 'true')
+    expect(container.querySelectorAll('.animate-pulse').length).toBeGreaterThan(0)
+    expect(capture.data).toBeNull()
+  })
+
+  it('renders the error message when error is provided', () => {
+    render(<BudgetVsActualHorizontalChart data={sampleData} error="取得エラー" />)
+
+    expect(screen.getByRole('alert')).toHaveTextContent('取得エラー')
+    expect(capture.data).toBeNull()
   })
 })

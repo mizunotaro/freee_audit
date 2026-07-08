@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
 import { formatCurrency } from '@/lib/utils'
 import type { MonthlyTrend } from '@/types'
 
@@ -103,9 +103,32 @@ describe('MonthlyTrendChart', () => {
     expect(formatted[0].cash).toBe(500000)
   })
 
-  it('renders without crashing for empty data', () => {
+  it('renders the empty state when data is empty', () => {
     render(<MonthlyTrendChart data={[]} />)
 
-    expect(capture.data?.data).toEqual([])
+    expect(screen.getByText('データがありません')).toBeInTheDocument()
+    expect(capture.data).toBeNull()
+  })
+
+  it('renders the loading skeleton when loading is true', () => {
+    const { container } = render(<MonthlyTrendChart data={sampleTrend} loading />)
+
+    expect(screen.getByRole('status')).toHaveAttribute('aria-busy', 'true')
+    expect(container.querySelectorAll('.animate-pulse').length).toBeGreaterThan(0)
+    expect(capture.data).toBeNull()
+  })
+
+  it('renders the error message when error is provided', () => {
+    render(<MonthlyTrendChart data={sampleTrend} error="取得に失敗しました" />)
+
+    expect(screen.getByRole('alert')).toHaveTextContent('取得に失敗しました')
+    expect(capture.data).toBeNull()
+  })
+
+  it('prefers loading over error when both are set', () => {
+    render(<MonthlyTrendChart data={sampleTrend} loading error="boom" />)
+
+    expect(screen.getByRole('status')).toBeInTheDocument()
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   })
 })
