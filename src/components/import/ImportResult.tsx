@@ -169,7 +169,14 @@ export function ImportResult({ result }: ImportResultProps) {
               {validRows}/{totalRows} 有効行
             </span>
           </div>
-          <div className="flex h-2 overflow-hidden rounded-full">
+          <div
+            className="flex h-2 overflow-hidden rounded-full"
+            role="progressbar"
+            aria-valuenow={validRows}
+            aria-valuemin={0}
+            aria-valuemax={totalRows}
+            aria-label="インポート処理の進捗"
+          >
             {stats.successRate > 0 && (
               <div
                 className="bg-green-500"

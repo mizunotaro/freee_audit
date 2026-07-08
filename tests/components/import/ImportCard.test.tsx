@@ -163,3 +163,44 @@ describe('ImportCard — preview flow', () => {
     expect(onError).toHaveBeenCalledWith('プレビュー取得失敗')
   })
 })
+
+describe('ImportCard — accessibility', () => {
+  it('exposes the dropzone as a focusable button named after the import type', () => {
+    render(<ImportCard type="journal" apiEndpoint="/api/import/journals" companyId="c1" />)
+    const dropzone = screen.getByRole('button', { name: '仕訳データファイルを選択' })
+    expect(dropzone).toHaveAttribute('tabindex', '0')
+    dropzone.focus()
+    expect(dropzone).toHaveFocus()
+  })
+
+  it('activates the file picker via Enter and Space keyboard events', () => {
+    const { container } = render(
+      <ImportCard type="journal" apiEndpoint="/api/import/journals" companyId="c1" />
+    )
+    const input = container.querySelector('input[type="file"]') as HTMLInputElement
+    const clickSpy = vi.spyOn(input, 'click')
+    const dropzone = screen.getByRole('button', { name: '仕訳データファイルを選択' })
+
+    fireEvent.keyDown(dropzone, { key: 'Enter' })
+    expect(clickSpy).toHaveBeenCalledTimes(1)
+
+    fireEvent.keyDown(dropzone, { key: ' ' })
+    expect(clickSpy).toHaveBeenCalledTimes(2)
+  })
+
+  it('labels the icon-only clear button once a file is selected', () => {
+    const { container } = render(
+      <ImportCard type="journal" apiEndpoint="/api/import/journals" companyId="c1" />
+    )
+    selectFile(container, csvFile())
+    expect(screen.getByRole('button', { name: '選択したファイルをクリア' })).toBeInTheDocument()
+  })
+
+  it('labels the icon-only error dismiss button when validation fails', () => {
+    const { container } = render(
+      <ImportCard type="journal" apiEndpoint="/api/import/journals" companyId="c1" />
+    )
+    selectFile(container, new File(['x'], 'data.txt'))
+    expect(screen.getByRole('button', { name: 'エラーを閉じる' })).toBeInTheDocument()
+  })
+})

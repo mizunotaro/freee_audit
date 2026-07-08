@@ -116,16 +116,24 @@ export function JournalImport() {
       </div>
 
       {error && (
-        <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-4 text-red-700">
+        <div
+          role="alert"
+          className="mb-4 rounded-lg border border-red-200 bg-red-50 p-4 text-red-700"
+        >
           {error}
-          <button onClick={() => setError(null)} className="ml-2 text-red-500 hover:text-red-700">
+          <button
+            type="button"
+            onClick={() => setError(null)}
+            aria-label="エラーを閉じる"
+            className="ml-2 text-red-500 hover:text-red-700"
+          >
             ×
           </button>
         </div>
       )}
 
       {result && (
-        <div className="mb-4 rounded-lg border border-green-200 bg-green-50 p-4">
+        <div role="status" className="mb-4 rounded-lg border border-green-200 bg-green-50 p-4">
           <h4 className="mb-2 font-semibold text-green-800">インポート結果</h4>
           <div className="grid grid-cols-3 gap-4 text-sm">
             <div>
@@ -155,6 +163,7 @@ export function JournalImport() {
             </div>
           )}
           <button
+            type="button"
             onClick={() => setResult(null)}
             className="mt-2 text-sm text-green-600 hover:text-green-700"
           >
@@ -221,6 +230,7 @@ export function JournalImport() {
 
       <div className="flex gap-3">
         <button
+          type="button"
           onClick={handleUpload}
           disabled={!file || uploading}
           className="rounded bg-blue-500 px-6 py-2 text-white hover:bg-blue-600 disabled:opacity-50"
@@ -229,6 +239,7 @@ export function JournalImport() {
         </button>
         {file && (
           <button
+            type="button"
             onClick={handleClear}
             className="rounded border border-gray-300 px-4 py-2 text-gray-600 hover:bg-gray-100"
           >
@@ -236,6 +247,7 @@ export function JournalImport() {
           </button>
         )}
         <button
+          type="button"
           onClick={handleDownloadTemplate}
           className="rounded border border-gray-300 px-4 py-2 text-gray-600 hover:bg-gray-100"
         >

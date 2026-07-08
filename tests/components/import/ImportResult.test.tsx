@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { render } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
 import { ImportResult } from '@/components/import/ImportResult'
 import type { ImportResultData, ImportErrorUI } from '@/components/import/types'
 
@@ -169,5 +169,22 @@ describe('ImportResult — warnings truncation', () => {
     expect(getByText('警告4')).toBeInTheDocument()
     expect(queryByText('警告5')).toBeNull()
     expect(getByText('...他 2件')).toBeInTheDocument()
+  })
+})
+
+describe('ImportResult — accessibility', () => {
+  it('exposes the processing bar as a progressbar with aria values', () => {
+    const { container } = render(
+      <ImportResult
+        result={buildResult({ imported: 8, skipped: 2, failed: 0, totalRows: 10, validRows: 10 })}
+      />
+    )
+    const bar = screen.getByRole('progressbar')
+    expect(bar).toHaveAttribute('aria-valuenow', '10')
+    expect(bar).toHaveAttribute('aria-valuemin', '0')
+    expect(bar).toHaveAttribute('aria-valuemax', '10')
+    expect(bar).toHaveAttribute('aria-label', 'インポート処理の進捗')
+    // segment title tooltips are preserved alongside the new role
+    expect(container.querySelector('[title="成功: 8"]')).not.toBeNull()
   })
 })
