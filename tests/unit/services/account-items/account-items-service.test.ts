@@ -178,6 +178,40 @@ describe('AccountItemsService', () => {
         )
       }
     })
+
+    it('should map account_category_balance credit to balance credit', async () => {
+      vi.mocked(freeeClient.getAccountItems).mockResolvedValue({
+        data: [{ ...mockFreeeAccountItem, account_category_balance: 'credit' }],
+        error: undefined,
+      })
+      vi.mocked(prisma.accountItem.upsert).mockResolvedValue(mockAccountItem as never)
+
+      await syncAccountItemsFromFreee(mockCompanyId, mockFreeeCompanyId)
+
+      expect(prisma.accountItem.upsert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          create: expect.objectContaining({ balance: 'credit' }),
+          update: expect.objectContaining({ balance: 'credit' }),
+        })
+      )
+    })
+
+    it('should map account_category_balance debit to balance debit', async () => {
+      vi.mocked(freeeClient.getAccountItems).mockResolvedValue({
+        data: [{ ...mockFreeeAccountItem, account_category_balance: 'debit' }],
+        error: undefined,
+      })
+      vi.mocked(prisma.accountItem.upsert).mockResolvedValue(mockAccountItem as never)
+
+      await syncAccountItemsFromFreee(mockCompanyId, mockFreeeCompanyId)
+
+      expect(prisma.accountItem.upsert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          create: expect.objectContaining({ balance: 'debit' }),
+          update: expect.objectContaining({ balance: 'debit' }),
+        })
+      )
+    })
   })
 
   describe('getAccountItems', () => {

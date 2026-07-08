@@ -8,9 +8,11 @@ import {
   getTotalDepreciationByCategory,
   createFixedAsset,
   deleteFixedAsset,
+  importFixedAssetsFromFreee,
   type FixedAsset,
 } from '@/services/fixed-assets/depreciation'
 import { prisma } from '@/lib/db'
+import { freeeClient } from '@/integrations/freee/client'
 
 vi.mock('@/lib/db', () => ({
   prisma: {
@@ -28,6 +30,24 @@ vi.mock('@/integrations/freee/client', () => ({
     getAccountItems: vi.fn(),
   },
 }))
+
+function makeAsset(id: string, name: string, acquisitionCost: number, salvageValue: number) {
+  return {
+    id,
+    companyId: 'company-1',
+    freeeAssetId: null,
+    name,
+    acquisitionDate: new Date('2024-01-01'),
+    acquisitionCost,
+    salvageValue,
+    usefulLife: 5,
+    depreciationMethod: 'straight_line',
+    accumulatedDep: 0,
+    bookValue: acquisitionCost,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  }
+}
 
 describe('DepreciationService', () => {
   const mockCompanyId = 'company-1'
@@ -509,6 +529,164 @@ describe('DepreciationService', () => {
       expect(Number.isInteger(result.depreciationAmount)).toBe(true)
       expect(Number.isInteger(result.accumulatedDepAfter)).toBe(true)
       expect(Number.isInteger(result.bookValueAfter)).toBe(true)
+    })
+  })
+
+  describe('importFixedAssetsFromFreee', () => {
+    it('should return unavailable message when freee responds without error', async () => {
+      vi.mocked(freeeClient.getAccountItems).mockResolvedValue({
+        data: [mockAsset as unknown as object],
+        error: undefined,
+      } as never)
+
+      const result = await importFixedAssetsFromFreee(mockCompanyId, 999)
+
+      expect(freeeClient.getAccountItems).toHaveBeenCalledWith(999)
+      expect(result.imported).toBe(0)
+      expect(result.error).toBe('Fixed assets API not yet available in freee')
+    })
+
+    it('should surface the freee API error message', async () => {
+      vi.mocked(freeeClient.getAccountItems).mockResolvedValue({
+        data: undefined,
+        error: { message: 'Unauthorized', code: 'UNAUTHORIZED' },
+      } as never)
+
+      const result = await importFixedAssetsFromFreee(mockCompanyId, 999)
+
+      expect(result.imported).toBe(0)
+      expect(result.error).toBe('Unauthorized')
+    })
+
+    it('should catch thrown errors and return the message', async () => {
+      vi.mocked(freeeClient.getAccountItems).mockRejectedValue(new Error('Network failure'))
+
+      const result = await importFixedAssetsFromFreee(mockCompanyId, 999)
+
+      expect(result.imported).toBe(0)
+      expect(result.error).toBe('Network failure')
+    })
+
+    it('should return Unknown error for non-Error rejection', async () => {
+      vi.mocked(freeeClient.getAccountItems).mockRejectedValue('boom')
+
+      const result = await importFixedAssetsFromFreee(mockCompanyId, 999)
+
+      expect(result.imported).toBe(0)
+      expect(result.error).toBe('Unknown error')
+    })
+  })
+
+  describe('calculateDepreciation - exact amounts', () => {
+    it('should compute declining balance amount exactly', async () => {
+      const decliningAsset: FixedAsset = {
+        ...mockAsset,
+        depreciationMethod: 'declining_balance',
+      }
+      const periodStart = new Date('2024-01-01')
+      const periodEnd = new Date('2024-01-31')
+
+      const result = await calculateDepreciation(decliningAsset, periodStart, periodEnd)
+
+      // rate = 1 - (0.1)^(1/5); monthly = cost * rate / 12
+      expect(result.depreciationAmount).toBe(30754)
+      expect(result.accumulatedDepAfter).toBe(30754)
+      expect(result.bookValueAfter).toBe(969246)
+    })
+
+    it('should compute fixed percentage amount exactly for life=5', async () => {
+      const fixedPercentageAsset: FixedAsset = {
+        ...mockAsset,
+        depreciationMethod: 'fixed_percentage',
+      }
+      const periodStart = new Date('2024-01-01')
+      const periodEnd = new Date('2024-01-31')
+
+      const result = await calculateDepreciation(fixedPercentageAsset, periodStart, periodEnd)
+
+      // rate 0.352; monthly = cost * 0.352 / 12
+      expect(result.depreciationAmount).toBe(29333)
+      expect(result.accumulatedDepAfter).toBe(29333)
+      expect(result.bookValueAfter).toBe(970667)
+    })
+
+    it.each([
+      [2, 5300],
+      [3, 4467],
+      [5, 2933],
+      [8, 2192],
+      [10, 2033],
+      [15, 1867],
+      [20, 1783],
+      [40, 1600],
+      [50, 1500],
+    ])(
+      'should apply the fixed percentage rate table for usefulLife=%i (dep=%i)',
+      async (usefulLife, expected) => {
+        const asset: FixedAsset = {
+          ...mockAsset,
+          acquisitionCost: 100000,
+          salvageValue: 0,
+          bookValue: 100000,
+          usefulLife,
+          depreciationMethod: 'fixed_percentage',
+        }
+        const periodStart = new Date('2024-01-01')
+        const periodEnd = new Date('2024-01-31')
+
+        const result = await calculateDepreciation(asset, periodStart, periodEnd)
+
+        expect(result.depreciationAmount).toBe(expected)
+      }
+    )
+  })
+
+  describe('getTotalDepreciationByCategory - category bucketing', () => {
+    it('should bucket depreciation amounts by asset category', async () => {
+      vi.mocked(prisma.fixedAsset.findMany).mockResolvedValue([
+        makeAsset('asset-bld', 'オフィスビル', 1200000, 200000),
+        makeAsset('asset-car', '営業車', 600000, 100000),
+        makeAsset('asset-mac', '製造機械', 300000, 0),
+        makeAsset('asset-tool', '事務機器具', 240000, 0),
+        makeAsset('asset-soft', '会計ソフト', 120000, 0),
+        makeAsset('asset-other', '商標権', 60000, 0),
+      ])
+      vi.mocked(prisma.fixedAsset.update).mockResolvedValue({} as never)
+
+      const totals = await getTotalDepreciationByCategory(mockCompanyId, 2024, 1)
+
+      expect(Object.keys(totals)).toHaveLength(6)
+      expect(totals['建物']).toBe(16667)
+      expect(totals['車両運搬具']).toBe(8333)
+      expect(totals['機械装置']).toBe(5000)
+      expect(totals['工具器具備品']).toBe(4000)
+      expect(totals['ソフトウェア']).toBe(2000)
+      expect(totals['その他']).toBe(1000)
+    })
+
+    it('should accumulate amounts when multiple assets share a category', async () => {
+      vi.mocked(prisma.fixedAsset.findMany).mockResolvedValue([
+        makeAsset('a1', 'パソコン（器具）', 240000, 0),
+        makeAsset('a2', 'デスク（備品）', 120000, 0),
+      ])
+      vi.mocked(prisma.fixedAsset.update).mockResolvedValue({} as never)
+
+      const totals = await getTotalDepreciationByCategory(mockCompanyId, 2024, 1)
+
+      expect(Object.keys(totals)).toEqual(['工具器具備品'])
+      expect(totals['工具器具備品']).toBe(6000)
+    })
+
+    it('should skip fully depreciated assets when bucketing', async () => {
+      const fullyDep = makeAsset('fd', '製造機械', 300000, 0)
+      fullyDep.accumulatedDep = 300000
+      fullyDep.bookValue = 0
+      vi.mocked(prisma.fixedAsset.findMany).mockResolvedValue([fullyDep])
+      vi.mocked(prisma.fixedAsset.update).mockResolvedValue({} as never)
+
+      const totals = await getTotalDepreciationByCategory(mockCompanyId, 2024, 1)
+
+      expect(totals).toEqual({})
     })
   })
 })

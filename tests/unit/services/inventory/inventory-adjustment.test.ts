@@ -319,6 +319,50 @@ describe('InventoryAdjustmentService', () => {
 
       expect(alerts.length).toBe(3)
     })
+
+    it('should detect large variance using the default threshold and format details', async () => {
+      vi.mocked(prisma.inventoryAdjustment.findUnique).mockResolvedValue({
+        ...mockAdjustment,
+        openingBalance: 1000000,
+        closingBalance: 1300000,
+        adjustment: 300000,
+        journalEntryId: null,
+        status: 'PENDING',
+      })
+
+      const alerts = await detectInventoryAlerts(mockCompanyId, 2024, 1)
+
+      const varianceAlert = alerts.find((a) => a.type === 'LARGE_VARIANCE')
+      expect(varianceAlert).toBeDefined()
+      expect(varianceAlert?.message).toContain('30.0%')
+      expect(varianceAlert?.details).toMatchObject({
+        openingBalance: 1000000,
+        closingBalance: 1300000,
+        adjustment: 300000,
+        varianceRate: 0.3,
+      })
+    })
+
+    it('should attach the adjustment record to missing-journal details', async () => {
+      vi.mocked(prisma.inventoryAdjustment.findUnique).mockResolvedValue({
+        ...mockAdjustment,
+        journalEntryId: null,
+        status: 'PENDING',
+        adjustment: 5000,
+      })
+
+      const alerts = await detectInventoryAlerts(mockCompanyId, 2024, 1)
+
+      const missingJournalAlert = alerts.find((a) => a.type === 'MISSING_JOURNAL')
+      expect(missingJournalAlert).toBeDefined()
+      // The alert stores the sanitized result shape (no raw companyId/timestamps).
+      expect(missingJournalAlert?.details?.adjustment).toMatchObject({
+        id: 'adj-1',
+        adjustment: 5000,
+        status: 'PENDING',
+        journalEntryId: null,
+      })
+    })
   })
 
   describe('analyzeInventoryTrend', () => {
