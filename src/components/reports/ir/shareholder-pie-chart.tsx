@@ -2,6 +2,8 @@
 
 import * as React from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { ChartState, type ChartStateStatus } from '@/components/charts/chart-state'
+import { resolveChartStatus } from '@/components/charts/resolve-chart-status'
 import type { ShareholderData } from '@/types/reports/ir-report'
 
 export interface ShareholderPieChartProps {
@@ -9,6 +11,8 @@ export interface ShareholderPieChartProps {
   title?: string
   language?: 'ja' | 'en'
   size?: number
+  loading?: boolean
+  error?: string | null
 }
 
 const COLORS = [
@@ -27,6 +31,8 @@ export function ShareholderPieChart({
   title = '株主構成',
   language = 'ja',
   size = 200,
+  loading = false,
+  error = null,
 }: ShareholderPieChartProps) {
   const [hoveredIndex, setHoveredIndex] = React.useState<number | null>(null)
 
@@ -82,20 +88,25 @@ export function ShareholderPieChart({
     })
   }, [data, total, size])
 
-  if (data.length === 0) {
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle>{title}</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="py-8 text-center text-muted-foreground">
-            {language === 'en' ? 'No data available' : 'データがありません'}
-          </p>
-        </CardContent>
-      </Card>
-    )
-  }
+  const emptyMessage = language === 'en' ? 'No data available' : 'データがありません'
+  const resolution = resolveChartStatus({
+    loading,
+    error: error ?? null,
+    dataLength: data.length,
+  })
+  const renderState = (status: ChartStateStatus) => (
+    <Card>
+      <CardHeader>
+        <CardTitle>{title}</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <ChartState status={status} error={error ?? undefined} emptyMessage={emptyMessage} />
+      </CardContent>
+    </Card>
+  )
+
+  if (resolution.success && resolution.data !== 'ready') return renderState(resolution.data)
+  if (!resolution.success) return renderState('error')
 
   const tooltipData = hoveredIndex !== null ? data[hoveredIndex] : null
 

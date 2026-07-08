@@ -3,6 +3,8 @@
 import * as React from 'react'
 import { TrendingUp, TrendingDown, Minus } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { ChartState, type ChartStateStatus } from '@/components/charts/chart-state'
+import { resolveChartStatus } from '@/components/charts/resolve-chart-status'
 import type { FinancialHighlight } from '@/types/reports/ir-report'
 
 export interface FinancialHighlightsChartProps {
@@ -10,6 +12,8 @@ export interface FinancialHighlightsChartProps {
   title?: string
   showComparison?: boolean
   language?: 'ja' | 'en'
+  loading?: boolean
+  error?: string | null
 }
 
 const COLORS = {
@@ -34,6 +38,8 @@ export function FinancialHighlightsChart({
   title = '財務ハイライト',
   showComparison = true,
   language = 'ja',
+  loading = false,
+  error = null,
 }: FinancialHighlightsChartProps) {
   const sortedHighlights = React.useMemo(() => {
     return [...highlights].sort((a, b) => a.fiscalYear.localeCompare(b.fiscalYear))
@@ -53,20 +59,25 @@ export function FinancialHighlightsChart({
     return <Minus className="h-4 w-4 text-gray-400" />
   }
 
-  if (sortedHighlights.length === 0) {
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle>{title}</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="py-8 text-center text-muted-foreground">
-            {language === 'en' ? 'No data available' : 'データがありません'}
-          </p>
-        </CardContent>
-      </Card>
-    )
-  }
+  const emptyMessage = language === 'en' ? 'No data available' : 'データがありません'
+  const resolution = resolveChartStatus({
+    loading,
+    error: error ?? null,
+    dataLength: highlights.length,
+  })
+  const renderState = (status: ChartStateStatus) => (
+    <Card>
+      <CardHeader>
+        <CardTitle>{title}</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <ChartState status={status} error={error ?? undefined} emptyMessage={emptyMessage} />
+      </CardContent>
+    </Card>
+  )
+
+  if (resolution.success && resolution.data !== 'ready') return renderState(resolution.data)
+  if (!resolution.success) return renderState('error')
 
   return (
     <Card>
