@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { TaxValidator } from '@/services/dd/validators/tax-validator'
 import type { ValidatorContext } from '@/services/dd/validators/base-validator'
-import type { DDAnalyticsContext, DDJournalData } from '@/services/dd/types'
+import type { DDJournalData } from '@/services/dd/types'
 
 vi.mock('@/services/dd/validators/validation-engine', () => ({
   ddValidationEngine: {
@@ -116,6 +116,38 @@ describe('TaxValidator', () => {
       const result = await validator.validate('TAX', rules, context)
       expect(result.success).toBe(true)
     })
+
+    it('caps the audit risk score at 1.00 even with many adjustment years', async () => {
+      const journalsByYear: DDJournalData[] = []
+      for (let year = 2014; year <= 2020; year++) {
+        journalsByYear.push(
+          makeJournal({
+            entryDate: new Date(`${year}-06-15`),
+            description: '税務調査による修正',
+            amount: 50000,
+            debitAccount: '法人税',
+            creditAccount: '現金',
+            id: `j${year}`,
+            taxAmount: 0,
+          })
+        )
+      }
+      const context = makeContext(journalsByYear, 2020)
+      context.analyticsContext.fiscalYears = [2014, 2015, 2016, 2017, 2018, 2019, 2020]
+      context.analyticsContext.journals = journalsByYear
+      const rules = [{ type: 'AUDIT_HISTORY' as const, field: 'tax_audits', lookback: 7 }]
+
+      const result = await validator.validate('TAX', rules, context)
+      expect(result.success).toBe(true)
+      if (result.success) {
+        // 7 years * 0.2 = 1.4, but Math.min caps the score at 1.00
+        const riskEvidence = result.data.evidence.find((e) =>
+          e.reference.includes('tax_audit_risk')
+        )
+        expect(riskEvidence).toBeDefined()
+        expect(riskEvidence!.summary).toContain('1.00')
+      }
+    })
   })
 
   describe('EXPOSURE rule', () => {
@@ -207,6 +239,32 @@ describe('TaxValidator', () => {
       expect(result.success).toBe(true)
       if (result.success) {
         expect(result.data.findings).toHaveLength(0)
+      }
+    })
+
+    it('detects provision ratio above the upper bound (>120%)', async () => {
+      const journals = [
+        makeJournal({
+          debitAccount: '法人税',
+          creditAccount: '現金',
+          amount: 100000,
+          description: '税額',
+        }),
+        makeJournal({
+          debitAccount: '現金',
+          creditAccount: '未払法人税',
+          amount: 250000,
+          description: '未払計上',
+        }),
+      ]
+      const context = makeContext(journals, 2024)
+      const rules = [{ type: 'PROVISION' as const, field: 'probable_loss' }]
+
+      const result = await validator.validate('TAX', rules, context)
+      expect(result.success).toBe(true)
+      if (result.success) {
+        expect(result.data.findings.length).toBeGreaterThan(0)
+        expect(result.data.findings[0].severity).toBe('MEDIUM')
       }
     })
   })

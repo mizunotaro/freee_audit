@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { DDChecklistService } from '@/services/dd/checklist-service'
-import type { DDAnalyticsContext } from '@/services/dd/types'
 import { prisma } from '@/lib/db'
 
 vi.mock('@/lib/db', () => ({
@@ -121,6 +120,40 @@ describe('DDChecklistService', () => {
         expect(result.error.code).toBe('CREATE_FAILED')
       }
     })
+
+    it('should create a TAX_DD checklist using the aliased definitions', async () => {
+      vi.mocked(prisma.dDChecklist.create).mockResolvedValue(
+        createMockChecklist({ type: 'TAX_DD' })
+      )
+      vi.mocked(prisma.dDChecklistItem.createMany).mockResolvedValue({ count: 25 })
+
+      const result = await service.createChecklist({
+        type: 'TAX_DD',
+        fiscalYear: mockFiscalYear,
+        companyId: mockCompanyId,
+      })
+
+      expect(result.success).toBe(true)
+      const createManyCall = vi.mocked(prisma.dDChecklistItem.createMany).mock.calls[0]?.[0]
+      expect(createManyCall?.data).toHaveLength(25) // TAX_DD aliases IPO_SHORT_REVIEW_CHECKLIST
+    })
+
+    it('should create a COMPREHENSIVE checklist combining both definition sets', async () => {
+      vi.mocked(prisma.dDChecklist.create).mockResolvedValue(
+        createMockChecklist({ type: 'COMPREHENSIVE' })
+      )
+      vi.mocked(prisma.dDChecklistItem.createMany).mockResolvedValue({ count: 41 })
+
+      const result = await service.createChecklist({
+        type: 'COMPREHENSIVE',
+        fiscalYear: mockFiscalYear,
+        companyId: mockCompanyId,
+      })
+
+      expect(result.success).toBe(true)
+      const createManyCall = vi.mocked(prisma.dDChecklistItem.createMany).mock.calls[0]?.[0]
+      expect(createManyCall?.data).toHaveLength(41) // IPO (25) + MA (16)
+    })
   })
 
   describe('getChecklist', () => {
@@ -154,6 +187,15 @@ describe('DDChecklistService', () => {
       expect(result.success).toBe(false)
       if (!result.success) {
         expect(result.error.code).toBe('NOT_FOUND')
+      }
+    })
+
+    it('should return FETCH_FAILED when the database throws', async () => {
+      vi.mocked(prisma.dDChecklist.findUnique).mockRejectedValue(new Error('DB down'))
+      const result = await service.getChecklist('checklist-123')
+      expect(result.success).toBe(false)
+      if (!result.success) {
+        expect(result.error.code).toBe('FETCH_FAILED')
       }
     })
   })
@@ -207,6 +249,31 @@ describe('DDChecklistService', () => {
       expect(result.success).toBe(true)
       if (result.success) {
         expect(result.data.status).toBe('FAILED')
+      }
+    })
+
+    it('should not set checkedAt when status is not provided', async () => {
+      vi.mocked(prisma.dDChecklistItem.update).mockResolvedValue(
+        createMockChecklistItem({ recommendation: 'rec' })
+      )
+
+      await service.updateChecklistItem('item-1', { recommendation: 'rec' })
+
+      expect(prisma.dDChecklistItem.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ checkedAt: undefined, recommendation: 'rec' }),
+        })
+      )
+    })
+
+    it('should return UPDATE_FAILED when the database throws', async () => {
+      vi.mocked(prisma.dDChecklistItem.update).mockRejectedValue(new Error('DB down'))
+
+      const result = await service.updateChecklistItem('item-1', { status: 'PASSED' })
+
+      expect(result.success).toBe(false)
+      if (!result.success) {
+        expect(result.error.code).toBe('UPDATE_FAILED')
       }
     })
   })
@@ -276,6 +343,63 @@ describe('DDChecklistService', () => {
       expect(result.success).toBe(false)
       if (!result.success) {
         expect(result.error.code).toBe('NOT_FOUND')
+      }
+    })
+
+    it('should count findings by severity x status and compute the weighted score', async () => {
+      const mockChecklist = createMockChecklist({
+        items: [
+          createMockChecklistItem({ id: 'a', itemCode: 'A', status: 'PASSED', severity: 'HIGH' }),
+          createMockChecklistItem({
+            id: 'b',
+            itemCode: 'B',
+            status: 'FAILED',
+            severity: 'CRITICAL',
+            findings: '[]',
+          }),
+          createMockChecklistItem({ id: 'c', itemCode: 'C', status: 'N_A', severity: 'MEDIUM' }),
+          createMockChecklistItem({
+            id: 'd',
+            itemCode: 'D',
+            status: 'IN_PROGRESS',
+            severity: 'LOW',
+          }),
+        ],
+      })
+
+      vi.mocked(prisma.dDChecklist.findUnique).mockResolvedValue(mockChecklist)
+      vi.mocked(prisma.dDChecklist.update).mockResolvedValue(
+        createMockChecklist({ status: 'COMPLETED' })
+      )
+
+      const result = await service.runChecklist('checklist-123')
+      expect(result.success).toBe(true)
+      if (result.success) {
+        const data = result.data
+        expect(data.totalItems).toBe(4)
+        expect(data.passedItems).toBe(1)
+        expect(data.failedItems).toBe(1)
+        expect(data.naItems).toBe(1)
+        expect(data.criticalFindings).toBe(1) // CRITICAL + FAILED
+        expect(data.highFindings).toBe(0) // HIGH item is PASSED, not FAILED
+        expect(data.mediumFindings).toBe(0) // MEDIUM item is N_A, not FAILED
+        expect(data.lowFindings).toBe(1) // LOW counts regardless of status
+        // (100*4 + 0*5 + 50*3 + 50*2) / (4+5+3+2) = 650/14 = 46.43 -> 46
+        expect(data.overallScore).toBe(46)
+      }
+    })
+
+    it('should return RUN_FAILED when the post-run update throws', async () => {
+      const mockChecklist = createMockChecklist({
+        items: [createMockChecklistItem({ status: 'PASSED', severity: 'HIGH' })],
+      })
+      vi.mocked(prisma.dDChecklist.findUnique).mockResolvedValue(mockChecklist)
+      vi.mocked(prisma.dDChecklist.update).mockRejectedValue(new Error('DB down'))
+
+      const result = await service.runChecklist('checklist-123')
+      expect(result.success).toBe(false)
+      if (!result.success) {
+        expect(result.error.code).toBe('RUN_FAILED')
       }
     })
   })

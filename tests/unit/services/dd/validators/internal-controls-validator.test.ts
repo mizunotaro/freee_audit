@@ -116,6 +116,38 @@ describe('InternalControlsValidator', () => {
         expect(result.data.findings[0].severity).toBe('CRITICAL')
       }
     })
+
+    it('assigns HIGH severity when ratio is between 10% and 20%', async () => {
+      const journals = [
+        ...Array.from({ length: 2 }, () => makeJournal({ description: '' })),
+        ...Array.from({ length: 13 }, () => makeJournal({ description: '十分な長さの説明文です' })),
+      ]
+      const context = makeContext(journals)
+      const rules = [{ type: 'DOCUMENTATION' as const, field: 'control_activities' }]
+
+      const result = await validator.validate('IC', rules, context)
+      expect(result.success).toBe(true)
+      if (result.success) {
+        expect(result.data.findings.length).toBeGreaterThan(0)
+        expect(result.data.findings[0].severity).toBe('HIGH')
+      }
+    })
+
+    it('assigns MEDIUM severity when ratio is between threshold and 10%', async () => {
+      const journals = [
+        makeJournal({ description: '' }),
+        ...Array.from({ length: 14 }, () => makeJournal({ description: '十分な長さの説明文です' })),
+      ]
+      const context = makeContext(journals)
+      const rules = [{ type: 'DOCUMENTATION' as const, field: 'control_activities' }]
+
+      const result = await validator.validate('IC', rules, context)
+      expect(result.success).toBe(true)
+      if (result.success) {
+        expect(result.data.findings.length).toBeGreaterThan(0)
+        expect(result.data.findings[0].severity).toBe('MEDIUM')
+      }
+    })
   })
 
   describe('RECONCILIATION rule', () => {
@@ -187,6 +219,31 @@ describe('InternalControlsValidator', () => {
       if (result.success) {
         expect(result.data.findings.length).toBeGreaterThan(0)
         expect(result.data.findings[0].severity).toBe('INFO')
+      }
+    })
+
+    it('uses the default 1,000,000 minimum when rule.min is omitted', async () => {
+      const journals = [makeJournal({ amount: 1500000 }), makeJournal({ amount: 50000 })]
+      const context = makeContext(journals)
+      const rules = [{ type: 'TESTING' as const, field: 'operating_effectiveness' }]
+
+      const result = await validator.validate('IC', rules, context)
+      expect(result.success).toBe(true)
+      if (result.success) {
+        expect(result.data.findings.length).toBeGreaterThan(0)
+        expect(result.data.evidence.some((e) => e.summary.includes('100万円'))).toBe(true)
+      }
+    })
+
+    it('does not raise a finding when there are no high-value journals', async () => {
+      const journals = [makeJournal({ amount: 50000 })]
+      const context = makeContext(journals)
+      const rules = [{ type: 'TESTING' as const, field: 'operating_effectiveness' }]
+
+      const result = await validator.validate('IC', rules, context)
+      expect(result.success).toBe(true)
+      if (result.success) {
+        expect(result.data.findings).toHaveLength(0)
       }
     })
   })
