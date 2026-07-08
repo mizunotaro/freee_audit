@@ -3,6 +3,7 @@ import { withAuth, type AuthenticatedRequest } from '@/lib/api'
 import { validateCompanyId } from '@/lib/api/auth-helpers'
 import { ddChecklistService } from '@/services/dd/checklist-service'
 import type { DDChecklistType } from '@/services/dd/types'
+import { logRouteAudit } from '@/lib/route-audit'
 
 async function getHandler(req: AuthenticatedRequest) {
   try {
@@ -136,6 +137,14 @@ async function postHandler(req: AuthenticatedRequest) {
       )
     }
 
+    await logRouteAudit({
+      request: req,
+      userId: req.user.id,
+      action: 'DD_CHECKLIST_CREATE',
+      resource: 'dd_checklist',
+      resourceId: result.data.id,
+    })
+
     return NextResponse.json({
       data: {
         id: result.data.id,
@@ -147,6 +156,14 @@ async function postHandler(req: AuthenticatedRequest) {
       },
     })
   } catch (error) {
+    await logRouteAudit({
+      request: req,
+      userId: req.user.id,
+      action: 'DD_CHECKLIST_CREATE',
+      resource: 'dd_checklist',
+      result: 'FAILURE',
+      details: { error: error instanceof Error ? error.message : 'Unknown error' },
+    })
     console.error('[API] Error creating DD checklist:', error)
     if (error instanceof Error && error.message.includes('Access denied')) {
       return NextResponse.json(

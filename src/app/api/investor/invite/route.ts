@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { validateSession } from '@/lib/auth'
 import { createInvitation } from '@/services/investor/invitation-service'
 import { z } from 'zod'
+import { logRouteAudit } from '@/lib/route-audit'
 
 const inviteSchema = z.object({
   email: z.string().email(),
@@ -45,6 +46,15 @@ export async function POST(request: NextRequest) {
 
     const inviteUrl = `${baseUrl}/investor/accept?token=${result.token}`
 
+    await logRouteAudit({
+      request,
+      userId: user.id,
+      action: 'INVESTOR_INVITE_CREATE',
+      resource: 'investor_invitation',
+      resourceId: result.invitationId,
+      details: { email },
+    })
+
     return NextResponse.json({
       success: true,
       invitationId: result.invitationId,
@@ -58,6 +68,13 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    await logRouteAudit({
+      request,
+      action: 'INVESTOR_INVITE_CREATE',
+      resource: 'investor_invitation',
+      result: 'FAILURE',
+      details: { error: error instanceof Error ? error.message : 'Unknown error' },
+    })
     console.error('Invite error:', error)
     return NextResponse.json({ success: false, error: 'Internal server error' }, { status: 500 })
   }

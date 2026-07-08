@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getAuthUser } from '@/lib/api/auth-helpers'
 import { analyzeFinancialData } from '@/services/ai/analysis-service'
 import { calculateFinancialKPIs } from '@/services/analytics/financial-kpi'
+import { logRouteAudit } from '@/lib/route-audit'
 
 export async function POST(request: NextRequest) {
   try {
@@ -33,8 +34,22 @@ export async function POST(request: NextRequest) {
       prompt
     )
 
+    await logRouteAudit({
+      request,
+      userId: user.id,
+      action: 'ANALYSIS_RUN',
+      resource: 'analysis',
+    })
+
     return NextResponse.json(result)
   } catch (error) {
+    await logRouteAudit({
+      request,
+      action: 'ANALYSIS_RUN',
+      resource: 'analysis',
+      result: 'FAILURE',
+      details: { error: error instanceof Error ? error.message : 'Unknown error' },
+    })
     console.error('Analysis API error:', error)
     return NextResponse.json({ error: 'Failed to analyze financial data' }, { status: 500 })
   }

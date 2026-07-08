@@ -5,6 +5,7 @@ import { createContextManager } from '@/lib/ai/context/context-manager'
 import type { ChatRequest, StreamChunk } from '../types'
 import type { PersonaType } from '@/lib/ai/personas/types'
 import { getAuthUser } from '@/lib/api/auth-helpers'
+import { logRouteAudit } from '@/lib/route-audit'
 
 const PERSONA_NAMES: Record<PersonaType, string> = {
   cpa: '公認会計士',
@@ -106,6 +107,13 @@ export async function POST(request: NextRequest): Promise<Response> {
       }
     })()
 
+    await logRouteAudit({
+      request,
+      userId,
+      action: 'CHAT_STREAM',
+      resource: 'chat',
+    })
+
     return new Response(stream.readable, {
       headers: {
         'Content-Type': 'text/event-stream',
@@ -115,6 +123,13 @@ export async function POST(request: NextRequest): Promise<Response> {
       },
     })
   } catch (error) {
+    await logRouteAudit({
+      request,
+      action: 'CHAT_STREAM',
+      resource: 'chat',
+      result: 'FAILURE',
+      details: { error: error instanceof Error ? error.message : 'Unknown error' },
+    })
     console.error('[Stream API] Error:', error)
     return new Response(JSON.stringify({ error: 'Internal server error' }), { status: 500 })
   }

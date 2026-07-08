@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { validateSession } from '@/lib/auth'
 import { ddChecklistService } from '@/services/dd/checklist-service'
 import { prisma } from '@/lib/db'
+import { logRouteAudit } from '@/lib/route-audit'
 
 async function getAuthUser(request: NextRequest) {
   const token = request.cookies.get('session')?.value
@@ -109,6 +110,14 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       )
     }
 
+    await logRouteAudit({
+      request,
+      userId: user.id,
+      action: 'DD_CHECKLIST_ITEM_UPDATE',
+      resource: 'dd_checklist_item',
+      resourceId: id,
+    })
+
     return NextResponse.json({
       data: {
         id: result.data.id,
@@ -117,6 +126,13 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       },
     })
   } catch (error) {
+    await logRouteAudit({
+      request,
+      action: 'DD_CHECKLIST_ITEM_UPDATE',
+      resource: 'dd_checklist_item',
+      result: 'FAILURE',
+      details: { error: error instanceof Error ? error.message : 'Unknown error' },
+    })
     console.error('Error updating DD checklist item:', error)
     return NextResponse.json({ error: 'Failed to update DD checklist item' }, { status: 500 })
   }
@@ -154,11 +170,26 @@ export async function DELETE(
       where: { id },
     })
 
+    await logRouteAudit({
+      request,
+      userId: user.id,
+      action: 'DD_CHECKLIST_DELETE',
+      resource: 'dd_checklist',
+      resourceId: id,
+    })
+
     return NextResponse.json({
       success: true,
       message: 'Checklist deleted successfully',
     })
   } catch (error) {
+    await logRouteAudit({
+      request,
+      action: 'DD_CHECKLIST_DELETE',
+      resource: 'dd_checklist',
+      result: 'FAILURE',
+      details: { error: error instanceof Error ? error.message : 'Unknown error' },
+    })
     console.error('Error deleting DD checklist:', error)
     return NextResponse.json({ error: 'Failed to delete DD checklist' }, { status: 500 })
   }

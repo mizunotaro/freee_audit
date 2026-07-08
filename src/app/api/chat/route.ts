@@ -6,6 +6,7 @@ import { createContextManager } from '@/lib/ai/context/context-manager'
 import type { PersonaType } from '@/lib/ai/personas/types'
 import type { PersonaAnalysis } from '@/lib/ai/orchestrator/orchestrator-types'
 import { getAuthUser } from '@/lib/api/auth-helpers'
+import { logRouteAudit } from '@/lib/route-audit'
 
 const PERSONA_NAMES: Record<PersonaType, string> = {
   cpa: '公認会計士',
@@ -168,8 +169,22 @@ export async function POST(request: NextRequest): Promise<NextResponse<ChatRespo
       },
     }
 
+    await logRouteAudit({
+      request,
+      userId,
+      action: 'CHAT_SEND',
+      resource: 'chat',
+    })
+
     return NextResponse.json(response)
   } catch (error) {
+    await logRouteAudit({
+      request,
+      action: 'CHAT_SEND',
+      resource: 'chat',
+      result: 'FAILURE',
+      details: { error: error instanceof Error ? error.message : 'Unknown error' },
+    })
     console.error('[Chat API] Error:', error)
     return NextResponse.json(
       {

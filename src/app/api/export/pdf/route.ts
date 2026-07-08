@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { validateSession } from '@/lib/auth'
+import { logRouteAudit } from '@/lib/route-audit'
 import {
   createExportService,
   ExportRequest,
@@ -42,6 +43,14 @@ export async function POST(request: NextRequest) {
     const exportService = createExportService('pdf')
     const result = await exportService.export(mockData, options)
 
+    await logRouteAudit({
+      request,
+      userId: user.id,
+      action: 'EXPORT_PDF',
+      resource: 'export',
+      details: { reportType: body.reportType, fiscalYear: body.fiscalYear },
+    })
+
     return NextResponse.json({
       downloadUrl: result.downloadUrl,
       expiresAt: result.expiresAt.toISOString(),
@@ -49,6 +58,13 @@ export async function POST(request: NextRequest) {
       filename: result.filename,
     })
   } catch (error) {
+    await logRouteAudit({
+      request,
+      action: 'EXPORT_PDF',
+      resource: 'export',
+      result: 'FAILURE',
+      details: { error: error instanceof Error ? error.message : 'Unknown error' },
+    })
     console.error('PDF export error:', error)
     return NextResponse.json({ error: 'Failed to generate PDF' }, { status: 500 })
   }

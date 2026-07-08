@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { prisma } from '@/lib/db'
 import { validateSession } from '@/lib/auth'
+import { logRouteAudit } from '@/lib/route-audit'
 
 const updatePeerSchema = z.object({
   ticker: z.string().nullable().optional(),
@@ -99,8 +100,23 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       },
     })
 
+    await logRouteAudit({
+      request,
+      userId: user.id,
+      action: 'PEER_COMPANY_UPDATE',
+      resource: 'peer_company',
+      resourceId: id,
+    })
+
     return NextResponse.json({ success: true, data: peer })
   } catch (error) {
+    await logRouteAudit({
+      request,
+      action: 'PEER_COMPANY_UPDATE',
+      resource: 'peer_company',
+      result: 'FAILURE',
+      details: { error: error instanceof Error ? error.message : 'Unknown error' },
+    })
     return NextResponse.json(
       { success: false, error: error instanceof Error ? error.message : 'Unknown error' },
       { status: 500 }
@@ -130,8 +146,23 @@ export async function DELETE(
 
     await prisma.peerCompany.delete({ where: { id } })
 
+    await logRouteAudit({
+      request,
+      userId: user.id,
+      action: 'PEER_COMPANY_DELETE',
+      resource: 'peer_company',
+      resourceId: id,
+    })
+
     return NextResponse.json({ success: true })
   } catch (error) {
+    await logRouteAudit({
+      request,
+      action: 'PEER_COMPANY_DELETE',
+      resource: 'peer_company',
+      result: 'FAILURE',
+      details: { error: error instanceof Error ? error.message : 'Unknown error' },
+    })
     return NextResponse.json(
       { success: false, error: error instanceof Error ? error.message : 'Unknown error' },
       { status: 500 }

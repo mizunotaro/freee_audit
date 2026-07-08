@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { validateSession } from '@/lib/auth'
 import { createPeerSelectorAI } from '@/services/peer-companies'
 import { getAIService } from '@/lib/integrations/ai'
+import { logRouteAudit } from '@/lib/route-audit'
 
 const suggestPeersSchema = z.object({
   industry: z.string().min(1),
@@ -88,8 +89,22 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: result.error.message }, { status: 400 })
     }
 
+    await logRouteAudit({
+      request,
+      userId: user.id,
+      action: 'PEER_COMPANY_SUGGEST',
+      resource: 'peer_company',
+    })
+
     return NextResponse.json({ success: true, data: result.data })
   } catch (error) {
+    await logRouteAudit({
+      request,
+      action: 'PEER_COMPANY_SUGGEST',
+      resource: 'peer_company',
+      result: 'FAILURE',
+      details: { error: error instanceof Error ? error.message : 'Unknown error' },
+    })
     return NextResponse.json(
       { success: false, error: error instanceof Error ? error.message : 'Unknown error' },
       { status: 500 }

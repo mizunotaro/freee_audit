@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { requireAuth, getCompanyId } from '@/lib/api/auth-helpers'
 import { rateLimit } from '@/lib/security/rate-limit-middleware'
 import type { FAQItem } from '@/types/reports/ir-report'
+import { logRouteAudit } from '@/lib/route-audit'
 
 const API_TIMEOUT_MS = 30000
 
@@ -124,8 +125,23 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     faqs.push(newFAQ)
     saveFAQs(companyId, faqs)
 
+    await logRouteAudit({
+      request,
+      userId: user.id,
+      action: 'IR_FAQ_CREATE',
+      resource: 'ir_faq',
+      resourceId: newFAQ.id,
+    })
+
     return addSecurityHeaders(NextResponse.json({ success: true, data: newFAQ }, { status: 201 }))
   } catch (error) {
+    await logRouteAudit({
+      request,
+      action: 'IR_FAQ_CREATE',
+      resource: 'ir_faq',
+      result: 'FAILURE',
+      details: { error: error instanceof Error ? error.message : 'Unknown error' },
+    })
     console.error('FAQ POST error:', error)
     return addSecurityHeaders(
       NextResponse.json({ success: false, error: 'Failed to create FAQ' }, { status: 500 })

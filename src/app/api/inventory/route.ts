@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { validateSession } from '@/lib/auth'
 import { withRateLimit } from '@/lib/security'
+import { logRouteAudit } from '@/lib/route-audit'
 import {
   checkInventoryAdjustmentStatus,
   getInventoryAdjustments,
@@ -100,6 +101,13 @@ async function handler(request: NextRequest) {
         parsed.data.month,
         parsed.data.reason || ''
       )
+      await logRouteAudit({
+        request,
+        userId: user.id,
+        action: 'INVENTORY_ADJUSTMENT_SKIP',
+        resource: 'inventory_adjustment',
+        details: { fiscalYear: parsed.data.fiscalYear, month: parsed.data.month },
+      })
       return NextResponse.json({ success: true })
     }
 
@@ -120,6 +128,13 @@ async function handler(request: NextRequest) {
     }
 
     const result = await createInventoryAdjustment(data)
+    await logRouteAudit({
+      request,
+      userId: user.id,
+      action: 'INVENTORY_ADJUSTMENT_CREATE',
+      resource: 'inventory_adjustment',
+      details: { fiscalYear: parsed.data.fiscalYear, month: parsed.data.month },
+    })
     return NextResponse.json({ adjustment: result })
   }
 

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { withAuth, type AuthenticatedRequest, validateCompanyId } from '@/lib/api'
 import { accountItemImporter } from '@/services/import/account-item-importer'
 import { IMPORT_LIMITS, type ImportErrorCode } from '@/services/import/types'
+import { logRouteAudit } from '@/lib/route-audit'
 
 const IMPORT_TIMEOUT_MS = 60000
 
@@ -97,6 +98,18 @@ async function handler(req: AuthenticatedRequest) {
 
     const importResult = result.data
 
+    await logRouteAudit({
+      request: req,
+      userId: req.user.id,
+      action: 'IMPORT_ACCOUNT_ITEMS',
+      resource: 'import',
+      details: {
+        imported: importResult.imported,
+        failed: importResult.failed,
+        dryRun,
+      },
+    })
+
     return NextResponse.json({
       success: importResult.success,
       status: importResult.status,
@@ -113,6 +126,14 @@ async function handler(req: AuthenticatedRequest) {
       durationMs: importResult.durationMs,
     })
   } catch (error) {
+    await logRouteAudit({
+      request: req,
+      userId: req.user.id,
+      action: 'IMPORT_ACCOUNT_ITEMS',
+      resource: 'import',
+      result: 'FAILURE',
+      details: { error: error instanceof Error ? error.message : 'Unknown error' },
+    })
     console.error('[API] Account item import error:', error)
     if (error instanceof Error && error.name === 'AbortError') {
       return NextResponse.json(

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { validateSession } from '@/lib/auth'
 import { BoardMeetingService } from '@/services/board/board-meeting-service'
+import { logRouteAudit } from '@/lib/route-audit'
 
 async function getAuthUser(request: NextRequest) {
   const token = request.cookies.get('session')?.value
@@ -28,8 +29,23 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     }
 
     const items = await BoardMeetingService.generateDefaultAgendaItems(params.id, fiscalYear)
+    await logRouteAudit({
+      request,
+      userId: user.id,
+      action: 'BOARD_AGENDA_ITEM_GENERATE',
+      resource: 'board_agenda_item',
+      resourceId: params.id,
+    })
     return NextResponse.json(items, { status: 201 })
   } catch (error) {
+    await logRouteAudit({
+      request,
+      action: 'BOARD_AGENDA_ITEM_GENERATE',
+      resource: 'board_agenda_item',
+      resourceId: params.id,
+      result: 'FAILURE',
+      details: { error: error instanceof Error ? error.message : 'Unknown error' },
+    })
     console.error('Error generating default agenda items:', error)
     return NextResponse.json({ error: 'Failed to generate default agenda items' }, { status: 500 })
   }

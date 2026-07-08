@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { requireAuth, getCompanyId } from '@/lib/api/auth-helpers'
 import { rateLimit } from '@/lib/security/rate-limit-middleware'
 import type { IREvent } from '@/types/reports/ir-report'
+import { logRouteAudit } from '@/lib/route-audit'
 
 const API_TIMEOUT_MS = 30000
 
@@ -88,8 +89,23 @@ export async function PUT(request: NextRequest, { params }: RouteParams): Promis
 
     saveEvents(companyId, events)
 
+    await logRouteAudit({
+      request,
+      userId: user.id,
+      action: 'IR_EVENT_UPDATE',
+      resource: 'ir_event',
+      resourceId: id,
+    })
+
     return addSecurityHeaders(NextResponse.json({ success: true, data: events[index] }))
   } catch (error) {
+    await logRouteAudit({
+      request,
+      action: 'IR_EVENT_UPDATE',
+      resource: 'ir_event',
+      result: 'FAILURE',
+      details: { error: error instanceof Error ? error.message : 'Unknown error' },
+    })
     console.error('IR Event PUT error:', error)
     return addSecurityHeaders(
       NextResponse.json({ success: false, error: 'Failed to update IR event' }, { status: 500 })
@@ -130,8 +146,23 @@ export async function DELETE(request: NextRequest, { params }: RouteParams): Pro
     events.splice(index, 1)
     saveEvents(companyId, events)
 
+    await logRouteAudit({
+      request,
+      userId: user.id,
+      action: 'IR_EVENT_DELETE',
+      resource: 'ir_event',
+      resourceId: id,
+    })
+
     return addSecurityHeaders(NextResponse.json({ success: true }))
   } catch (error) {
+    await logRouteAudit({
+      request,
+      action: 'IR_EVENT_DELETE',
+      resource: 'ir_event',
+      result: 'FAILURE',
+      details: { error: error instanceof Error ? error.message : 'Unknown error' },
+    })
     console.error('IR Event DELETE error:', error)
     return addSecurityHeaders(
       NextResponse.json({ success: false, error: 'Failed to delete IR event' }, { status: 500 })

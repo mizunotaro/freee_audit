@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { withAuth, type AuthenticatedRequest } from '@/lib/api'
 import { prisma } from '@/lib/db'
 import { encrypt } from '@/lib/crypto/encryption'
+import { logRouteAudit } from '@/lib/route-audit'
 
 const saveAiConfigSchema = z.object({
   provider: z.enum(['openai', 'gemini', 'claude']),
@@ -100,8 +101,24 @@ async function postHandler(req: AuthenticatedRequest) {
       },
     })
 
+    await logRouteAudit({
+      request: req,
+      userId: req.user.id,
+      action: 'AI_CONFIG_SAVE',
+      resource: 'ai_config',
+      details: { provider },
+    })
+
     return NextResponse.json({ success: true })
   } catch (error) {
+    await logRouteAudit({
+      request: req,
+      userId: req.user.id,
+      action: 'AI_CONFIG_SAVE',
+      resource: 'ai_config',
+      result: 'FAILURE',
+      details: { error: error instanceof Error ? error.message : 'Unknown error' },
+    })
     console.error('Failed to save AI config:', error)
     return NextResponse.json({ error: 'Failed to save configuration' }, { status: 500 })
   }

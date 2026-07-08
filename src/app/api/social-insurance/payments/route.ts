@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { validateSession } from '@/lib/auth'
 import { PaymentChecker } from '@/services/social-insurance'
+import { logRouteAudit } from '@/lib/route-audit'
 
 const paymentsQuerySchema = z.object({
   insuranceType: z.enum(['health', 'pension', 'employment', 'work_accident', 'care']).optional(),
@@ -76,8 +77,23 @@ export async function POST(request: NextRequest) {
       ...parsed.data,
     })
 
+    await logRouteAudit({
+      request,
+      userId: user.id,
+      action: 'SOCIAL_INSURANCE_PAYMENT_CREATE',
+      resource: 'social_insurance_payment',
+      resourceId: payment.id,
+    })
+
     return NextResponse.json(payment, { status: 201 })
   } catch (error) {
+    await logRouteAudit({
+      request,
+      action: 'SOCIAL_INSURANCE_PAYMENT_CREATE',
+      resource: 'social_insurance_payment',
+      result: 'FAILURE',
+      details: { error: error instanceof Error ? error.message : 'Unknown error' },
+    })
     console.error('Error creating social insurance payment:', error)
     return NextResponse.json({ error: 'Failed to create payment' }, { status: 500 })
   }

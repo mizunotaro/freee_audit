@@ -8,6 +8,7 @@ import {
   SENSITIVE_FIELDS,
 } from '@/lib/api/settings-sanitizer'
 import { z } from 'zod'
+import { logRouteAudit } from '@/lib/route-audit'
 
 const ENCRYPTED_FIELDS = [...SENSITIVE_FIELDS]
 
@@ -114,8 +115,23 @@ async function putHandler(req: AuthenticatedRequest) {
 
     const safeSettings = sanitizeSettings(settings)
 
+    await logRouteAudit({
+      request: req,
+      userId: req.user.id,
+      action: 'SETTINGS_UPDATE',
+      resource: 'settings',
+    })
+
     return NextResponse.json({ success: true, settings: safeSettings })
   } catch (error) {
+    await logRouteAudit({
+      request: req,
+      userId: req.user.id,
+      action: 'SETTINGS_UPDATE',
+      resource: 'settings',
+      result: 'FAILURE',
+      details: { error: error instanceof Error ? error.message : 'Unknown error' },
+    })
     console.error('Failed to save settings:', error)
     return NextResponse.json({ error: 'Failed to save settings' }, { status: 500 })
   }

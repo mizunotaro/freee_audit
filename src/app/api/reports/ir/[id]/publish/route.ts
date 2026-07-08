@@ -3,6 +3,7 @@ import { requireAuth, getCompanyId } from '@/lib/api/auth-helpers'
 import { irReportService } from '@/services/reports/ir/ir-report-service'
 import { rateLimit } from '@/lib/security/rate-limit-middleware'
 import type { IRReport } from '@/types/reports/ir-report'
+import { logRouteAudit } from '@/lib/route-audit'
 
 const API_TIMEOUT_MS = 30000
 
@@ -72,6 +73,14 @@ export async function POST(request: NextRequest, { params }: RouteParams): Promi
 
     const updatedReport = await irReportService.getReport(id)
 
+    await logRouteAudit({
+      request,
+      userId: user.id,
+      action: 'IR_REPORT_PUBLISH',
+      resource: 'ir_report',
+      resourceId: id,
+    })
+
     return addSecurityHeaders(
       NextResponse.json({
         success: true,
@@ -80,6 +89,13 @@ export async function POST(request: NextRequest, { params }: RouteParams): Promi
       })
     )
   } catch (error) {
+    await logRouteAudit({
+      request,
+      action: 'IR_REPORT_PUBLISH',
+      resource: 'ir_report',
+      result: 'FAILURE',
+      details: { error: error instanceof Error ? error.message : 'Unknown error' },
+    })
     console.error('IR Report publish error:', error)
     return addSecurityHeaders(
       NextResponse.json({ success: false, error: 'Failed to publish IR report' }, { status: 500 })

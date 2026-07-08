@@ -17,6 +17,7 @@ import { createInternalError, createMissingFieldsError } from '../types/app-erro
 import { withRateLimit } from '../middleware/rate-limit'
 import { withTimeout } from '../middleware/timeout'
 import { addSecurityHeaders } from '../middleware/security-headers'
+import { logRouteAudit } from '@/lib/route-audit'
 
 /**
  * 財務比率分析APIエンドポイント
@@ -132,6 +133,13 @@ async function handlePost(
         cached: true,
         durationMs: Date.now() - startTime,
       })
+      await logRouteAudit({
+        request,
+        userId: user.id,
+        action: 'ANALYSIS_RATIOS',
+        resource: 'analysis',
+        details: { cached: true },
+      })
       return NextResponse.json(
         createSuccessResponse(cachedResult, {
           requestId,
@@ -179,6 +187,13 @@ async function handlePost(
 
     logger.info('Analysis completed', { durationMs: Date.now() - startTime, cached: false })
 
+    await logRouteAudit({
+      request,
+      userId: user.id,
+      action: 'ANALYSIS_RATIOS',
+      resource: 'analysis',
+    })
+
     return NextResponse.json(
       createSuccessResponse(output, {
         requestId,
@@ -187,6 +202,14 @@ async function handlePost(
       })
     )
   } catch (error) {
+    await logRouteAudit({
+      request,
+      userId: user.id,
+      action: 'ANALYSIS_RATIOS',
+      resource: 'analysis',
+      result: 'FAILURE',
+      details: { error: error instanceof Error ? error.message : 'Unknown error' },
+    })
     logger.error('Unexpected error', error instanceof Error ? error : new Error(String(error)))
     const internalError = createInternalError(
       error instanceof Error ? error.message : 'Unknown error',

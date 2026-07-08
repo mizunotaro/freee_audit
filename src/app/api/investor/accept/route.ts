@@ -3,6 +3,7 @@ import { acceptInvitation, validateInvitationToken } from '@/services/investor/i
 import { z } from 'zod'
 import { login } from '@/lib/auth'
 import { withRateLimit } from '@/lib/security'
+import { logRouteAudit } from '@/lib/route-audit'
 
 const acceptSchema = z.object({
   token: z.string().min(1),
@@ -20,6 +21,13 @@ async function postHandler(request: NextRequest) {
     if (!result.success) {
       return NextResponse.json({ success: false, error: result.error }, { status: 400 })
     }
+
+    await logRouteAudit({
+      request,
+      userId: result.userId,
+      action: 'INVESTOR_INVITE_ACCEPT',
+      resource: 'investor_invitation',
+    })
 
     const validation = await validateInvitationToken(token)
     if (!validation.valid || !validation.invitation) {
@@ -58,6 +66,13 @@ async function postHandler(request: NextRequest) {
       )
     }
 
+    await logRouteAudit({
+      request,
+      action: 'INVESTOR_INVITE_ACCEPT',
+      resource: 'investor_invitation',
+      result: 'FAILURE',
+      details: { error: error instanceof Error ? error.message : 'Unknown error' },
+    })
     console.error('Accept invitation error:', error)
     return NextResponse.json({ success: false, error: 'Internal server error' }, { status: 500 })
   }

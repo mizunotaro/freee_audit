@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { validateSession } from '@/lib/auth'
 import { BoardMeetingService } from '@/services/board/board-meeting-service'
+import { logRouteAudit } from '@/lib/route-audit'
 
 async function getAuthUser(request: NextRequest) {
   const token = request.cookies.get('session')?.value
@@ -54,8 +55,24 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
       status,
     })
 
+    await logRouteAudit({
+      request,
+      userId: user.id,
+      action: 'BOARD_MEETING_UPDATE',
+      resource: 'board_meeting',
+      resourceId: params.id,
+    })
+
     return NextResponse.json(meeting)
   } catch (error) {
+    await logRouteAudit({
+      request,
+      action: 'BOARD_MEETING_UPDATE',
+      resource: 'board_meeting',
+      resourceId: params.id,
+      result: 'FAILURE',
+      details: { error: error instanceof Error ? error.message : 'Unknown error' },
+    })
     console.error('Error updating board meeting:', error)
     return NextResponse.json({ error: 'Failed to update board meeting' }, { status: 500 })
   }
@@ -74,8 +91,24 @@ export async function DELETE(request: NextRequest, { params }: { params: { id: s
     }
 
     await BoardMeetingService.deleteBoardMeeting(params.id)
+    await logRouteAudit({
+      request,
+      userId: user.id,
+      action: 'BOARD_MEETING_DELETE',
+      resource: 'board_meeting',
+      resourceId: params.id,
+    })
+
     return NextResponse.json({ success: true })
   } catch (error) {
+    await logRouteAudit({
+      request,
+      action: 'BOARD_MEETING_DELETE',
+      resource: 'board_meeting',
+      resourceId: params.id,
+      result: 'FAILURE',
+      details: { error: error instanceof Error ? error.message : 'Unknown error' },
+    })
     console.error('Error deleting board meeting:', error)
     return NextResponse.json({ error: 'Failed to delete board meeting' }, { status: 500 })
   }

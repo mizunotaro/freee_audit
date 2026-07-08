@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { prisma } from '@/lib/db'
 import { validateSession } from '@/lib/auth'
+import { logRouteAudit } from '@/lib/route-audit'
 
 const listPeersQuerySchema = z.object({
   activeOnly: z.string().optional(),
@@ -143,8 +144,23 @@ export async function POST(request: NextRequest) {
       },
     })
 
+    await logRouteAudit({
+      request,
+      userId: user.id,
+      action: 'PEER_COMPANY_CREATE',
+      resource: 'peer_company',
+      resourceId: peer.id,
+    })
+
     return NextResponse.json({ success: true, data: peer })
   } catch (error) {
+    await logRouteAudit({
+      request,
+      action: 'PEER_COMPANY_CREATE',
+      resource: 'peer_company',
+      result: 'FAILURE',
+      details: { error: error instanceof Error ? error.message : 'Unknown error' },
+    })
     return NextResponse.json(
       { success: false, error: error instanceof Error ? error.message : 'Unknown error' },
       { status: 500 }
