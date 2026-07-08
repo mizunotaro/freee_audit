@@ -6,6 +6,7 @@ import type {
   InfoSourceId,
   InfoSourceConfig,
 } from '../types'
+import { type AppError, type Result, createAppError, ERROR_CODES, failure } from '@/types/result'
 
 export const NTA_CONFIG: InfoSourceConfig = {
   id: 'nta',
@@ -44,7 +45,11 @@ export class NtaInfoSource extends BaseInfoSource {
       )
 
       const latencyMs = Date.now() - startTime
-      this.recordSuccess(latencyMs)
+      if (result.success) {
+        this.recordSuccess(latencyMs)
+      } else {
+        this.recordFailure(result.error?.message ?? 'NTA fetch failed')
+      }
 
       return result
     } catch (error) {
@@ -69,8 +74,23 @@ export class NtaInfoSource extends BaseInfoSource {
   private async executeFetch(query: ExternalInfoQuery): Promise<ExternalInfoResult> {
     const startTime = Date.now()
 
-    const items = await this.scrapeNtaSite(query)
+    const itemsResult = await this.scrapeNtaSite(query)
+    if (!itemsResult.success) {
+      return {
+        success: false,
+        items: [],
+        totalFound: 0,
+        source: this.sourceId,
+        fetchedAt: new Date(),
+        latencyMs: Date.now() - startTime,
+        error: {
+          code: 'nta_fetch_error',
+          message: itemsResult.error.message,
+        },
+      }
+    }
 
+    const items = itemsResult.data
     return {
       success: true,
       items,
@@ -81,13 +101,20 @@ export class NtaInfoSource extends BaseInfoSource {
     }
   }
 
-  private async scrapeNtaSite(query: ExternalInfoQuery): Promise<ExternalInfoItem[]> {
+  private async scrapeNtaSite(
+    query: ExternalInfoQuery
+  ): Promise<Result<ExternalInfoItem[], AppError>> {
     return this.executeWithTimeout(() => this.performScraping(query), this.config.timeoutMs)
   }
 
-  private async performScraping(_query: ExternalInfoQuery): Promise<ExternalInfoItem[]> {
-    throw new Error(
-      'NTA scraping not implemented. Enable mock source for development or implement web_search source.'
+  private async performScraping(
+    _query: ExternalInfoQuery
+  ): Promise<Result<ExternalInfoItem[], AppError>> {
+    return failure(
+      createAppError(
+        ERROR_CODES.BUSINESS_LOGIC_ERROR,
+        'NTA scraping not implemented. Enable mock source for development or implement web_search source.'
+      )
     )
   }
 

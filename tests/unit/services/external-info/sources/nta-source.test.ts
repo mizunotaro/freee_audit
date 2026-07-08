@@ -29,6 +29,22 @@ describe('NtaInfoSource', () => {
     }
   })
 
+  it('preserves not-implemented message and records failure health', async () => {
+    const source = new NtaInfoSource()
+    const result = await source.fetch({ query: '税制改正' })
+
+    expect(result.success).toBe(false)
+    if (!result.success && result.error) {
+      expect(result.error.code).toBe('nta_fetch_error')
+      expect(result.error.message).toContain('NTA scraping not implemented')
+    }
+
+    const health = source.getHealth()
+    expect(health.status).toBe('degraded')
+    expect(health.consecutiveFailures).toBe(1)
+    expect(health.lastError).toContain('NTA scraping not implemented')
+  })
+
   it('uses default config', () => {
     const source = new NtaInfoSource()
     const config = source.getConfig()
