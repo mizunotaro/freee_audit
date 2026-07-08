@@ -4,6 +4,7 @@ import { requireAuth, getCompanyId } from '@/lib/api/auth-helpers'
 import { irReportService } from '@/services/reports/ir/ir-report-service'
 import { rateLimit } from '@/lib/security/rate-limit-middleware'
 import type { IRReport } from '@/types/reports/ir-report'
+import { logRouteAudit } from '@/lib/route-audit'
 
 const API_TIMEOUT_MS = 30000
 
@@ -135,8 +136,23 @@ export async function PUT(request: NextRequest, { params }: RouteParams): Promis
 
     await irReportService.saveReport(updatedReport)
 
+    await logRouteAudit({
+      request,
+      userId: user.id,
+      action: 'IR_REPORT_UPDATE',
+      resource: 'ir_report',
+      resourceId: id,
+    })
+
     return addSecurityHeaders(NextResponse.json({ success: true, data: updatedReport }))
   } catch (error) {
+    await logRouteAudit({
+      request,
+      action: 'IR_REPORT_UPDATE',
+      resource: 'ir_report',
+      result: 'FAILURE',
+      details: { error: error instanceof Error ? error.message : 'Unknown error' },
+    })
     console.error('IR Report PUT error:', error)
     return addSecurityHeaders(
       NextResponse.json({ success: false, error: 'Failed to update IR report' }, { status: 500 })
@@ -175,8 +191,23 @@ export async function DELETE(request: NextRequest, { params }: RouteParams): Pro
 
     await irReportService.deleteReport(id)
 
+    await logRouteAudit({
+      request,
+      userId: user.id,
+      action: 'IR_REPORT_DELETE',
+      resource: 'ir_report',
+      resourceId: id,
+    })
+
     return addSecurityHeaders(NextResponse.json({ success: true }))
   } catch (error) {
+    await logRouteAudit({
+      request,
+      action: 'IR_REPORT_DELETE',
+      resource: 'ir_report',
+      result: 'FAILURE',
+      details: { error: error instanceof Error ? error.message : 'Unknown error' },
+    })
     console.error('IR Report DELETE error:', error)
     return addSecurityHeaders(
       NextResponse.json({ success: false, error: 'Failed to delete IR report' }, { status: 500 })

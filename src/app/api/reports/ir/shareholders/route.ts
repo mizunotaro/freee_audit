@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { requireAuth, getCompanyId } from '@/lib/api/auth-helpers'
 import { rateLimit } from '@/lib/security/rate-limit-middleware'
 import type { ShareholderData } from '@/types/reports/ir-report'
+import { logRouteAudit } from '@/lib/route-audit'
 
 const API_TIMEOUT_MS = 30000
 
@@ -101,10 +102,25 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     shareholders.push(newShareholder)
     saveShareholders(companyId, shareholders)
 
+    await logRouteAudit({
+      request,
+      userId: user.id,
+      action: 'IR_SHAREHOLDER_CREATE',
+      resource: 'ir_shareholder',
+      resourceId: newShareholder.id,
+    })
+
     return addSecurityHeaders(
       NextResponse.json({ success: true, data: newShareholder }, { status: 201 })
     )
   } catch (error) {
+    await logRouteAudit({
+      request,
+      action: 'IR_SHAREHOLDER_CREATE',
+      resource: 'ir_shareholder',
+      result: 'FAILURE',
+      details: { error: error instanceof Error ? error.message : 'Unknown error' },
+    })
     console.error('Shareholders POST error:', error)
     return addSecurityHeaders(
       NextResponse.json({ success: false, error: 'Failed to create shareholder' }, { status: 500 })

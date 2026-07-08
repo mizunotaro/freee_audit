@@ -6,6 +6,7 @@ import type {
   KeidanrenBusinessReport,
   ReportTemplateType,
 } from '@/types/reports/business'
+import { logRouteAudit } from '@/lib/route-audit'
 
 const TIMEOUT_MS = 60000
 
@@ -37,6 +38,13 @@ export async function POST(request: NextRequest) {
 
     if (format === 'html') {
       const html = generateHTML(templateType, data, safeCompanyName, safeFiscalYear)
+      await logRouteAudit({
+        request,
+        userId: user.id,
+        action: 'BUSINESS_REPORT_EXPORT',
+        resource: 'business_report',
+        details: { format },
+      })
       return new NextResponse(html, {
         headers: {
           'Content-Type': 'text/html; charset=utf-8',
@@ -47,6 +55,13 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ error: 'Only HTML format is supported currently' }, { status: 400 })
   } catch (error) {
+    await logRouteAudit({
+      request,
+      action: 'BUSINESS_REPORT_EXPORT',
+      resource: 'business_report',
+      result: 'FAILURE',
+      details: { error: error instanceof Error ? error.message : 'Unknown error' },
+    })
     console.error('Error exporting report:', error)
     return NextResponse.json({ error: 'Failed to export report' }, { status: 500 })
   } finally {

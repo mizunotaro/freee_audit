@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { prisma } from '@/lib/db'
 import { validateSession } from '@/lib/auth'
+import { logRouteAudit } from '@/lib/route-audit'
 
 const updateProviderSchema = z.object({
   enabled: z.boolean().optional(),
@@ -48,6 +49,14 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       },
     })
 
+    await logRouteAudit({
+      request,
+      userId: user.id,
+      action: 'MARKET_DATA_PROVIDER_UPDATE',
+      resource: 'market_data_provider',
+      resourceId: id,
+    })
+
     return NextResponse.json({
       success: true,
       data: {
@@ -58,6 +67,13 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       },
     })
   } catch (error) {
+    await logRouteAudit({
+      request,
+      action: 'MARKET_DATA_PROVIDER_UPDATE',
+      resource: 'market_data_provider',
+      result: 'FAILURE',
+      details: { error: error instanceof Error ? error.message : 'Unknown error' },
+    })
     return NextResponse.json(
       { success: false, error: error instanceof Error ? error.message : 'Unknown error' },
       { status: 500 }
@@ -87,8 +103,23 @@ export async function DELETE(
 
     await prisma.marketDataProvider.delete({ where: { id } })
 
+    await logRouteAudit({
+      request,
+      userId: user.id,
+      action: 'MARKET_DATA_PROVIDER_DELETE',
+      resource: 'market_data_provider',
+      resourceId: id,
+    })
+
     return NextResponse.json({ success: true })
   } catch (error) {
+    await logRouteAudit({
+      request,
+      action: 'MARKET_DATA_PROVIDER_DELETE',
+      resource: 'market_data_provider',
+      result: 'FAILURE',
+      details: { error: error instanceof Error ? error.message : 'Unknown error' },
+    })
     return NextResponse.json(
       { success: false, error: error instanceof Error ? error.message : 'Unknown error' },
       { status: 500 }

@@ -3,6 +3,7 @@ import { getAuthUser } from '@/lib/api/auth-helpers'
 import { buildSectionPrompt } from '@/lib/prompts/business-report/keidanren-prompts'
 import { sanitizeHtml, sanitizePlainText } from '@/lib/utils/html-sanitize'
 import type { ReportTemplateType } from '@/types/reports/business'
+import { logRouteAudit } from '@/lib/route-audit'
 
 const TIMEOUT_MS = 60000
 
@@ -47,9 +48,22 @@ export async function POST(request: NextRequest) {
 
     result.content = sanitizeHtml(result.content)
 
+    await logRouteAudit({
+      request,
+      userId: user.id,
+      action: 'BUSINESS_REPORT_GENERATE',
+      resource: 'business_report',
+    })
     clearTimeout(timeoutId)
     return NextResponse.json(result)
   } catch (error) {
+    await logRouteAudit({
+      request,
+      action: 'BUSINESS_REPORT_GENERATE',
+      resource: 'business_report',
+      result: 'FAILURE',
+      details: { error: error instanceof Error ? error.message : 'Unknown error' },
+    })
     console.error('Error generating content:', error)
     clearTimeout(timeoutId)
     return NextResponse.json({ error: 'Failed to generate content' }, { status: 500 })

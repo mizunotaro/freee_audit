@@ -19,6 +19,7 @@ import {
 } from '@/services/budget/actual-vs-budget'
 import { calculateDetailedActualVsBudget } from '@/services/budget/detailed-actual-vs-budget'
 import type { ProfitLoss } from '@/types'
+import { logRouteAudit } from '@/lib/route-audit'
 
 function generateSamplePL(
   fiscalYear: number,
@@ -156,6 +157,12 @@ export async function POST(request: NextRequest) {
     switch (action) {
       case 'create': {
         const budget = await createBudget({ ...data, companyId: user.companyId })
+        await logRouteAudit({
+          request,
+          userId: user.id,
+          action: 'BUDGET_CREATE',
+          resource: 'budget',
+        })
         return NextResponse.json({ budget })
       }
 
@@ -181,6 +188,12 @@ export async function POST(request: NextRequest) {
           fiscalYear,
           departmentId
         )
+        await logRouteAudit({
+          request,
+          userId: user.id,
+          action: 'BUDGET_IMPORT',
+          resource: 'budget',
+        })
         return NextResponse.json(result)
       }
 
@@ -188,6 +201,13 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'Invalid action' }, { status: 400 })
     }
   } catch (error) {
+    await logRouteAudit({
+      request,
+      action: 'BUDGET_MANAGE',
+      resource: 'budget',
+      result: 'FAILURE',
+      details: { error: error instanceof Error ? error.message : 'Unknown error' },
+    })
     console.error('Budget POST error:', error)
     return NextResponse.json({ error: 'Failed to process budget request' }, { status: 500 })
   }
@@ -208,8 +228,22 @@ export async function DELETE(request: NextRequest) {
     }
 
     await deleteBudget(id)
+    await logRouteAudit({
+      request,
+      userId: user.id,
+      action: 'BUDGET_DELETE',
+      resource: 'budget',
+      resourceId: id,
+    })
     return NextResponse.json({ success: true })
   } catch (error) {
+    await logRouteAudit({
+      request,
+      action: 'BUDGET_DELETE',
+      resource: 'budget',
+      result: 'FAILURE',
+      details: { error: error instanceof Error ? error.message : 'Unknown error' },
+    })
     console.error('Budget DELETE error:', error)
     return NextResponse.json({ error: 'Failed to delete budget' }, { status: 500 })
   }
@@ -235,8 +269,22 @@ export async function PUT(request: NextRequest) {
     if (note !== undefined) updateData.note = note
 
     const budget = await updateBudget(id, updateData)
+    await logRouteAudit({
+      request,
+      userId: user.id,
+      action: 'BUDGET_UPDATE',
+      resource: 'budget',
+      resourceId: id,
+    })
     return NextResponse.json({ budget })
   } catch (error) {
+    await logRouteAudit({
+      request,
+      action: 'BUDGET_UPDATE',
+      resource: 'budget',
+      result: 'FAILURE',
+      details: { error: error instanceof Error ? error.message : 'Unknown error' },
+    })
     console.error('Budget PUT error:', error)
     return NextResponse.json({ error: 'Failed to update budget' }, { status: 500 })
   }

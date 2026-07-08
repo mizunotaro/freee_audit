@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { requireAuth, getCompanyId } from '@/lib/api/auth-helpers'
 import { rateLimit } from '@/lib/security/rate-limit-middleware'
 import type { ShareholderData } from '@/types/reports/ir-report'
+import { logRouteAudit } from '@/lib/route-audit'
 
 const API_TIMEOUT_MS = 30000
 
@@ -82,8 +83,23 @@ export async function PUT(request: NextRequest, { params }: RouteParams): Promis
 
     saveShareholders(companyId, shareholders)
 
+    await logRouteAudit({
+      request,
+      userId: user.id,
+      action: 'IR_SHAREHOLDER_UPDATE',
+      resource: 'ir_shareholder',
+      resourceId: id,
+    })
+
     return addSecurityHeaders(NextResponse.json({ success: true, data: shareholders[index] }))
   } catch (error) {
+    await logRouteAudit({
+      request,
+      action: 'IR_SHAREHOLDER_UPDATE',
+      resource: 'ir_shareholder',
+      result: 'FAILURE',
+      details: { error: error instanceof Error ? error.message : 'Unknown error' },
+    })
     console.error('Shareholder PUT error:', error)
     return addSecurityHeaders(
       NextResponse.json({ success: false, error: 'Failed to update shareholder' }, { status: 500 })
@@ -124,8 +140,23 @@ export async function DELETE(request: NextRequest, { params }: RouteParams): Pro
     shareholders.splice(index, 1)
     saveShareholders(companyId, shareholders)
 
+    await logRouteAudit({
+      request,
+      userId: user.id,
+      action: 'IR_SHAREHOLDER_DELETE',
+      resource: 'ir_shareholder',
+      resourceId: id,
+    })
+
     return addSecurityHeaders(NextResponse.json({ success: true }))
   } catch (error) {
+    await logRouteAudit({
+      request,
+      action: 'IR_SHAREHOLDER_DELETE',
+      resource: 'ir_shareholder',
+      result: 'FAILURE',
+      details: { error: error instanceof Error ? error.message : 'Unknown error' },
+    })
     console.error('Shareholder DELETE error:', error)
     return addSecurityHeaders(
       NextResponse.json({ success: false, error: 'Failed to delete shareholder' }, { status: 500 })

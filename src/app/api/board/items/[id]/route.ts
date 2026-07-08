@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { validateSession } from '@/lib/auth'
 import { prisma } from '@/lib/db'
 import { BoardMeetingService } from '@/services/board/board-meeting-service'
+import { logRouteAudit } from '@/lib/route-audit'
 
 async function getAuthUser(request: NextRequest) {
   const token = request.cookies.get('session')?.value
@@ -53,8 +54,24 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
       resolutionStatus,
     })
 
+    await logRouteAudit({
+      request,
+      userId: user.id,
+      action: 'BOARD_AGENDA_ITEM_UPDATE',
+      resource: 'board_agenda_item',
+      resourceId: params.id,
+    })
+
     return NextResponse.json(item)
   } catch (error) {
+    await logRouteAudit({
+      request,
+      action: 'BOARD_AGENDA_ITEM_UPDATE',
+      resource: 'board_agenda_item',
+      resourceId: params.id,
+      result: 'FAILURE',
+      details: { error: error instanceof Error ? error.message : 'Unknown error' },
+    })
     console.error('Error updating agenda item:', error)
     return NextResponse.json({ error: 'Failed to update agenda item' }, { status: 500 })
   }
@@ -72,8 +89,24 @@ export async function DELETE(request: NextRequest, { params }: { params: { id: s
     }
 
     await BoardMeetingService.deleteAgendaItem(params.id)
+    await logRouteAudit({
+      request,
+      userId: user.id,
+      action: 'BOARD_AGENDA_ITEM_DELETE',
+      resource: 'board_agenda_item',
+      resourceId: params.id,
+    })
+
     return NextResponse.json({ success: true })
   } catch (error) {
+    await logRouteAudit({
+      request,
+      action: 'BOARD_AGENDA_ITEM_DELETE',
+      resource: 'board_agenda_item',
+      resourceId: params.id,
+      result: 'FAILURE',
+      details: { error: error instanceof Error ? error.message : 'Unknown error' },
+    })
     console.error('Error deleting agenda item:', error)
     return NextResponse.json({ error: 'Failed to delete agenda item' }, { status: 500 })
   }

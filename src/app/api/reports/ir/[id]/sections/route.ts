@@ -4,6 +4,7 @@ import { requireAuth, getCompanyId } from '@/lib/api/auth-helpers'
 import { irReportService } from '@/services/reports/ir/ir-report-service'
 import { rateLimit } from '@/lib/security/rate-limit-middleware'
 import type { IRReport, IRReportSection, ReportSectionType } from '@/types/reports/ir-report'
+import { logRouteAudit } from '@/lib/route-audit'
 
 const API_TIMEOUT_MS = 30000
 
@@ -161,8 +162,23 @@ export async function PUT(request: NextRequest, { params }: RouteParams): Promis
 
     await irReportService.saveReport(updatedReport)
 
+    await logRouteAudit({
+      request,
+      userId: user.id,
+      action: 'IR_SECTION_UPDATE',
+      resource: 'ir_report_section',
+      resourceId: id,
+    })
+
     return addSecurityHeaders(NextResponse.json({ success: true, data: sections }))
   } catch (error) {
+    await logRouteAudit({
+      request,
+      action: 'IR_SECTION_UPDATE',
+      resource: 'ir_report_section',
+      result: 'FAILURE',
+      details: { error: error instanceof Error ? error.message : 'Unknown error' },
+    })
     console.error('IR Sections PUT error:', error)
     return addSecurityHeaders(
       NextResponse.json({ success: false, error: 'Failed to update sections' }, { status: 500 })

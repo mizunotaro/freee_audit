@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { prisma } from '@/lib/db'
 import { validateSession } from '@/lib/auth'
+import { logRouteAudit } from '@/lib/route-audit'
 
 const createProviderSchema = z.object({
   provider: z.string().min(1),
@@ -96,6 +97,14 @@ export async function POST(request: NextRequest) {
       },
     })
 
+    await logRouteAudit({
+      request,
+      userId: user.id,
+      action: 'MARKET_DATA_PROVIDER_CREATE',
+      resource: 'market_data_provider',
+      resourceId: providerRecord.id,
+    })
+
     return NextResponse.json({
       success: true,
       data: {
@@ -106,6 +115,13 @@ export async function POST(request: NextRequest) {
       },
     })
   } catch (error) {
+    await logRouteAudit({
+      request,
+      action: 'MARKET_DATA_PROVIDER_CREATE',
+      resource: 'market_data_provider',
+      result: 'FAILURE',
+      details: { error: error instanceof Error ? error.message : 'Unknown error' },
+    })
     return NextResponse.json(
       { success: false, error: error instanceof Error ? error.message : 'Unknown error' },
       { status: 500 }

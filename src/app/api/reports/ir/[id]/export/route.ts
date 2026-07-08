@@ -4,6 +4,7 @@ import { getIRReport } from '@/services/reports/ir-report-service'
 import { exportIRReportToPDF, type PDFExportOptions } from '@/services/reports/ir-pdf-exporter'
 import { exportIRReportToPPTX, type PPTXExportOptions } from '@/services/reports/ir-pptx-exporter'
 import { sanitizePlainText } from '@/lib/utils/html-sanitize'
+import { logRouteAudit } from '@/lib/route-audit'
 
 const EXPORT_TIMEOUT_MS = 60000
 
@@ -109,6 +110,15 @@ export async function POST(
 
         clearTimeout(timeoutId)
 
+        await logRouteAudit({
+          request,
+          userId: user.id,
+          action: 'IR_REPORT_EXPORT',
+          resource: 'ir_report',
+          resourceId: id,
+          details: { format },
+        })
+
         return new NextResponse(bufferToArrayBuffer(result.data.buffer), {
           headers: {
             'Content-Type': 'application/pdf',
@@ -137,6 +147,15 @@ export async function POST(
 
         clearTimeout(timeoutId)
 
+        await logRouteAudit({
+          request,
+          userId: user.id,
+          action: 'IR_REPORT_EXPORT',
+          resource: 'ir_report',
+          resourceId: id,
+          details: { format },
+        })
+
         return new NextResponse(bufferToArrayBuffer(result.data.buffer), {
           headers: {
             'Content-Type':
@@ -156,6 +175,13 @@ export async function POST(
       throw error
     }
   } catch (error) {
+    await logRouteAudit({
+      request,
+      action: 'IR_REPORT_EXPORT',
+      resource: 'ir_report',
+      result: 'FAILURE',
+      details: { error: error instanceof Error ? error.message : 'Unknown error' },
+    })
     console.error('Export API error:', error)
     const message = error instanceof Error ? error.message : 'Unknown error'
     return NextResponse.json({ error: 'Export failed', details: message }, { status: 500 })

@@ -4,6 +4,7 @@ import { requireAuth, getCompanyId } from '@/lib/api/auth-helpers'
 import { irReportService } from '@/services/reports/ir/ir-report-service'
 import { rateLimit } from '@/lib/security/rate-limit-middleware'
 import type { IRReportListFilter } from '@/types/reports/ir-report'
+import { logRouteAudit } from '@/lib/route-audit'
 
 const API_TIMEOUT_MS = 30000
 
@@ -145,8 +146,23 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       createdBy: user.id,
     })
 
+    await logRouteAudit({
+      request,
+      userId: user.id,
+      action: 'IR_REPORT_CREATE',
+      resource: 'ir_report',
+      resourceId: report.id,
+    })
+
     return addSecurityHeaders(NextResponse.json({ success: true, data: report }, { status: 201 }))
   } catch (error) {
+    await logRouteAudit({
+      request,
+      action: 'IR_REPORT_CREATE',
+      resource: 'ir_report',
+      result: 'FAILURE',
+      details: { error: error instanceof Error ? error.message : 'Unknown error' },
+    })
     console.error('IR Reports POST error:', error)
     return addSecurityHeaders(
       NextResponse.json({ success: false, error: 'Failed to create IR report' }, { status: 500 })

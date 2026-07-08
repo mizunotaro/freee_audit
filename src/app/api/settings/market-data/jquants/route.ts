@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { prisma } from '@/lib/db'
 import { validateSession } from '@/lib/auth'
 import { encrypt } from '@/lib/crypto'
+import { logRouteAudit } from '@/lib/route-audit'
 
 const saveJquantsSchema = z.object({
   email: z.string().min(1),
@@ -67,6 +68,14 @@ export async function POST(request: NextRequest) {
       })
     }
 
+    await logRouteAudit({
+      request,
+      userId: user.id,
+      action: 'JQUANTS_CREDENTIALS_SAVE',
+      resource: 'market_data_provider',
+      resourceId: provider.id,
+    })
+
     return NextResponse.json({
       success: true,
       data: {
@@ -76,6 +85,13 @@ export async function POST(request: NextRequest) {
       },
     })
   } catch (error) {
+    await logRouteAudit({
+      request,
+      action: 'JQUANTS_CREDENTIALS_SAVE',
+      resource: 'market_data_provider',
+      result: 'FAILURE',
+      details: { error: error instanceof Error ? error.message : 'Unknown error' },
+    })
     return NextResponse.json(
       { success: false, error: error instanceof Error ? error.message : 'Unknown error' },
       { status: 500 }

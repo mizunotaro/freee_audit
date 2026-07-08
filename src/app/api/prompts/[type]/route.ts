@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { validateSession } from '@/lib/auth'
 import { getPrompt, setPrompt, type AnalysisType } from '@/services/ai/prompt-service'
+import { logRouteAudit } from '@/lib/route-audit'
 
 async function handler(request: NextRequest, { params }: { params: Promise<{ type: string }> }) {
   const token = request.headers.get('authorization')?.replace('Bearer ', '')
@@ -37,8 +38,23 @@ async function handler(request: NextRequest, { params }: { params: Promise<{ typ
         userPromptTemplate: body.userPromptTemplate,
         variables: body.variables,
       })
+      await logRouteAudit({
+        request,
+        userId: user.id,
+        action: 'PROMPT_UPDATE',
+        resource: 'custom_prompt',
+        resourceId: analysisType,
+      })
       return NextResponse.json({ prompt })
     } catch {
+      await logRouteAudit({
+        request,
+        userId: user.id,
+        action: 'PROMPT_UPDATE',
+        resource: 'custom_prompt',
+        resourceId: analysisType,
+        result: 'FAILURE',
+      })
       return NextResponse.json({ error: 'Failed to save prompt' }, { status: 500 })
     }
   }
