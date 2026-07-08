@@ -42,19 +42,25 @@ describe('DefaultCurrencyConverter', () => {
     it('should return same amount for same currency', () => {
       const result = converter.convert(1000, 'JPY', 'JPY', mockRate)
 
-      expect(result.originalAmount).toBe(1000)
-      expect(result.convertedAmount).toBe(1000)
-      expect(result.originalCurrency).toBe('JPY')
-      expect(result.convertedCurrency).toBe('JPY')
+      expect(result.success).toBe(true)
+      if (result.success) {
+        expect(result.data.originalAmount).toBe(1000)
+        expect(result.data.convertedAmount).toBe(1000)
+        expect(result.data.originalCurrency).toBe('JPY')
+        expect(result.data.convertedCurrency).toBe('JPY')
+      }
     })
 
     it('should convert JPY to USD correctly', () => {
       const result = converter.convert(14950, 'JPY', 'USD', mockRate)
 
-      expect(result.originalAmount).toBe(14950)
-      expect(result.originalCurrency).toBe('JPY')
-      expect(result.convertedCurrency).toBe('USD')
-      expect(result.convertedAmount).toBeCloseTo(100, 0)
+      expect(result.success).toBe(true)
+      if (result.success) {
+        expect(result.data.originalAmount).toBe(14950)
+        expect(result.data.originalCurrency).toBe('JPY')
+        expect(result.data.convertedCurrency).toBe('USD')
+        expect(result.data.convertedAmount).toBeCloseTo(100, 0)
+      }
     })
 
     it('should convert USD to JPY correctly', () => {
@@ -74,13 +80,16 @@ describe('DefaultCurrencyConverter', () => {
 
       const result = converter.convert(100, 'USD', 'JPY', usdToJpyRate)
 
-      expect(result.originalAmount).toBe(100)
-      expect(result.originalCurrency).toBe('USD')
-      expect(result.convertedCurrency).toBe('JPY')
-      expect(result.convertedAmount).toBe(14950)
+      expect(result.success).toBe(true)
+      if (result.success) {
+        expect(result.data.originalAmount).toBe(100)
+        expect(result.data.originalCurrency).toBe('USD')
+        expect(result.data.convertedCurrency).toBe('JPY')
+        expect(result.data.convertedAmount).toBe(14950)
+      }
     })
 
-    it('should throw error for incompatible currency pair', () => {
+    it('should return failure for incompatible currency pair', () => {
       const incompatibleRate: ExchangeRate = {
         id: 'rate-3',
         rateDate: new Date('2024-01-15'),
@@ -95,13 +104,22 @@ describe('DefaultCurrencyConverter', () => {
         updatedAt: new Date(),
       }
 
-      expect(() => converter.convert(100, 'JPY', 'USD', incompatibleRate)).toThrow()
+      const result = converter.convert(100, 'JPY', 'USD', incompatibleRate)
+
+      expect(result.success).toBe(false)
+      if (!result.success) {
+        expect(result.error.code).toBe('BUSINESS_LOGIC_ERROR')
+        expect(result.error.message).toBe('Cannot convert from JPY to USD with rate EUR/GBP')
+      }
     })
 
     it('should round converted amount to 2 decimal places', () => {
       const result = converter.convert(10000, 'JPY', 'USD', { ...mockRate, rate: 149.33 })
 
-      expect(result.convertedAmount).toBe(Math.round((10000 / 149.33) * 100) / 100)
+      expect(result.success).toBe(true)
+      if (result.success) {
+        expect(result.data.convertedAmount).toBe(Math.round((10000 / 149.33) * 100) / 100)
+      }
     })
   })
 
@@ -109,8 +127,11 @@ describe('DefaultCurrencyConverter', () => {
     it('should return same amount for same currency without calling rate service', async () => {
       const result = await converter.convertWithLatestRate(1000, 'JPY', 'JPY')
 
-      expect(result.originalAmount).toBe(1000)
-      expect(result.convertedAmount).toBe(1000)
+      expect(result.success).toBe(true)
+      if (result.success) {
+        expect(result.data.originalAmount).toBe(1000)
+        expect(result.data.convertedAmount).toBe(1000)
+      }
       expect(mockRateService.getLatestRate).not.toHaveBeenCalled()
     })
 
@@ -118,13 +139,31 @@ describe('DefaultCurrencyConverter', () => {
       const result = await converter.convertWithLatestRate(14950, 'JPY', 'USD')
 
       expect(mockRateService.getLatestRate).toHaveBeenCalledWith('JPY', 'USD')
-      expect(result.convertedAmount).toBeCloseTo(100, 0)
+      expect(result.success).toBe(true)
+      if (result.success) {
+        expect(result.data.convertedAmount).toBeCloseTo(100, 0)
+      }
     })
 
     it('should include exchange rate in result', async () => {
       const result = await converter.convertWithLatestRate(14950, 'JPY', 'USD')
 
-      expect(result.exchangeRate).toEqual(mockRate)
+      expect(result.success).toBe(true)
+      if (result.success) {
+        expect(result.data.exchangeRate).toEqual(mockRate)
+      }
+    })
+
+    it('should return failure when the rate service rejects', async () => {
+      vi.mocked(mockRateService.getLatestRate).mockRejectedValueOnce(new Error('rate unavailable'))
+
+      const result = await converter.convertWithLatestRate(14950, 'JPY', 'USD')
+
+      expect(result.success).toBe(false)
+      if (!result.success) {
+        expect(result.error.code).toBe('EXTERNAL_SERVICE_ERROR')
+        expect(result.error.message).toBe('rate unavailable')
+      }
     })
   })
 })
@@ -141,13 +180,19 @@ describe('createCurrencyConverter', () => {
 
     const converter = createCurrencyConverter(mockService)
 
-    expect(converter).toBeInstanceOf(DefaultCurrencyConverter)
+    expect(converter.success).toBe(true)
+    if (converter.success) {
+      expect(converter.data).toBeInstanceOf(DefaultCurrencyConverter)
+    }
   })
 
   it('should create converter with default BOJ service when not provided', () => {
     const converter = createCurrencyConverter()
 
-    expect(converter).toBeInstanceOf(DefaultCurrencyConverter)
+    expect(converter.success).toBe(true)
+    if (converter.success) {
+      expect(converter.data).toBeInstanceOf(DefaultCurrencyConverter)
+    }
   })
 })
 

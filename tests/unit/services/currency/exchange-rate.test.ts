@@ -129,17 +129,26 @@ describe('BOJExchangeRateService', () => {
 describe('createExchangeRateService', () => {
   it('should create BOJ service by default', () => {
     const service = createExchangeRateService()
-    expect(service).toBeInstanceOf(BOJExchangeRateService)
+    expect(service.success).toBe(true)
+    if (service.success) {
+      expect(service.data).toBeInstanceOf(BOJExchangeRateService)
+    }
   })
 
   it('should create BOJ service when specified', () => {
     const service = createExchangeRateService('BOJ')
-    expect(service).toBeInstanceOf(BOJExchangeRateService)
+    expect(service.success).toBe(true)
+    if (service.success) {
+      expect(service.data).toBeInstanceOf(BOJExchangeRateService)
+    }
   })
 
-  it('should throw error for ECB service (not implemented)', () => {
-    expect(() => createExchangeRateService('ECB')).toThrow(
-      'ECB exchange rate service not implemented'
-    )
+  it('should return failure for ECB service (not implemented)', () => {
+    const service = createExchangeRateService('ECB')
+    expect(service.success).toBe(false)
+    if (!service.success) {
+      expect(service.error.code).toBe('BUSINESS_LOGIC_ERROR')
+      expect(service.error.message).toBe('ECB exchange rate service not implemented')
+    }
   })
 })

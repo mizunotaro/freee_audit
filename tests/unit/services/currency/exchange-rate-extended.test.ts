@@ -77,15 +77,22 @@ describe('BOJExchangeRateService (extended)', () => {
 
 describe('createExchangeRateService (extended)', () => {
   it.each(['MURC', 'OPEN_EXCHANGE', 'MANUAL'] as ExchangeRateSource[])(
-    'throws for unsupported source %s',
+    'returns failure for unsupported source %s',
     (source) => {
-      expect(() => createExchangeRateService(source)).toThrow(
-        `${source} exchange rate service not implemented`
-      )
+      const service = createExchangeRateService(source)
+      expect(service.success).toBe(false)
+      if (!service.success) {
+        expect(service.error.code).toBe('BUSINESS_LOGIC_ERROR')
+        expect(service.error.message).toBe(`${source} exchange rate service not implemented`)
+      }
     }
   )
 
   it('returns a BOJ service for the explicit BOJ source', () => {
-    expect(createExchangeRateService('BOJ')).toBeInstanceOf(BOJExchangeRateService)
+    const service = createExchangeRateService('BOJ')
+    expect(service.success).toBe(true)
+    if (service.success) {
+      expect(service.data).toBeInstanceOf(BOJExchangeRateService)
+    }
   })
 })

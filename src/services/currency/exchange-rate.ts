@@ -6,6 +6,14 @@ import {
   CurrencyCode,
 } from './types'
 import { exchangeRateCache } from '@/lib/cache'
+import {
+  type AppError,
+  type Result,
+  createAppError,
+  ERROR_CODES,
+  failure,
+  success,
+} from '@/types/result'
 
 export class BOJExchangeRateService implements ExchangeRateService {
   private baseUrl = 'https://www.boj.or.jp/statistics'
@@ -134,16 +142,23 @@ export class BOJExchangeRateService implements ExchangeRateService {
   }
 }
 
-export function createExchangeRateService(source: ExchangeRateSource = 'BOJ'): ExchangeRateService {
+export function createExchangeRateService(
+  source: ExchangeRateSource = 'BOJ'
+): Result<ExchangeRateService, AppError> {
   switch (source) {
     case 'BOJ':
-      return new BOJExchangeRateService()
+      return success(new BOJExchangeRateService())
     case 'ECB':
     case 'MURC':
     case 'OPEN_EXCHANGE':
     case 'MANUAL':
-      throw new Error(`${source} exchange rate service not implemented`)
+      return failure(
+        createAppError(
+          ERROR_CODES.BUSINESS_LOGIC_ERROR,
+          `${source} exchange rate service not implemented`
+        )
+      )
     default:
-      return new BOJExchangeRateService()
+      return success(new BOJExchangeRateService())
   }
 }

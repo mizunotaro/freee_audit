@@ -8,19 +8,32 @@ import {
 } from './types'
 import { createExchangeRateService } from './exchange-rate'
 import { addMonths } from 'date-fns'
+import {
+  type AppError,
+  type Result,
+  createAppError,
+  ERROR_CODES,
+  failure,
+  success,
+} from '@/types/result'
 
 export class DefaultCurrencyConverter implements CurrencyConverter {
   constructor(private rateService: ExchangeRateService) {}
 
-  convert(amount: number, from: Currency, to: Currency, rate: ExchangeRate): CurrencyConversion {
+  convert(
+    amount: number,
+    from: Currency,
+    to: Currency,
+    rate: ExchangeRate
+  ): Result<CurrencyConversion, AppError> {
     if (from === to) {
-      return {
+      return success({
         originalAmount: amount,
         originalCurrency: from,
         convertedAmount: amount,
         convertedCurrency: to,
         exchangeRate: rate,
-      }
+      })
     }
 
     let convertedAmount: number
@@ -30,28 +43,39 @@ export class DefaultCurrencyConverter implements CurrencyConverter {
     } else if (from === rate.toCurrency && to === rate.fromCurrency) {
       convertedAmount = amount * rate.rate
     } else {
-      throw new Error(
-        `Cannot convert from ${from} to ${to} with rate ${rate.fromCurrency}/${rate.toCurrency}`
+      return failure(
+        createAppError(
+          ERROR_CODES.BUSINESS_LOGIC_ERROR,
+          `Cannot convert from ${from} to ${to} with rate ${rate.fromCurrency}/${rate.toCurrency}`,
+          {
+            details: {
+              from,
+              to,
+              rateFrom: rate.fromCurrency,
+              rateTo: rate.toCurrency,
+            },
+          }
+        )
       )
     }
 
-    return {
+    return success({
       originalAmount: amount,
       originalCurrency: from,
       convertedAmount: Math.round(convertedAmount * 100) / 100,
       convertedCurrency: to,
       exchangeRate: rate,
-    }
+    })
   }
 
   async convertWithLatestRate(
     amount: number,
     from: Currency,
     to: Currency
-  ): Promise<CurrencyConversion> {
+  ): Promise<Result<CurrencyConversion, AppError>> {
     if (from === to) {
       const now = new Date()
-      return {
+      return success({
         originalAmount: amount,
         originalCurrency: from,
         convertedAmount: amount,
@@ -69,17 +93,33 @@ export class DefaultCurrencyConverter implements CurrencyConverter {
           createdAt: now,
           updatedAt: now,
         },
-      }
+      })
     }
 
-    const rate = await this.rateService.getLatestRate(from, to)
-    return this.convert(amount, from, to, rate)
+    try {
+      const rate = await this.rateService.getLatestRate(from, to)
+      return this.convert(amount, from, to, rate)
+    } catch (error) {
+      const cause = error instanceof Error ? error : new Error(String(error))
+      return failure(createAppError(ERROR_CODES.EXTERNAL_SERVICE_ERROR, cause.message, { cause }))
+    }
   }
 }
 
-export function createCurrencyConverter(service?: ExchangeRateService): CurrencyConverter {
-  const rateService = service || createExchangeRateService('BOJ')
-  return new DefaultCurrencyConverter(rateService)
+export function createCurrencyConverter(
+  service?: ExchangeRateService
+): Result<CurrencyConverter, AppError> {
+  let rateService: ExchangeRateService
+  if (service) {
+    rateService = service
+  } else {
+    const result = createExchangeRateService('BOJ')
+    if (!result.success) {
+      return failure(result.error)
+    }
+    rateService = result.data
+  }
+  return success(new DefaultCurrencyConverter(rateService))
 }
 
 export function calculateRunway(
