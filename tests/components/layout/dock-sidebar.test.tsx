@@ -99,4 +99,21 @@ describe('DockSidebar expansion', () => {
     })
     expect(screen.getByText('F')).toBeInTheDocument()
   })
+
+  it('cancels the pending collapse timer when re-entered before it fires', () => {
+    render(<DockSidebar user={user('ADMIN')} locale="ja" />)
+
+    const aside = document.querySelector('aside') as HTMLElement
+
+    fireEvent.mouseEnter(aside) // expand
+    fireEvent.mouseLeave(aside) // schedule collapse in 1000ms
+    fireEvent.mouseEnter(aside) // re-enter before the timer fires → cancel it
+
+    act(() => {
+      vi.advanceTimersByTime(1000)
+    })
+
+    // timer was cancelled, so the sidebar stays expanded (compact "F" hidden)
+    expect(screen.queryByText('F')).toBeNull()
+  })
 })

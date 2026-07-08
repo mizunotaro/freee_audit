@@ -67,4 +67,12 @@ describe('Sidebar', () => {
 
     expect(screen.getByText('journalProposal')).toBeInTheDocument()
   })
+
+  it('highlights the entry whose href is a pathname prefix', () => {
+    pathnameMock.mockReturnValue('/ja/dashboard')
+    render(<Sidebar user={user('ADMIN')} locale="ja" />)
+
+    expect(screen.getByRole('link', { name: 'dashboard' })).toHaveClass('bg-primary')
+    expect(screen.getByRole('link', { name: 'settings' })).not.toHaveClass('bg-primary')
+  })
 })
