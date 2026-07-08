@@ -122,7 +122,7 @@ export class JQuantsProvider extends BaseMarketDataProvider {
       const url = `${JQUANTS_API_BASE}/fins/statements?code=${ticker}`
       const response = await this.fetchWithAuth<{ statements: JQuantsFinancial[] }>(url)
 
-      const financials = (response.statements ?? []).map(this.mapFinancial)
+      const financials = (response.statements ?? []).map((s) => this.mapFinancial(s))
 
       return { success: true, data: financials }
     } catch (error) {
