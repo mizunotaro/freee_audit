@@ -70,6 +70,18 @@ export interface PeriodicSummary {
   trendAnalysis: string
 }
 
+/**
+ * Generates a periodic report covering the trailing 3, 6, or 12 months (optionally
+ * including prior-year comparison periods), each with BS/PL/CF/KPI summaries and an
+ * overall trend analysis.
+ *
+ * Reads MonthlyBalance rows from the DB and falls back to randomized sample data when
+ * a period has no recorded balances.
+ *
+ * @param config - Period window, fiscal-year-end month, and prior-year toggle.
+ * @returns PeriodicReportData with per-period data and a PeriodicSummary.
+ * @throws Rejected on unexpected DB errors.
+ */
 export async function generatePeriodicReport(
   config: PeriodicReportConfig
 ): Promise<PeriodicReportData> {
@@ -479,6 +491,13 @@ function generateSamplePeriodData(period: {
   }
 }
 
+/**
+ * Renders a PeriodicReportData as a 2D string grid (rows of cells) for spreadsheet
+ * or CSV export, with one column per period.
+ *
+ * @param data - Generated periodic report.
+ * @returns Array of rows, each an array of cell strings.
+ */
 export function formatPeriodicReportForExport(data: PeriodicReportData): string[][] {
   const rows: string[][] = []
 

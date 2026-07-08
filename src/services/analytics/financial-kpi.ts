@@ -21,6 +21,10 @@ export interface IndustryBenchmark {
   inventoryTurnover: { min: number; median: number; max: number }
 }
 
+/**
+ * Industry benchmark ranges (min/median/max) keyed by sector, used to position a
+ * company's metrics against typical peers. Keys correspond to {@link IndustrySector}.
+ */
 export const INDUSTRY_BENCHMARKS: Record<IndustrySector, IndustryBenchmark> = {
   manufacturing: {
     sector: 'manufacturing',
@@ -139,6 +143,21 @@ export interface ExtendedFinancialKPIs extends FinancialKPIs {
   advice: KPIAdvice[]
 }
 
+/**
+ * Calculates the core financial KPIs (profitability, efficiency, safety, growth,
+ * cash flow) plus a benchmark comparison against the company's sector.
+ *
+ * Results are memoized in an in-process cache keyed by a hash of the inputs, so
+ * repeated calls with the same arguments return the cached object.
+ *
+ * @param bs - Balance sheet.
+ * @param pl - Profit & loss statement.
+ * @param cf - Cash flow statement.
+ * @param previousPL - Prior-period P&L for growth metrics; growth is 0 when omitted.
+ * @param options - Accounting standard (defaults to JGAAP), sector (defaults to
+ *   'other'), and company size; omitted fields fall back to defaults.
+ * @returns The assembled FinancialKPIs.
+ */
 export function calculateFinancialKPIs(
   bs: BalanceSheet,
   pl: ProfitLoss,
@@ -192,6 +211,20 @@ function generateKPIHash(
   })
 }
 
+/**
+ * Calculates the extended KPI set: core {@link FinancialKPIs} plus startup (burn
+ * rate, runway, CAC/LTV), VC (Rule of 40, growth, NRR), and bank (DSCR, interest
+ * coverage) metrics, together with generated advisory items.
+ *
+ * @param bs - Balance sheet.
+ * @param pl - Profit & loss statement.
+ * @param cf - Cash flow statement.
+ * @param previousPL - Prior-period P&L for growth metrics.
+ * @param options - Optional operational inputs (marketing spend, customer counts,
+ *   interest expense, principal payments, valuation, etc.); each derived metric
+ *   degrades gracefully to `null`/default when its inputs are absent.
+ * @returns ExtendedFinancialKPIs combining base, startup, VC, bank, and advice.
+ */
 export function calculateExtendedKPIs(
   bs: BalanceSheet,
   pl: ProfitLoss,
@@ -747,6 +780,14 @@ export interface KPIBenchmark {
   description: string
 }
 
+/**
+ * Maps a FinancialKPIs result into a flat list of benchmark evaluations (value,
+ * target, and good/warning/bad status) for dashboard display.
+ *
+ * @param kpis - Previously computed financial KPIs.
+ * @returns KPIBenchmark entries for ROE, ROA, current ratio, D/E ratio, equity
+ *   ratio, gross margin, operating margin, and EBITDA margin.
+ */
 export function getKPIBenchmarks(kpis: FinancialKPIs): KPIBenchmark[] {
   return [
     {

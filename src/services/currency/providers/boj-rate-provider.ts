@@ -10,11 +10,22 @@ interface BOJRateData {
   rate: number
 }
 
+/**
+ * ExchangeRateProvider that fetches BOJ foreign-exchange CSV rates, persists them
+ * (upserting by date/currency), and records each fetch in an audit log.
+ */
 export class BOJRateProvider implements ExchangeRateProvider {
   readonly source: ExchangeRateSource = 'BOJ'
   readonly priority = 1
   readonly confidence = 1.0
 
+  /**
+   * Fetches, parses, persists, and logs BOJ rates for a date.
+   *
+   * @param date - Target date (used to build the monthly CSV URL).
+   * @returns success with the saved ExchangeRate array, or failure with an Error if
+   *   the fetch, parse, or persistence fails or yields no rates.
+   */
   async fetchRates(date: Date): Promise<Result<ExchangeRate[], Error>> {
     const startTime = Date.now()
 
@@ -47,6 +58,11 @@ export class BOJRateProvider implements ExchangeRateProvider {
     }
   }
 
+  /**
+   * Probes BOJ reachability with a HEAD request.
+   *
+   * @returns True if the BOJ host responds OK; false on network error or non-OK status.
+   */
   async isAvailable(): Promise<boolean> {
     try {
       const response = await fetch(BOJ_BASE_URL, {
@@ -153,6 +169,11 @@ export class BOJRateProvider implements ExchangeRateProvider {
   }
 }
 
+/**
+ * Creates a new BOJRateProvider instance.
+ *
+ * @returns A configured BOJRateProvider.
+ */
 export function createBOJRateProvider(): BOJRateProvider {
   return new BOJRateProvider()
 }

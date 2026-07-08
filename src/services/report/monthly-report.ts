@@ -32,6 +32,17 @@ export interface MonthlyReportInput {
   month: number
 }
 
+/**
+ * Generates a consolidated monthly report (balance sheet, P&L, cash flow, KPIs,
+ * budget variance, and runway) for a company and month.
+ *
+ * Reads MonthlyBalance rows from the DB and falls back to sample data when a period
+ * has no recorded balances.
+ *
+ * @param input - Company id, fiscal year, and month.
+ * @returns success with the MonthlyReport, or failure with NOT_FOUND when the company
+ *   does not exist. Rejects on unexpected DB errors.
+ */
 export async function generateMonthlyReport(
   input: MonthlyReportInput
 ): Promise<Result<MonthlyReport, AppError>> {
@@ -411,6 +422,14 @@ function generateSampleProfitLoss(fiscalYear: number, month: number): ProfitLoss
   }
 }
 
+/**
+ * Builds a 12-month (months 1-12) trend of revenue, profit, and cash.
+ *
+ * @param companyId - Company id.
+ * @param fiscalYear - Fiscal year.
+ * @returns MonthlyTrend entries for months 1-12.
+ * @throws Rejected on unexpected DB errors during balance lookups.
+ */
 export async function getMonthlyTrend(
   companyId: string,
   fiscalYear: number
@@ -434,6 +453,12 @@ export async function getMonthlyTrend(
   return trends
 }
 
+/**
+ * Renders a MonthlyReport as a plain-text export (BS, PL, KPIs, runway).
+ *
+ * @param report - Generated monthly report.
+ * @returns Multi-line text representation suitable for export.
+ */
 export function formatReportForExport(report: MonthlyReport): string {
   const lines: string[] = []
 
@@ -475,6 +500,17 @@ export function formatReportForExport(report: MonthlyReport): string {
   return lines.join('\n')
 }
 
+/**
+ * Generates a multi-month comparative report (3, 6, or 12 months ending at `endMonth`)
+ * with BS/PL/CF/KPI sections aligned across periods.
+ *
+ * @param companyId - Company id.
+ * @param fiscalYear - Fiscal year.
+ * @param endMonth - Final month of the window (1-12).
+ * @param monthCount - Window length: 3, 6, or 12.
+ * @returns success with the MultiMonthReport, or failure with NOT_FOUND when the
+ *   company does not exist. Rejects on unexpected DB errors.
+ */
 export async function getMultiMonthReport(
   companyId: string,
   fiscalYear: number,

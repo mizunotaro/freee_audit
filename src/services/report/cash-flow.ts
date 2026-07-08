@@ -16,6 +16,13 @@ export interface CashFlowInputs {
   beginningCash: number
 }
 
+/**
+ * Calculates net operating cash flow by adjusting net income for non-cash items
+ * (depreciation, amortization) and working-capital changes.
+ *
+ * @param inputs - Cash flow input components.
+ * @returns Net cash from operating activities.
+ */
 export function calculateOperatingCF(inputs: CashFlowInputs): number {
   let cf = inputs.netIncome
 
@@ -29,14 +36,33 @@ export function calculateOperatingCF(inputs: CashFlowInputs): number {
   return cf
 }
 
+/**
+ * Calculates net investing cash flow (fixed-asset sale proceeds less purchases).
+ *
+ * @param inputs - Cash flow input components.
+ * @returns Net cash from investing activities.
+ */
 export function calculateInvestingCF(inputs: CashFlowInputs): number {
   return -inputs.fixedAssetPurchases + inputs.fixedAssetSales
 }
 
+/**
+ * Calculates net financing cash flow (borrowing proceeds less repayments and dividends).
+ *
+ * @param inputs - Cash flow input components.
+ * @returns Net cash from financing activities.
+ */
 export function calculateFinancingCF(inputs: CashFlowInputs): number {
   return inputs.borrowingProceeds - inputs.borrowingRepayments - inputs.dividendsPaid
 }
 
+/**
+ * Builds a full indirect-method cash flow statement from operating/investing/financing
+ * components, including categorized line items and beginning/ending cash.
+ *
+ * @param inputs - Cash flow input components.
+ * @returns CashFlowStatement with line items and the net change in cash.
+ */
 export function calculateCashFlowStatement(inputs: CashFlowInputs): CashFlowStatement {
   const operatingCash = calculateOperatingCF(inputs)
   const investingCash = calculateInvestingCF(inputs)
@@ -79,14 +105,38 @@ export function calculateCashFlowStatement(inputs: CashFlowInputs): CashFlowStat
   }
 }
 
+/**
+ * Calculates gross profit (revenue less cost of sales).
+ *
+ * @param revenue - Total revenue.
+ * @param costOfSales - Cost of sales.
+ * @returns Gross profit.
+ */
 export function calculateGrossProfit(revenue: number, costOfSales: number): number {
   return revenue - costOfSales
 }
 
+/**
+ * Calculates operating income (gross profit less operating expenses).
+ *
+ * @param grossProfit - Gross profit.
+ * @param operatingExpenses - Selling, general & administrative expenses.
+ * @returns Operating income.
+ */
 export function calculateOperatingIncome(grossProfit: number, operatingExpenses: number): number {
   return grossProfit - operatingExpenses
 }
 
+/**
+ * Calculates net income: operating income plus non-operating income, less
+ * non-operating expenses and income tax.
+ *
+ * @param operatingIncome - Operating income.
+ * @param nonOperatingIncome - Non-operating income.
+ * @param nonOperatingExpenses - Non-operating expenses.
+ * @param incomeTax - Income tax expense.
+ * @returns Net income.
+ */
 export function calculateNetIncome(
   operatingIncome: number,
   nonOperatingIncome: number,
@@ -96,6 +146,13 @@ export function calculateNetIncome(
   return operatingIncome + nonOperatingIncome - nonOperatingExpenses - incomeTax
 }
 
+/**
+ * Sums ProfitLossItem amounts grouped by their `category` (items without a category
+ * fall under 'default').
+ *
+ * @param items - Profit & loss line items.
+ * @returns Map of category to total amount.
+ */
 export function aggregateByCategory(items: ProfitLossItem[]): Map<string, number> {
   const result = new Map<string, number>()
 
@@ -108,11 +165,27 @@ export function aggregateByCategory(items: ProfitLossItem[]): Map<string, number
   return result
 }
 
+/**
+ * Calculates year-over-year growth as a percentage. Returns 100 when the previous
+ * value is 0 and the current is positive, otherwise 0 when the previous value is 0.
+ *
+ * @param currentValue - Current-period value.
+ * @param previousValue - Prior-period value.
+ * @returns Growth rate in percent.
+ */
 export function calculateYoYGrowth(currentValue: number, previousValue: number): number {
   if (previousValue === 0) return currentValue > 0 ? 100 : 0
   return ((currentValue - previousValue) / Math.abs(previousValue)) * 100
 }
 
+/**
+ * Calculates month-over-month growth as a percentage. Returns 100 when the previous
+ * value is 0 and the current is positive, otherwise 0 when the previous value is 0.
+ *
+ * @param currentValue - Current-period value.
+ * @param previousValue - Prior-period value.
+ * @returns Growth rate in percent.
+ */
 export function calculateMoMGrowth(currentValue: number, previousValue: number): number {
   if (previousValue === 0) return currentValue > 0 ? 100 : 0
   return ((currentValue - previousValue) / Math.abs(previousValue)) * 100

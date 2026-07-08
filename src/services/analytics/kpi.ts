@@ -1,5 +1,12 @@
 import type { KPIResult, RunwayCalculation, BalanceSheet, ProfitLoss } from '@/types'
 
+/**
+ * Calculates Return on Equity (ROE): net income as a percentage of equity.
+ *
+ * @param netIncome - Net income for the period.
+ * @param equity - Total shareholders' equity.
+ * @returns KPIResult holding ROE in percent; `0` when equity is zero.
+ */
 export function calculateROE(netIncome: number, equity: number): KPIResult {
   const value = equity > 0 ? (netIncome / equity) * 100 : 0
 
@@ -12,6 +19,13 @@ export function calculateROE(netIncome: number, equity: number): KPIResult {
   }
 }
 
+/**
+ * Calculates Return on Assets (ROA): net income as a percentage of total assets.
+ *
+ * @param netIncome - Net income for the period.
+ * @param totalAssets - Total assets.
+ * @returns KPIResult holding ROA in percent; `0` when total assets is zero.
+ */
 export function calculateROA(netIncome: number, totalAssets: number): KPIResult {
   const value = totalAssets > 0 ? (netIncome / totalAssets) * 100 : 0
 
@@ -24,6 +38,13 @@ export function calculateROA(netIncome: number, totalAssets: number): KPIResult 
   }
 }
 
+/**
+ * Calculates Return on Sales (ROS): operating income as a percentage of revenue.
+ *
+ * @param operatingIncome - Operating income.
+ * @param revenue - Total revenue.
+ * @returns KPIResult holding ROS in percent; `0` when revenue is zero.
+ */
 export function calculateROS(operatingIncome: number, revenue: number): KPIResult {
   const value = revenue > 0 ? (operatingIncome / revenue) * 100 : 0
 
@@ -36,6 +57,13 @@ export function calculateROS(operatingIncome: number, revenue: number): KPIResul
   }
 }
 
+/**
+ * Calculates gross profit margin: gross profit as a percentage of revenue.
+ *
+ * @param grossProfit - Gross profit.
+ * @param revenue - Total revenue.
+ * @returns KPIResult holding the margin in percent; `0` when revenue is zero.
+ */
 export function calculateGrossMargin(grossProfit: number, revenue: number): KPIResult {
   const value = revenue > 0 ? (grossProfit / revenue) * 100 : 0
 
@@ -48,6 +76,13 @@ export function calculateGrossMargin(grossProfit: number, revenue: number): KPIR
   }
 }
 
+/**
+ * Calculates operating margin: operating income as a percentage of revenue.
+ *
+ * @param operatingIncome - Operating income.
+ * @param revenue - Total revenue.
+ * @returns KPIResult holding the margin in percent; `0` when revenue is zero.
+ */
 export function calculateOperatingMargin(operatingIncome: number, revenue: number): KPIResult {
   const value = revenue > 0 ? (operatingIncome / revenue) * 100 : 0
 
@@ -60,6 +95,14 @@ export function calculateOperatingMargin(operatingIncome: number, revenue: numbe
   }
 }
 
+/**
+ * Calculates EBITDA by adding depreciation and amortization back to operating income.
+ *
+ * @param operatingIncome - Operating income.
+ * @param depreciation - Depreciation expense.
+ * @param amortization - Amortization expense (e.g. goodwill).
+ * @returns EBITDA as a raw currency amount.
+ */
 export function calculateEBITDA(
   operatingIncome: number,
   depreciation: number,
@@ -68,6 +111,13 @@ export function calculateEBITDA(
   return operatingIncome + depreciation + amortization
 }
 
+/**
+ * Calculates EBITDA margin: EBITDA as a percentage of revenue.
+ *
+ * @param ebitda - EBITDA (see {@link calculateEBITDA}).
+ * @param revenue - Total revenue.
+ * @returns KPIResult holding the margin in percent; `0` when revenue is zero.
+ */
 export function calculateEBITDAMargin(ebitda: number, revenue: number): KPIResult {
   const value = revenue > 0 ? (ebitda / revenue) * 100 : 0
 
@@ -80,6 +130,13 @@ export function calculateEBITDAMargin(ebitda: number, revenue: number): KPIResul
   }
 }
 
+/**
+ * Calculates current ratio: current assets as a percentage of current liabilities.
+ *
+ * @param currentAssets - Total current assets.
+ * @param currentLiabilities - Total current liabilities.
+ * @returns KPIResult holding the ratio in percent; `0` when current liabilities is zero.
+ */
 export function calculateCurrentRatio(
   currentAssets: number,
   currentLiabilities: number
@@ -95,6 +152,15 @@ export function calculateCurrentRatio(
   }
 }
 
+/**
+ * Calculates quick (acid-test) ratio: current assets less inventory, as a percentage
+ * of current liabilities.
+ *
+ * @param currentAssets - Total current assets.
+ * @param inventory - Inventory included in current assets.
+ * @param currentLiabilities - Total current liabilities.
+ * @returns KPIResult holding the ratio in percent; `0` when current liabilities is zero.
+ */
 export function calculateQuickRatio(
   currentAssets: number,
   inventory: number,
@@ -112,6 +178,13 @@ export function calculateQuickRatio(
   }
 }
 
+/**
+ * Calculates debt-to-equity (D/E) ratio: total liabilities divided by equity.
+ *
+ * @param totalLiabilities - Total liabilities.
+ * @param equity - Total shareholders' equity.
+ * @returns KPIResult holding the unitless ratio; `0` when equity is zero.
+ */
 export function calculateDERatio(totalLiabilities: number, equity: number): KPIResult {
   const value = equity > 0 ? totalLiabilities / equity : 0
 
@@ -124,6 +197,13 @@ export function calculateDERatio(totalLiabilities: number, equity: number): KPIR
   }
 }
 
+/**
+ * Calculates equity ratio: equity as a percentage of total assets.
+ *
+ * @param equity - Total shareholders' equity.
+ * @param totalAssets - Total assets.
+ * @returns KPIResult holding the ratio in percent; `0` when total assets is zero.
+ */
 export function calculateEquityRatio(equity: number, totalAssets: number): KPIResult {
   const value = totalAssets > 0 ? (equity / totalAssets) * 100 : 0
 
@@ -136,6 +216,17 @@ export function calculateEquityRatio(equity: number, totalAssets: number): KPIRe
   }
 }
 
+/**
+ * Calculates cash runway: how many months the current cash balance lasts given the
+ * net burn rate (monthly expenses minus monthly revenue).
+ *
+ * @param currentCash - Cash balance at the start.
+ * @param averageMonthlyRevenue - Average monthly revenue.
+ * @param averageMonthlyExpenses - Average monthly expenses.
+ * @returns RunwayCalculation with burn rate, runway months, projected zero-cash date,
+ *   and optimistic/realistic/pessimistic scenarios. `runwayMonths` is `Infinity` when
+ *   the business is not burning cash.
+ */
 export function calculateRunway(
   currentCash: number,
   averageMonthlyRevenue: number,
@@ -168,6 +259,12 @@ export function calculateRunway(
   }
 }
 
+/**
+ * Wraps a RunwayCalculation into a displayable KPIResult.
+ *
+ * @param runway - Precomputed runway (see {@link calculateRunway}).
+ * @returns KPIResult expressed in months; capped at 999 when runway is infinite.
+ */
 export function calculateRunwayKPI(runway: RunwayCalculation): KPIResult {
   return {
     name: 'Runway',
@@ -178,6 +275,18 @@ export function calculateRunwayKPI(runway: RunwayCalculation): KPIResult {
   }
 }
 
+/**
+ * Computes the standard set of financial KPIs from a balance sheet and P&L.
+ *
+ * Inventory is detected from current-asset items whose names contain "棚卸" or "在庫".
+ *
+ * @param bs - Balance sheet.
+ * @param pl - Profit & loss statement.
+ * @param depreciation - Depreciation expense (defaults to 0).
+ * @param amortization - Amortization expense (defaults to 0).
+ * @returns KPIResult entries: ROE, ROA, ROS, gross/operating margin, EBITDA margin,
+ *   current ratio, quick ratio, D/E ratio, and equity ratio.
+ */
 export function calculateAllKPIs(
   bs: BalanceSheet,
   pl: ProfitLoss,
