@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import {
   ExportFormat,
   ExportOptions,
@@ -66,6 +66,15 @@ export function ExportModal({ isOpen, onClose, onExport }: ExportModalProps) {
     setOptions((prev) => ({ ...prev, [key]: value }))
   }
 
+  useEffect(() => {
+    if (!isOpen) return
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose()
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [isOpen, onClose])
+
   if (!isOpen) return null
 
   return (
@@ -73,11 +82,29 @@ export function ExportModal({ isOpen, onClose, onExport }: ExportModalProps) {
       <div className="flex min-h-screen items-center justify-center p-4">
         <div className="fixed inset-0 bg-black bg-opacity-50" onClick={onClose} />
 
-        <div className="relative w-full max-w-md rounded-lg bg-white shadow-xl">
+        <div
+          className="relative w-full max-w-md rounded-lg bg-white shadow-xl"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="export-modal-title"
+        >
           <div className="flex items-center justify-between border-b p-4">
-            <h2 className="text-lg font-semibold">エクスポート設定</h2>
-            <button type="button" onClick={onClose} className="text-gray-400 hover:text-gray-600">
-              <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <h2 id="export-modal-title" className="text-lg font-semibold">
+              エクスポート設定
+            </h2>
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="閉じる"
+              className="text-gray-400 hover:text-gray-600"
+            >
+              <svg
+                className="h-5 w-5"
+                aria-hidden="true"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
                 <path
                   strokeLinecap="round"
                   strokeLinejoin="round"
@@ -90,12 +117,22 @@ export function ExportModal({ isOpen, onClose, onExport }: ExportModalProps) {
 
           <div className="space-y-4 p-4">
             <div>
-              <label className="mb-2 block text-sm font-medium text-gray-700">出力形式</label>
-              <div className="grid grid-cols-4 gap-2">
+              <span
+                id="export-format-label"
+                className="mb-2 block text-sm font-medium text-gray-700"
+              >
+                出力形式
+              </span>
+              <div
+                className="grid grid-cols-4 gap-2"
+                role="group"
+                aria-labelledby="export-format-label"
+              >
                 {(Object.keys(formatLabels) as ExportFormat[]).map((f) => (
                   <button
                     key={f}
                     type="button"
+                    aria-pressed={format === f}
                     onClick={() => setFormat(f)}
                     className={`rounded-md border px-3 py-2 text-sm ${
                       format === f
@@ -110,8 +147,14 @@ export function ExportModal({ isOpen, onClose, onExport }: ExportModalProps) {
             </div>
 
             <div>
-              <label className="mb-2 block text-sm font-medium text-gray-700">言語</label>
+              <label
+                htmlFor="export-language"
+                className="mb-2 block text-sm font-medium text-gray-700"
+              >
+                言語
+              </label>
               <select
+                id="export-language"
                 value={options.language}
                 onChange={(e) => updateOption('language', e.target.value as ExportLanguage)}
                 className="w-full rounded-md border border-gray-300 px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
@@ -125,8 +168,14 @@ export function ExportModal({ isOpen, onClose, onExport }: ExportModalProps) {
             </div>
 
             <div>
-              <label className="mb-2 block text-sm font-medium text-gray-700">通貨</label>
+              <label
+                htmlFor="export-currency"
+                className="mb-2 block text-sm font-medium text-gray-700"
+              >
+                通貨
+              </label>
               <select
+                id="export-currency"
                 value={options.currency}
                 onChange={(e) => updateOption('currency', e.target.value as ExportCurrency)}
                 className="w-full rounded-md border border-gray-300 px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
@@ -143,10 +192,14 @@ export function ExportModal({ isOpen, onClose, onExport }: ExportModalProps) {
               <>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="mb-2 block text-sm font-medium text-gray-700">
+                    <label
+                      htmlFor="export-paper-size"
+                      className="mb-2 block text-sm font-medium text-gray-700"
+                    >
                       用紙サイズ
                     </label>
                     <select
+                      id="export-paper-size"
                       value={options.paperSize}
                       onChange={(e) => updateOption('paperSize', e.target.value as PaperSize)}
                       className="w-full rounded-md border border-gray-300 px-3 py-2 focus:ring-2 focus:ring-blue-500"
@@ -159,8 +212,14 @@ export function ExportModal({ isOpen, onClose, onExport }: ExportModalProps) {
                     </select>
                   </div>
                   <div>
-                    <label className="mb-2 block text-sm font-medium text-gray-700">向き</label>
+                    <label
+                      htmlFor="export-orientation"
+                      className="mb-2 block text-sm font-medium text-gray-700"
+                    >
+                      向き
+                    </label>
                     <select
+                      id="export-orientation"
                       value={options.orientation}
                       onChange={(e) => updateOption('orientation', e.target.value as Orientation)}
                       className="w-full rounded-md border border-gray-300 px-3 py-2 focus:ring-2 focus:ring-blue-500"
@@ -191,11 +250,15 @@ export function ExportModal({ isOpen, onClose, onExport }: ExportModalProps) {
 
             {options.currency === 'dual' && (
               <div>
-                <label className="mb-2 block text-sm font-medium text-gray-700">
+                <label
+                  htmlFor="export-exchange-rate"
+                  className="mb-2 block text-sm font-medium text-gray-700"
+                >
                   為替レート (USD/JPY)
                 </label>
                 <input
                   type="number"
+                  id="export-exchange-rate"
                   step="0.01"
                   value={options.exchangeRate || ''}
                   onChange={(e) => updateOption('exchangeRate', parseFloat(e.target.value))}

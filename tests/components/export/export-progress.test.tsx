@@ -20,6 +20,15 @@ describe('ExportProgress', () => {
     expect(screen.getByText('42%')).toBeInTheDocument()
   })
 
+  it('exposes a progressbar role with aria values reflecting the progress', () => {
+    render(<ExportProgress progress={makeProgress({ progress: 42.4 })} />)
+    const bar = screen.getByRole('progressbar')
+    expect(bar).toHaveAttribute('aria-valuenow', '42')
+    expect(bar).toHaveAttribute('aria-valuemin', '0')
+    expect(bar).toHaveAttribute('aria-valuemax', '100')
+    expect(bar).toHaveAttribute('aria-label', 'エクスポート進捗')
+  })
+
   it('falls back to the localized status text when no message is supplied', () => {
     render(<ExportProgress progress={makeProgress({ status: 'processing', message: '' })} />)
     expect(screen.getByText('処理中...')).toBeInTheDocument()
@@ -133,5 +142,20 @@ describe('ExportProgressOverlay', () => {
     )
     expect(screen.getByRole('button', { name: '閉じる' })).toBeInTheDocument()
     expect(screen.queryByText('ダウンロード')).not.toBeInTheDocument()
+  })
+
+  it('exposes a dialog role labelled by its heading', () => {
+    render(
+      <ExportProgressOverlay
+        isVisible
+        onClose={vi.fn()}
+        progress={makeProgress({ status: 'failed', error: 'timeout' })}
+      />
+    )
+    const dialog = screen.getByRole('dialog')
+    expect(dialog).toHaveAttribute('aria-modal', 'true')
+    const labelledBy = dialog.getAttribute('aria-labelledby')
+    expect(labelledBy).toBeTruthy()
+    expect(document.getElementById(labelledBy!)?.textContent).toBe('エクスポート中')
   })
 })

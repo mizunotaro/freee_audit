@@ -45,7 +45,14 @@ export function ExportProgress({ progress, className = '' }: ExportProgressProps
         <span className="text-sm text-gray-500">{Math.round(progress.progress)}%</span>
       </div>
 
-      <div className="h-2.5 w-full rounded-full bg-gray-200">
+      <div
+        className="h-2.5 w-full rounded-full bg-gray-200"
+        role="progressbar"
+        aria-valuenow={Math.round(progress.progress)}
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-label="エクスポート進捗"
+      >
         <div
           className={`h-2.5 rounded-full transition-all duration-300 ${getStatusColor()}`}
           style={{ width: `${progress.progress}%` }}
@@ -86,8 +93,13 @@ export function ExportProgressOverlay({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-      <div className="w-full max-w-sm rounded-lg bg-white p-6 shadow-xl">
-        <h3 className="mb-4 text-lg font-semibold">
+      <div
+        className="w-full max-w-sm rounded-lg bg-white p-6 shadow-xl"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="export-progress-title"
+      >
+        <h3 id="export-progress-title" className="mb-4 text-lg font-semibold">
           {progress.status === 'completed' ? 'エクスポート完了' : 'エクスポート中'}
         </h3>
 

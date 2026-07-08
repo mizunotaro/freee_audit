@@ -101,4 +101,55 @@ describe('AiSettings', () => {
     )
     expect(screen.queryByText('設定を保存しました')).toBeNull()
   })
+
+  it('associates the API key and model labels with their controls', async () => {
+    fetchMock.mockResolvedValue(okResponse({ config: { provider: 'openai', model: 'gpt-4' } }))
+
+    render(<AiSettings />)
+    await waitFor(() => expect(screen.getByRole('combobox')).toBeInTheDocument())
+
+    expect(screen.getByLabelText('APIキー')).toHaveAttribute('id', 'ai-api-key')
+    expect(screen.getByLabelText('モデル')).toHaveValue('gpt-4')
+  })
+
+  it('marks only the active provider button as pressed', async () => {
+    fetchMock.mockResolvedValue(okResponse({ config: { provider: 'gemini', model: 'gemini-pro' } }))
+
+    render(<AiSettings />)
+    await waitFor(() => expect(screen.getByRole('combobox')).toBeInTheDocument())
+
+    expect(screen.getByText('gemini').closest('button')).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByText('openai').closest('button')).toHaveAttribute('aria-pressed', 'false')
+  })
+
+  it('labels the show/hide API key toggle and wires it to the input', async () => {
+    fetchMock.mockResolvedValue(okResponse({ config: { provider: 'openai', model: 'gpt-4' } }))
+
+    render(<AiSettings />)
+    await waitFor(() => expect(screen.getByRole('combobox')).toBeInTheDocument())
+
+    const toggle = screen.getByRole('button', { name: 'APIキーを表示する' })
+    expect(toggle).toHaveAttribute('aria-controls', 'ai-api-key')
+    expect(toggle).toHaveAttribute('aria-pressed', 'false')
+
+    fireEvent.click(toggle)
+
+    const hideToggle = screen.getByRole('button', { name: 'APIキーを非表示にする' })
+    expect(hideToggle).toHaveAttribute('aria-pressed', 'true')
+  })
+
+  it('announces save errors inside a role=alert region', async () => {
+    fetchMock
+      .mockResolvedValueOnce(okResponse({ config: { provider: 'openai', model: 'gpt-4' } }))
+      .mockResolvedValueOnce(errResponse({ error: '無効なAPIキーです' }))
+
+    render(<AiSettings />)
+    await waitFor(() => expect(screen.getByRole('combobox')).toBeInTheDocument())
+
+    fireEvent.change(screen.getByPlaceholderText('sk-...'), { target: { value: 'sk-bad' } })
+    fireEvent.click(screen.getByRole('button', { name: '保存' }))
+
+    await waitFor(() => expect(screen.getByRole('alert')).toBeInTheDocument())
+    expect(screen.getByRole('alert')).toHaveTextContent('無効なAPIキーです')
+  })
 })

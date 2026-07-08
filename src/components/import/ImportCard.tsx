@@ -139,6 +139,13 @@ export function ImportCard({ type, apiEndpoint, companyId, onComplete, onError }
     e.preventDefault()
   }, [])
 
+  const handleDropzoneKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault()
+      fileInputRef.current?.click()
+    }
+  }, [])
+
   const handlePreview = useCallback(async () => {
     if (!state.file) return
 
@@ -270,6 +277,7 @@ export function ImportCard({ type, apiEndpoint, companyId, onComplete, onError }
               <Button
                 variant="ghost"
                 size="sm"
+                aria-label="エラーを閉じる"
                 onClick={() => dispatch({ type: 'SET_ERROR', payload: null })}
               >
                 <X className="h-4 w-4" />
@@ -283,18 +291,23 @@ export function ImportCard({ type, apiEndpoint, companyId, onComplete, onError }
             <div
               onDrop={handleDrop}
               onDragOver={handleDragOver}
+              onClick={() => fileInputRef.current?.click()}
+              onKeyDown={handleDropzoneKeyDown}
+              role="button"
+              tabIndex={0}
+              aria-label={`${typeLabel.ja}ファイルを選択`}
               className={`flex min-h-[200px] cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed transition-colors ${
                 state.file
                   ? 'border-green-300 bg-green-50'
                   : 'border-gray-300 bg-gray-50 hover:border-gray-400'
               }`}
-              onClick={() => fileInputRef.current?.click()}
             >
               <input
                 ref={fileInputRef}
                 type="file"
                 accept={ACCEPTED_EXTENSIONS.map((ext) => `.${ext}`).join(',')}
                 onChange={handleFileChange}
+                onClick={(e) => e.stopPropagation()}
                 className="hidden"
               />
               {state.file ? (
@@ -382,7 +395,12 @@ export function ImportCard({ type, apiEndpoint, companyId, onComplete, onError }
                 テンプレート
               </Button>
               {state.file && (
-                <Button variant="ghost" onClick={handleClear} disabled={isUploading}>
+                <Button
+                  variant="ghost"
+                  aria-label="選択したファイルをクリア"
+                  onClick={handleClear}
+                  disabled={isUploading}
+                >
                   <X className="h-4 w-4" />
                 </Button>
               )}

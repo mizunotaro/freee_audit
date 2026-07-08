@@ -115,3 +115,29 @@ describe('JournalImport — upload flow', () => {
     })
   })
 })
+
+describe('JournalImport — accessibility', () => {
+  it('announces validation errors inside a role=alert region and labels the dismiss control', () => {
+    const { container } = render(<JournalImport />)
+    selectFile(container, new File(['x'], 'data.txt', { type: 'text/plain' }))
+
+    expect(screen.getByRole('alert')).toHaveTextContent(/CSVファイルを選択してください/)
+    expect(screen.getByRole('button', { name: 'エラーを閉じる' })).toBeInTheDocument()
+  })
+
+  it('announces a completed import inside a role=status region', async () => {
+    global.fetch = vi
+      .fn()
+      .mockResolvedValue(
+        jsonRes({ success: true, imported: 5, skipped: 1, errors: [], totalRows: 6 })
+      )
+
+    const { container } = render(<JournalImport />)
+    selectFile(container, csvFile('journals.csv'))
+
+    fireEvent.click(screen.getByRole('button', { name: 'インポート実行' }))
+
+    await waitFor(() => expect(screen.getByRole('status')).toBeInTheDocument())
+    expect(screen.getByRole('status')).toHaveTextContent(/インポート結果/)
+  })
+})

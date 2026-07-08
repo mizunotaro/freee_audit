@@ -104,19 +104,32 @@ export function AiSettings() {
       <h2 className="mb-6 text-2xl font-bold">AI API設定</h2>
 
       {error && (
-        <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-4 text-red-700">
+        <div
+          role="alert"
+          className="mb-4 rounded-lg border border-red-200 bg-red-50 p-4 text-red-700"
+        >
           {error}
-          <button onClick={() => setError(null)} className="ml-2 text-red-500 hover:text-red-700">
+          <button
+            type="button"
+            onClick={() => setError(null)}
+            aria-label="エラーを閉じる"
+            className="ml-2 text-red-500 hover:text-red-700"
+          >
             ×
           </button>
         </div>
       )}
 
       {success && (
-        <div className="mb-4 rounded-lg border border-green-200 bg-green-50 p-4 text-green-700">
+        <div
+          role="status"
+          className="mb-4 rounded-lg border border-green-200 bg-green-50 p-4 text-green-700"
+        >
           {success}
           <button
+            type="button"
             onClick={() => setSuccess(null)}
+            aria-label="メッセージを閉じる"
             className="ml-2 text-green-500 hover:text-green-700"
           >
             ×
@@ -131,6 +144,8 @@ export function AiSettings() {
           {(['openai', 'gemini', 'claude'] as AIProvider[]).map((provider) => (
             <button
               key={provider}
+              type="button"
+              aria-pressed={config.provider === provider}
               onClick={() => handleProviderChange(provider)}
               className={`rounded-lg border-2 p-4 transition-all ${
                 config.provider === provider
@@ -150,9 +165,12 @@ export function AiSettings() {
 
         <div className="space-y-4">
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">APIキー</label>
+            <label htmlFor="ai-api-key" className="mb-1 block text-sm font-medium text-gray-700">
+              APIキー
+            </label>
             <div className="relative">
               <input
+                id="ai-api-key"
                 type={showApiKey ? 'text' : 'password'}
                 value={config.apiKey}
                 onChange={(e) => setConfig((prev) => ({ ...prev, apiKey: e.target.value }))}
@@ -162,6 +180,9 @@ export function AiSettings() {
               <button
                 type="button"
                 onClick={() => setShowApiKey(!showApiKey)}
+                aria-label={showApiKey ? 'APIキーを非表示にする' : 'APIキーを表示する'}
+                aria-pressed={showApiKey}
+                aria-controls="ai-api-key"
                 className="absolute right-2 top-1/2 -translate-y-1/2 text-sm text-gray-500 hover:text-gray-700"
               >
                 {showApiKey ? '隠す' : '表示'}
@@ -171,8 +192,11 @@ export function AiSettings() {
           </div>
 
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">モデル</label>
+            <label htmlFor="ai-model" className="mb-1 block text-sm font-medium text-gray-700">
+              モデル
+            </label>
             <select
+              id="ai-model"
               value={config.model}
               onChange={(e) => setConfig((prev) => ({ ...prev, model: e.target.value }))}
               className="w-full rounded-lg border px-4 py-2"
@@ -186,6 +210,7 @@ export function AiSettings() {
           </div>
 
           <button
+            type="button"
             onClick={handleSave}
             disabled={saving}
             className="bg-primary-500 hover:bg-primary-600 rounded px-4 py-2 text-white disabled:opacity-50"

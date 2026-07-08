@@ -29,7 +29,7 @@ export function ExportButton({ onExport, disabled = false, className = '' }: Exp
       className={`inline-flex items-center gap-2 rounded-md border border-transparent bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:cursor-not-allowed disabled:opacity-50 ${className}`}
     >
       {isLoading ? (
-        <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
+        <svg className="h-4 w-4 animate-spin" aria-hidden="true" fill="none" viewBox="0 0 24 24">
           <circle
             className="opacity-25"
             cx="12"
@@ -45,7 +45,13 @@ export function ExportButton({ onExport, disabled = false, className = '' }: Exp
           />
         </svg>
       ) : (
-        <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <svg
+          className="h-4 w-4"
+          aria-hidden="true"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
           <path
             strokeLinecap="round"
             strokeLinejoin="round"

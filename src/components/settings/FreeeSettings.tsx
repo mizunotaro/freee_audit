@@ -120,19 +120,32 @@ export function FreeeSettings() {
       <h2 className="mb-6 text-2xl font-bold">freee連携設定</h2>
 
       {error && (
-        <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-4 text-red-700">
+        <div
+          role="alert"
+          className="mb-4 rounded-lg border border-red-200 bg-red-50 p-4 text-red-700"
+        >
           {error}
-          <button onClick={() => setError(null)} className="ml-2 text-red-500 hover:text-red-700">
+          <button
+            type="button"
+            onClick={() => setError(null)}
+            aria-label="エラーを閉じる"
+            className="ml-2 text-red-500 hover:text-red-700"
+          >
             ×
           </button>
         </div>
       )}
 
       {success && (
-        <div className="mb-4 rounded-lg border border-green-200 bg-green-50 p-4 text-green-700">
+        <div
+          role="status"
+          className="mb-4 rounded-lg border border-green-200 bg-green-50 p-4 text-green-700"
+        >
           {success}
           <button
+            type="button"
             onClick={() => setSuccess(null)}
+            aria-label="メッセージを閉じる"
             className="ml-2 text-green-500 hover:text-green-700"
           >
             ×
@@ -171,6 +184,7 @@ export function FreeeSettings() {
           {status?.connected ? (
             <>
               <button
+                type="button"
                 onClick={handleTest}
                 disabled={loading}
                 className="rounded bg-blue-500 px-4 py-2 text-white hover:bg-blue-600 disabled:opacity-50"
@@ -178,6 +192,7 @@ export function FreeeSettings() {
                 接続テスト
               </button>
               <button
+                type="button"
                 onClick={handleDisconnect}
                 disabled={loading}
                 className="rounded bg-red-500 px-4 py-2 text-white hover:bg-red-600 disabled:opacity-50"
@@ -187,6 +202,7 @@ export function FreeeSettings() {
             </>
           ) : (
             <button
+              type="button"
               onClick={handleConnect}
               disabled={connecting}
               className="bg-primary-500 hover:bg-primary-600 rounded px-4 py-2 text-white disabled:opacity-50"

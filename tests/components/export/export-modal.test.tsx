@@ -109,3 +109,53 @@ describe('ExportModal', () => {
     }
   })
 })
+
+describe('ExportModal — accessibility', () => {
+  const onExport = vi.fn()
+  const onClose = vi.fn()
+
+  beforeEach(() => {
+    onClose.mockReset()
+    onExport.mockReset().mockResolvedValue(undefined)
+  })
+
+  it('exposes a dialog role labelled by the title', () => {
+    renderModal(true, onExport, onClose)
+    const dialog = screen.getByRole('dialog')
+    expect(dialog).toHaveAttribute('aria-modal', 'true')
+    const labelledBy = dialog.getAttribute('aria-labelledby')
+    expect(labelledBy).toBeTruthy()
+    expect(document.getElementById(labelledBy!)?.textContent).toBe('エクスポート設定')
+  })
+
+  it('closes when the Escape key is pressed', () => {
+    renderModal(true, onExport, onClose)
+    fireEvent.keyDown(window, { key: 'Escape' })
+    expect(onClose).toHaveBeenCalledTimes(1)
+  })
+
+  it('labels the icon-only close button', () => {
+    renderModal(true, onExport, onClose)
+    expect(screen.getByRole('button', { name: '閉じる' })).toBeInTheDocument()
+  })
+
+  it('marks only the selected format button as pressed', () => {
+    renderModal(true, onExport, onClose)
+    expect(screen.getByRole('button', { name: 'PDF' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('button', { name: 'Excel' })).toHaveAttribute('aria-pressed', 'false')
+  })
+
+  it('associates the language, currency, paper-size and orientation labels with their selects', () => {
+    renderModal(true, onExport, onClose)
+    expect(screen.getByLabelText('言語')).toHaveValue('ja')
+    expect(screen.getByLabelText('通貨')).toHaveValue('JPY')
+    expect(screen.getByLabelText('用紙サイズ')).toHaveValue('A4')
+    expect(screen.getByLabelText('向き')).toHaveValue('landscape')
+  })
+
+  it('associates the exchange-rate label with its input when currency is dual', () => {
+    renderModal(true, onExport, onClose)
+    fireEvent.change(screen.getByLabelText('通貨'), { target: { value: 'dual' } })
+    expect(screen.getByLabelText('為替レート (USD/JPY)')).toBeInTheDocument()
+  })
+})

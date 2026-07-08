@@ -86,4 +86,35 @@ describe('FreeeSettings', () => {
     // only the initial status check ran — no disconnect POST
     expect(fetchMock).toHaveBeenCalledTimes(1)
   })
+
+  it('announces disconnect success inside a role=status region', async () => {
+    vi.spyOn(window, 'confirm').mockReturnValue(true)
+    fetchMock
+      .mockResolvedValueOnce(okResponse({ companies: [{ id: 1, name: 'A' }] }))
+      .mockResolvedValueOnce(okResponse({}))
+
+    render(<FreeeSettings />)
+    await waitFor(() => expect(screen.getByText('接続済み')).toBeInTheDocument())
+
+    fireEvent.click(screen.getByRole('button', { name: '連携解除' }))
+
+    await waitFor(() => expect(screen.getByRole('status')).toBeInTheDocument())
+    expect(screen.getByRole('status')).toHaveTextContent('連携を解除しました')
+  })
+
+  it('announces a disconnect failure inside a role=alert region and labels its dismiss control', async () => {
+    vi.spyOn(window, 'confirm').mockReturnValue(true)
+    fetchMock
+      .mockResolvedValueOnce(okResponse({ companies: [{ id: 1, name: 'A' }] }))
+      .mockResolvedValueOnce({ ok: false, json: async () => ({}) })
+
+    render(<FreeeSettings />)
+    await waitFor(() => expect(screen.getByText('接続済み')).toBeInTheDocument())
+
+    fireEvent.click(screen.getByRole('button', { name: '連携解除' }))
+
+    await waitFor(() => expect(screen.getByRole('alert')).toBeInTheDocument())
+    expect(screen.getByRole('alert')).toHaveTextContent('連携解除に失敗しました')
+    expect(screen.getByRole('button', { name: 'エラーを閉じる' })).toBeInTheDocument()
+  })
 })
