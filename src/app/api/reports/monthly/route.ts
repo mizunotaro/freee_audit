@@ -25,18 +25,29 @@ export async function GET(request: NextRequest) {
     const resolvedCompanyId = user.companyId
 
     if (mode === 'single') {
-      const report = await generateMonthlyReport({
+      const reportResult = await generateMonthlyReport({
         companyId: resolvedCompanyId,
         fiscalYear,
         month,
       })
+      if (!reportResult.success) {
+        return NextResponse.json({ error: reportResult.error.message }, { status: 404 })
+      }
       const trend = await getMonthlyTrend(resolvedCompanyId, fiscalYear)
-      return NextResponse.json({ report, trend })
+      return NextResponse.json({ report: reportResult.data, trend })
     }
 
-    const report = await getMultiMonthReport(resolvedCompanyId, fiscalYear, endMonth, monthCount)
+    const reportResult = await getMultiMonthReport(
+      resolvedCompanyId,
+      fiscalYear,
+      endMonth,
+      monthCount
+    )
+    if (!reportResult.success) {
+      return NextResponse.json({ error: reportResult.error.message }, { status: 404 })
+    }
     const trend = await getMonthlyTrend(resolvedCompanyId, fiscalYear)
-    return NextResponse.json({ report, trend })
+    return NextResponse.json({ report: reportResult.data, trend })
   } catch (error) {
     console.error('Monthly report error:', error)
     return NextResponse.json({ error: 'Failed to generate monthly report' }, { status: 500 })

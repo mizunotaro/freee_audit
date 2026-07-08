@@ -39,7 +39,11 @@ export async function POST(request: NextRequest) {
     }
 
     const mockData = getMockReportData(body)
-    const exportService = createExportService('pptx')
+    const exportServiceResult = createExportService('pptx')
+    if (!exportServiceResult.success) {
+      return NextResponse.json({ error: exportServiceResult.error.message }, { status: 400 })
+    }
+    const exportService = exportServiceResult.data
     const result = await exportService.export(mockData, options)
 
     await logRouteAudit({

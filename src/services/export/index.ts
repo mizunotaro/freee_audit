@@ -32,17 +32,31 @@ import { createPDFExportService } from './pdf-export'
 import { createPPTXExportService } from './pptx-export'
 import { createExcelExportService } from './excel-export'
 import { ExportFormat, ExportService, ReportData } from './types'
+import {
+  type AppError,
+  type Result,
+  ERROR_CODES,
+  createAppError,
+  failure,
+  success,
+} from '@/types/result'
 
-export function createExportService(format: ExportFormat): ExportService<ReportData> {
+export function createExportService(
+  format: ExportFormat
+): Result<ExportService<ReportData>, AppError> {
   switch (format) {
     case 'pdf':
-      return createPDFExportService()
+      return success(createPDFExportService())
     case 'pptx':
-      return createPPTXExportService()
+      return success(createPPTXExportService())
     case 'excel':
     case 'csv':
-      return createExcelExportService()
+      return success(createExcelExportService())
     default:
-      throw new Error(`Unsupported export format: ${format}`)
+      return failure(
+        createAppError(ERROR_CODES.BUSINESS_LOGIC_ERROR, `Unsupported export format: ${format}`, {
+          details: { format },
+        })
+      )
   }
 }
