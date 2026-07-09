@@ -92,7 +92,14 @@ export function ProgressIndicator({
       </div>
 
       <div className="space-y-1">
-        <div className="h-2 w-full overflow-hidden rounded-full bg-gray-200">
+        <div
+          className="h-2 w-full overflow-hidden rounded-full bg-gray-200"
+          role="progressbar"
+          aria-valuenow={progressPercent}
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-label={stageInfo.label}
+        >
           <div
             className="h-full rounded-full bg-primary transition-all duration-300 ease-out"
             style={{ width: `${progressPercent}%` }}

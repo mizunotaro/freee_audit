@@ -39,7 +39,14 @@ export function ConfidenceIndicator({
 
   return (
     <div className={cn('flex items-center gap-2', className)}>
-      <div className={cn('w-full rounded-full bg-gray-200', sizeClasses[size])}>
+      <div
+        className={cn('w-full rounded-full bg-gray-200', sizeClasses[size])}
+        role="progressbar"
+        aria-valuenow={percentage}
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-label={`信頼度 ${percentage}% (${getLabel()})`}
+      >
         <div
           className={cn('rounded-full transition-all', getColor())}
           style={{ width: `${percentage}%`, height: '100%' }}
