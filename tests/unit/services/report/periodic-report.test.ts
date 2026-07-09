@@ -4,22 +4,21 @@ import {
   formatPeriodicReportForExport,
 } from '@/services/report/periodic-report'
 import type { PeriodicReportData, PeriodData } from '@/services/report/periodic-report'
+import { clearBalanceCache } from '@/services/report/balance-loader'
+import { prisma } from '@/lib/db'
 
 vi.mock('@/lib/db', () => ({
   prisma: {
-    $transaction: vi.fn(function (fn: Function) {
-      return fn({
-        monthlyBalance: {
-          findMany: vi.fn().mockResolvedValue([]),
-        },
-      })
-    }),
+    monthlyBalance: {
+      findMany: vi.fn().mockResolvedValue([]),
+    },
   },
 }))
 
 describe('generatePeriodicReport', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    clearBalanceCache()
   })
 
   it('should return report data with periods and summary', async function () {
@@ -44,6 +43,34 @@ describe('generatePeriodicReport', () => {
     })
 
     expect(result.periods.length).toBeGreaterThan(3)
+  })
+
+  it('should fetch balances in one query per fiscal year (no per-period N+1)', async () => {
+    const findMany = vi.mocked(prisma.monthlyBalance.findMany)
+    findMany.mockClear()
+
+    await generatePeriodicReport({
+      companyId: 'co-1',
+      fiscalYearEndMonth: 3,
+      periodType: '3months',
+      includePreviousYear: false,
+    })
+
+    expect(findMany).toHaveBeenCalledTimes(1)
+  })
+
+  it('should fetch previous-year balances in a second query when requested', async () => {
+    const findMany = vi.mocked(prisma.monthlyBalance.findMany)
+    findMany.mockClear()
+
+    await generatePeriodicReport({
+      companyId: 'co-1',
+      fiscalYearEndMonth: 3,
+      periodType: '3months',
+      includePreviousYear: true,
+    })
+
+    expect(findMany).toHaveBeenCalledTimes(2)
   })
 })
 

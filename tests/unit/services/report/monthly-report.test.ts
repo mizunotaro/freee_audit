@@ -5,6 +5,7 @@ import {
   formatReportForExport,
   getMultiMonthReport,
 } from '@/services/report/monthly-report'
+import { clearBalanceCache } from '@/services/report/balance-loader'
 import { prisma } from '@/lib/db'
 
 const { mockCompany } = vi.hoisted(() => {
@@ -109,6 +110,7 @@ vi.mock('@/services/budget/actual-vs-budget', () => ({
 describe('monthly-report', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    clearBalanceCache()
   })
 
   describe('generateMonthlyReport', () => {
@@ -143,12 +145,7 @@ describe('monthly-report', () => {
     })
 
     it('should return failure when company is not found', async () => {
-      vi.mocked(prisma.$transaction).mockImplementationOnce((callback) =>
-        callback({
-          company: { findFirst: vi.fn().mockResolvedValue(null) },
-          monthlyBalance: { findMany: vi.fn().mockResolvedValue([]) },
-        } as never)
-      )
+      vi.mocked(prisma.company.findFirst).mockResolvedValueOnce(null)
 
       const result = await generateMonthlyReport({
         companyId: 'missing',
@@ -348,6 +345,27 @@ describe('monthly-report', () => {
       expect(sectionTypes).toContain('pl')
       expect(sectionTypes).toContain('cf')
       expect(sectionTypes).toContain('kpi')
+    })
+  })
+
+  describe('query efficiency', () => {
+    it('should fetch a fiscal year in a single query (no per-month N+1)', async () => {
+      const findMany = vi.mocked(prisma.monthlyBalance.findMany)
+      findMany.mockClear()
+
+      await getMonthlyTrend('company-1', 2024)
+
+      expect(findMany).toHaveBeenCalledTimes(1)
+    })
+
+    it('should serve repeat reads of the same fiscal year from cache', async () => {
+      const findMany = vi.mocked(prisma.monthlyBalance.findMany)
+      findMany.mockClear()
+
+      await getMonthlyTrend('company-1', 2024)
+      await getMonthlyTrend('company-1', 2024)
+
+      expect(findMany).toHaveBeenCalledTimes(1)
     })
   })
 })

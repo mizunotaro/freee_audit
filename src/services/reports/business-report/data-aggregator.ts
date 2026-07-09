@@ -67,19 +67,15 @@ export class BusinessReportDataAggregator {
   }
 
   private async getFinancialData(companyId: string, fiscalYear: number): Promise<FinancialData> {
-    const currentYearBalances = await prisma.monthlyBalance.findMany({
+    const balances = await prisma.monthlyBalance.findMany({
       where: {
         companyId,
-        fiscalYear,
+        fiscalYear: { in: [fiscalYear, fiscalYear - 1] },
       },
     })
 
-    const previousYearBalances = await prisma.monthlyBalance.findMany({
-      where: {
-        companyId,
-        fiscalYear: fiscalYear - 1,
-      },
-    })
+    const currentYearBalances = balances.filter((b) => b.fiscalYear === fiscalYear)
+    const previousYearBalances = balances.filter((b) => b.fiscalYear === fiscalYear - 1)
 
     const currentYearTotals = this.aggregateByAccount(currentYearBalances)
     const previousYearTotals = this.aggregateByAccount(previousYearBalances)

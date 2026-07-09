@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { BusinessReportDataAggregator } from '@/services/reports/business-report/data-aggregator'
+import { prisma } from '@/lib/db'
 
 vi.mock('@/lib/db', () => ({
   prisma: {
@@ -30,6 +31,15 @@ describe('BusinessReportDataAggregator', () => {
       expect(result).toBeDefined()
       expect(result.companyInfo).toBeDefined()
       expect(result.financialData).toBeDefined()
+    })
+
+    it('should fetch current and previous year balances in a single query', async () => {
+      const findMany = vi.mocked(prisma.monthlyBalance.findMany)
+      findMany.mockClear()
+
+      await aggregator.aggregate('company-123', 2024)
+
+      expect(findMany).toHaveBeenCalledTimes(1)
     })
 
     it('should validate data', async () => {
