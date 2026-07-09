@@ -1,15 +1,17 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach, type Mock } from 'vitest'
 import { runAuditJob } from '@/jobs/audit-job'
 import { prisma } from '@/lib/db'
 import { createReceiptAnalyzer } from '@/services/audit/receipt-analyzer'
 import { createJournalChecker } from '@/services/audit/journal-checker'
 import { createAuditNotifier } from '@/lib/integrations/slack/notifier'
 import fs from 'fs/promises'
+import type { Journal } from '@prisma/client'
 
 vi.mock('@/lib/db', () => ({
   prisma: {
     journal: {
       findMany: vi.fn(),
+      count: vi.fn(),
       update: vi.fn(),
     },
     auditResult: {
@@ -43,10 +45,53 @@ vi.mock('fs/promises', () => ({
   readFile: vi.fn(),
 }))
 
+interface MockJournal {
+  id: string
+  freeeJournalId: string
+  entryDate: Date
+  debitAccount: string
+  creditAccount: string
+  amount: number
+  taxAmount: number | null
+  taxType: string | null
+  description: string | null
+  documentId: string | null
+  document: { filePath: string } | null
+}
+
+interface FindManyArgs {
+  take?: number
+  skip?: number
+  cursor?: { id?: string }
+}
+
+const findManyMock = prisma.journal.findMany as unknown as Mock<
+  (args?: FindManyArgs) => Promise<Journal[]>
+>
+
+// Simulates PERF-03-01 keyset cursor paging over a fixed set so the job can be
+// exercised end-to-end against the mock without an unbounded single findMany.
+function setupJournals(journals: MockJournal[]): void {
+  vi.mocked(prisma.journal.count).mockResolvedValue(journals.length)
+  findManyMock.mockImplementation(async (args) => {
+    const take = args?.take ?? journals.length
+    const skip = args?.skip ?? 0
+    const cursorId = args?.cursor?.id
+    let startIdx = 0
+    if (cursorId) {
+      const idx = journals.findIndex((j) => j.id === cursorId)
+      startIdx = idx >= 0 ? idx + skip : journals.length
+    }
+    return journals.slice(startIdx, startIdx + take) as unknown as Journal[]
+  })
+  vi.mocked(prisma.auditResult.create).mockResolvedValue({} as never)
+  vi.mocked(prisma.journal.update).mockResolvedValue({} as never)
+}
+
 describe('audit-job parallel processing', () => {
-  let mockReceiptAnalyzer: any
-  let mockJournalChecker: any
-  let mockNotifier: any
+  let mockReceiptAnalyzer: { analyzeBuffer: Mock }
+  let mockJournalChecker: { check: Mock }
+  let mockNotifier: { notifyAuditComplete: Mock }
 
   beforeEach(() => {
     vi.clearAllMocks()
@@ -68,16 +113,22 @@ describe('audit-job parallel processing', () => {
       notifyAuditComplete: vi.fn(),
     }
 
-    vi.mocked(createReceiptAnalyzer).mockReturnValue(mockReceiptAnalyzer)
-    vi.mocked(createJournalChecker).mockReturnValue(mockJournalChecker)
-    vi.mocked(createAuditNotifier).mockReturnValue(mockNotifier)
+    vi.mocked(createReceiptAnalyzer).mockReturnValue(
+      mockReceiptAnalyzer as unknown as ReturnType<typeof createReceiptAnalyzer>
+    )
+    vi.mocked(createJournalChecker).mockReturnValue(
+      mockJournalChecker as unknown as ReturnType<typeof createJournalChecker>
+    )
+    vi.mocked(createAuditNotifier).mockReturnValue(
+      mockNotifier as unknown as ReturnType<typeof createAuditNotifier>
+    )
   })
 
   afterEach(() => {
     vi.restoreAllMocks()
   })
 
-  const createMockJournal = (id: string, delay = 0) => ({
+  const createMockJournal = (id: string): MockJournal => ({
     id,
     freeeJournalId: `FREEE-${id}`,
     entryDate: new Date('2024-01-15'),
@@ -94,9 +145,7 @@ describe('audit-job parallel processing', () => {
   it('should process journals in parallel with default concurrency', async () => {
     const journals = Array.from({ length: 10 }, (_, i) => createMockJournal(`journal-${i}`))
 
-    vi.mocked(prisma.journal.findMany).mockResolvedValue(journals as any)
-    vi.mocked(prisma.auditResult.create).mockResolvedValue({} as any)
-    vi.mocked(prisma.journal.update).mockResolvedValue({} as any)
+    setupJournals(journals)
 
     const startTime = Date.now()
     const result = await runAuditJob()
@@ -107,14 +156,13 @@ describe('audit-job parallel processing', () => {
     expect(result.failed).toBe(0)
     expect(result.errors).toBe(0)
     expect(prisma.journal.findMany).toHaveBeenCalled()
+    expect(duration).toBeGreaterThanOrEqual(0)
   })
 
   it('should use custom concurrency from options', async () => {
     const journals = Array.from({ length: 20 }, (_, i) => createMockJournal(`journal-${i}`))
 
-    vi.mocked(prisma.journal.findMany).mockResolvedValue(journals as any)
-    vi.mocked(prisma.auditResult.create).mockResolvedValue({} as any)
-    vi.mocked(prisma.journal.update).mockResolvedValue({} as any)
+    setupJournals(journals)
 
     const result = await runAuditJob({ concurrency: 3 })
 
@@ -128,9 +176,7 @@ describe('audit-job parallel processing', () => {
 
     const journals = Array.from({ length: 15 }, (_, i) => createMockJournal(`journal-${i}`))
 
-    vi.mocked(prisma.journal.findMany).mockResolvedValue(journals as any)
-    vi.mocked(prisma.auditResult.create).mockResolvedValue({} as any)
-    vi.mocked(prisma.journal.update).mockResolvedValue({} as any)
+    setupJournals(journals)
 
     const result = await runAuditJob()
 
@@ -143,7 +189,7 @@ describe('audit-job parallel processing', () => {
   it('should continue processing when errors occur', async () => {
     const journals = Array.from({ length: 10 }, (_, i) => createMockJournal(`journal-${i}`))
 
-    vi.mocked(prisma.journal.findMany).mockResolvedValue(journals as any)
+    setupJournals(journals)
 
     let callCount = 0
     mockJournalChecker.check.mockImplementation(async () => {
@@ -153,9 +199,6 @@ describe('audit-job parallel processing', () => {
       }
       return { isValid: true, issues: [] }
     })
-
-    vi.mocked(prisma.auditResult.create).mockResolvedValue({} as any)
-    vi.mocked(prisma.journal.update).mockResolvedValue({} as any)
 
     const result = await runAuditJob()
 
@@ -167,7 +210,7 @@ describe('audit-job parallel processing', () => {
   it('should handle mixed passed and failed results', async () => {
     const journals = Array.from({ length: 10 }, (_, i) => createMockJournal(`journal-${i}`))
 
-    vi.mocked(prisma.journal.findMany).mockResolvedValue(journals as any)
+    setupJournals(journals)
 
     let callCount = 0
     mockJournalChecker.check.mockImplementation(async () => {
@@ -181,9 +224,6 @@ describe('audit-job parallel processing', () => {
       return { isValid: true, issues: [] }
     })
 
-    vi.mocked(prisma.auditResult.create).mockResolvedValue({} as any)
-    vi.mocked(prisma.journal.update).mockResolvedValue({} as any)
-
     const result = await runAuditJob()
 
     expect(result.totalProcessed).toBe(10)
@@ -195,9 +235,7 @@ describe('audit-job parallel processing', () => {
   it('should log progress for large batches', async () => {
     const journals = Array.from({ length: 100 }, (_, i) => createMockJournal(`journal-${i}`))
 
-    vi.mocked(prisma.journal.findMany).mockResolvedValue(journals as any)
-    vi.mocked(prisma.auditResult.create).mockResolvedValue({} as any)
-    vi.mocked(prisma.journal.update).mockResolvedValue({} as any)
+    setupJournals(journals)
 
     const consoleSpy = vi.spyOn(console, 'log')
 
@@ -210,9 +248,7 @@ describe('audit-job parallel processing', () => {
   it('should log memory usage for large batches', async () => {
     const journals = Array.from({ length: 150 }, (_, i) => createMockJournal(`journal-${i}`))
 
-    vi.mocked(prisma.journal.findMany).mockResolvedValue(journals as any)
-    vi.mocked(prisma.auditResult.create).mockResolvedValue({} as any)
-    vi.mocked(prisma.journal.update).mockResolvedValue({} as any)
+    setupJournals(journals)
 
     const consoleSpy = vi.spyOn(console, 'log')
 
@@ -223,17 +259,15 @@ describe('audit-job parallel processing', () => {
   })
 
   it('should respect skipDocumentAnalysis option', async () => {
-    const journals = [
+    const journals: MockJournal[] = [
       {
         ...createMockJournal('journal-1'),
         documentId: 'doc-1',
-        document: { id: 'doc-1', filePath: '/test.pdf' },
+        document: { filePath: '/test.pdf' },
       },
     ]
 
-    vi.mocked(prisma.journal.findMany).mockResolvedValue(journals as any)
-    vi.mocked(prisma.auditResult.create).mockResolvedValue({} as any)
-    vi.mocked(prisma.journal.update).mockResolvedValue({} as any)
+    setupJournals(journals)
 
     await runAuditJob({ skipDocumentAnalysis: true })
 
@@ -241,7 +275,7 @@ describe('audit-job parallel processing', () => {
   })
 
   it('should handle empty journal list', async () => {
-    vi.mocked(prisma.journal.findMany).mockResolvedValue([])
+    setupJournals([])
 
     const result = await runAuditJob()
 
@@ -254,9 +288,7 @@ describe('audit-job parallel processing', () => {
   it('should call notifier when notifyOnComplete is true', async () => {
     const journals = [createMockJournal('journal-1')]
 
-    vi.mocked(prisma.journal.findMany).mockResolvedValue(journals as any)
-    vi.mocked(prisma.auditResult.create).mockResolvedValue({} as any)
-    vi.mocked(prisma.journal.update).mockResolvedValue({} as any)
+    setupJournals(journals)
 
     await runAuditJob({ notifyOnComplete: true })
 
@@ -264,17 +296,15 @@ describe('audit-job parallel processing', () => {
   })
 
   it('should handle document analysis errors', async () => {
-    const journals = [
+    const journals: MockJournal[] = [
       {
         ...createMockJournal('journal-1'),
         documentId: 'doc-1',
-        document: { id: 'doc-1', filePath: '/test.pdf' },
+        document: { filePath: '/test.pdf' },
       },
     ]
 
-    vi.mocked(prisma.journal.findMany).mockResolvedValue(journals as any)
-    vi.mocked(prisma.auditResult.create).mockResolvedValue({} as any)
-    vi.mocked(prisma.journal.update).mockResolvedValue({} as any)
+    setupJournals(journals)
 
     vi.mocked(fs.readFile).mockResolvedValue(Buffer.from('test'))
     mockReceiptAnalyzer.analyzeBuffer.mockRejectedValue(new Error('Analysis failed'))
@@ -286,17 +316,15 @@ describe('audit-job parallel processing', () => {
   })
 
   it('should handle journals with documents successfully', async () => {
-    const journals = [
+    const journals: MockJournal[] = [
       {
         ...createMockJournal('journal-1'),
         documentId: 'doc-1',
-        document: { id: 'doc-1', filePath: '/test.pdf' },
+        document: { filePath: '/test.pdf' },
       },
     ]
 
-    vi.mocked(prisma.journal.findMany).mockResolvedValue(journals as any)
-    vi.mocked(prisma.auditResult.create).mockResolvedValue({} as any)
-    vi.mocked(prisma.journal.update).mockResolvedValue({} as any)
+    setupJournals(journals)
     vi.mocked(fs.readFile).mockResolvedValue(Buffer.from('test'))
 
     const result = await runAuditJob()
@@ -309,9 +337,7 @@ describe('audit-job parallel processing', () => {
   it('should handle failed validation with issues', async () => {
     const journals = [createMockJournal('journal-1')]
 
-    vi.mocked(prisma.journal.findMany).mockResolvedValue(journals as any)
-    vi.mocked(prisma.auditResult.create).mockResolvedValue({} as any)
-    vi.mocked(prisma.journal.update).mockResolvedValue({} as any)
+    setupJournals(journals)
 
     mockJournalChecker.check.mockResolvedValue({
       isValid: false,
@@ -331,9 +357,7 @@ describe('audit-job parallel processing', () => {
   it('should apply date filters correctly', async () => {
     const journals = [createMockJournal('journal-1')]
 
-    vi.mocked(prisma.journal.findMany).mockResolvedValue(journals as any)
-    vi.mocked(prisma.auditResult.create).mockResolvedValue({} as any)
-    vi.mocked(prisma.journal.update).mockResolvedValue({} as any)
+    setupJournals(journals)
 
     await runAuditJob({
       startDate: '2024-01-01',
@@ -355,9 +379,7 @@ describe('audit-job parallel processing', () => {
   it('should apply company filter correctly', async () => {
     const journals = [createMockJournal('journal-1')]
 
-    vi.mocked(prisma.journal.findMany).mockResolvedValue(journals as any)
-    vi.mocked(prisma.auditResult.create).mockResolvedValue({} as any)
-    vi.mocked(prisma.journal.update).mockResolvedValue({} as any)
+    setupJournals(journals)
 
     await runAuditJob({
       companyId: 'company-123',
@@ -375,9 +397,7 @@ describe('audit-job parallel processing', () => {
   it('should apply status filter correctly', async () => {
     const journals = [createMockJournal('journal-1')]
 
-    vi.mocked(prisma.journal.findMany).mockResolvedValue(journals as any)
-    vi.mocked(prisma.auditResult.create).mockResolvedValue({} as any)
-    vi.mocked(prisma.journal.update).mockResolvedValue({} as any)
+    setupJournals(journals)
 
     await runAuditJob({
       statusFilter: 'FAILED',
@@ -388,6 +408,44 @@ describe('audit-job parallel processing', () => {
         where: expect.objectContaining({
           auditStatus: 'FAILED',
         }),
+      })
+    )
+  })
+
+  it('should page through results using a bounded cursor (PERF-03-01)', async () => {
+    const journals = Array.from({ length: 120 }, (_, i) => createMockJournal(`journal-${i}`))
+
+    setupJournals(journals)
+
+    const result = await runAuditJob({ concurrency: 5 })
+
+    expect(result.totalProcessed).toBe(120)
+    // pageSize = concurrency(5) * PAGE_MULTIPLIER(5) = 25 -> ceil(120/25) = 5 pages
+    // (4 full pages + 1 partial), so findMany is called more than once.
+    expect(findManyMock.mock.calls.length).toBeGreaterThan(1)
+    // First page has no cursor; every subsequent page advances via cursor + skip:1.
+    const calls = findManyMock.mock.calls
+    expect(calls[0]?.[0]?.cursor).toBeUndefined()
+    expect(calls[1]?.[0]?.cursor).toEqual({ id: expect.any(String) })
+    expect(calls[1]?.[0]?.skip).toBe(1)
+  })
+
+  it('should project only filePath from the document relation (PERF-03-05)', async () => {
+    const journals: MockJournal[] = [
+      {
+        ...createMockJournal('journal-1'),
+        documentId: 'doc-1',
+        document: { filePath: '/test.pdf' },
+      },
+    ]
+
+    setupJournals(journals)
+
+    await runAuditJob()
+
+    expect(prisma.journal.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        include: { document: { select: { filePath: true } } },
       })
     )
   })
