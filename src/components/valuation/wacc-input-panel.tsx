@@ -132,6 +132,7 @@ export function WACCInputPanel({
                 <select
                   value={industry}
                   onChange={(e) => onIndustryChange(e.target.value)}
+                  aria-label="Industry"
                   className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm"
                 >
                   {INDUSTRY_OPTIONS.map((opt) => (
@@ -178,7 +179,12 @@ export function WACCInputPanel({
             )}
 
             {isLoadingAdvice && (
-              <div className="space-y-2">
+              <div
+                className="space-y-2"
+                role="status"
+                aria-busy="true"
+                aria-label="Loading AI recommendations"
+              >
                 <Skeleton className="h-4 w-full" />
                 <Skeleton className="h-4 w-3/4" />
               </div>
@@ -301,7 +307,13 @@ function InputField({
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger asChild>
-                <Info className="h-3 w-3 cursor-help text-muted-foreground" />
+                <button
+                  type="button"
+                  aria-label={`Information: ${label}`}
+                  className="inline-flex items-center rounded-sm text-muted-foreground hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  <Info className="h-3 w-3" aria-hidden="true" />
+                </button>
               </TooltipTrigger>
               <TooltipContent>
                 <p className="max-w-[200px] text-xs">{tooltip}</p>

@@ -18,16 +18,21 @@ import {
   Area,
   AreaChart,
 } from 'recharts'
+import { AlertCircle } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Badge } from '@/components/ui/badge'
+import { Skeleton } from '@/components/ui/skeleton'
 import { cn } from '@/lib/utils'
 import type { MonteCarloResult, DCFResult, WACCResult } from '@/services/valuation'
+import { resolveDisplayState } from '@/components/valuation/resolve-display-state'
 
 interface ValuationChartsProps {
   monteCarloResult?: MonteCarloResult | null
   dcfResult?: DCFResult | null
   waccResult?: WACCResult | null
+  isLoading?: boolean
+  error?: string | null
   className?: string
 }
 
@@ -37,6 +42,8 @@ export function ValuationCharts({
   monteCarloResult,
   dcfResult,
   waccResult,
+  isLoading = false,
+  error = null,
   className,
 }: ValuationChartsProps) {
   const histogramData = useMemo(() => {
@@ -84,10 +91,54 @@ export function ValuationCharts({
     }))
   }, [dcfResult])
 
-  if (!monteCarloResult && !dcfResult && !waccResult) {
+  const hasData = Boolean(monteCarloResult || dcfResult || waccResult)
+  const state = resolveDisplayState({ loading: isLoading, error, hasData })
+  const status = state.success ? state.data : 'ready'
+
+  if (status === 'loading') {
+    return (
+      <Card
+        className={cn('w-full', className)}
+        role="status"
+        aria-busy="true"
+        aria-label="Loading charts"
+      >
+        <CardHeader>
+          <CardTitle>Visualization</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <Skeleton className="h-48 w-full" />
+        </CardContent>
+      </Card>
+    )
+  }
+
+  if (status === 'error') {
     return (
       <Card className={cn('w-full', className)}>
-        <CardContent className="flex h-48 items-center justify-center text-muted-foreground">
+        <CardHeader>
+          <CardTitle>Visualization</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div
+            className="flex items-center justify-center gap-2 py-12 text-destructive"
+            role="alert"
+          >
+            <AlertCircle className="h-5 w-5" />
+            <span className="text-sm">{error || 'Failed to load charts'}</span>
+          </div>
+        </CardContent>
+      </Card>
+    )
+  }
+
+  if (status === 'empty') {
+    return (
+      <Card className={cn('w-full', className)}>
+        <CardContent
+          className="flex h-48 items-center justify-center text-muted-foreground"
+          role="status"
+        >
           Run calculations to see charts
         </CardContent>
       </Card>

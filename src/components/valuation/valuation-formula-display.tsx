@@ -31,17 +31,26 @@ export function ValuationFormulaDisplay({
         </Badge>
       </div>
       <ScrollArea className="max-h-[400px]">
-        <div className="p-4">
-          {steps.map((step, index) => (
-            <FormulaStepItem
-              key={step.id}
-              step={step}
-              depth={0}
-              maxDepth={maxDepth}
-              index={index}
-            />
-          ))}
-        </div>
+        {steps.length === 0 ? (
+          <div
+            className="flex items-center justify-center py-8 text-sm text-muted-foreground"
+            role="status"
+          >
+            No calculation steps available
+          </div>
+        ) : (
+          <div className="p-4">
+            {steps.map((step, index) => (
+              <FormulaStepItem
+                key={step.id}
+                step={step}
+                depth={0}
+                maxDepth={maxDepth}
+                index={index}
+              />
+            ))}
+          </div>
+        )}
       </ScrollArea>
     </div>
   )

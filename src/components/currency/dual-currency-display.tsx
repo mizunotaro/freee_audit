@@ -23,13 +23,19 @@ export function DualCurrencyDisplay({
     return <span className={className}>{formatCurrency(amount, currency, locale)}</span>
   }
 
+  const otherCurrency = currency === 'JPY' ? 'USD' : 'JPY'
+  const convertedAmount = currency === 'JPY' ? amount / exchangeRate : amount * exchangeRate
+  const converted = formatCurrency(convertedAmount, otherCurrency, locale)
+  const convertedLabel = locale === 'ja' ? '換算' : 'Converted'
+
   return (
     <div className={`flex flex-col ${className}`}>
       <span className="font-medium">{formatCurrency(amount, currency, locale)}</span>
-      <span className="text-sm text-gray-500">
-        {currency === 'JPY'
-          ? formatCurrency(amount / exchangeRate, 'USD', locale)
-          : formatCurrency(amount * exchangeRate, 'JPY', locale)}
+      <span
+        className="text-sm text-gray-500"
+        aria-label={`${convertedLabel}: ${converted} @ ${exchangeRate.toFixed(2)}`}
+      >
+        {converted}
         <span className="ml-1 text-xs">@{exchangeRate.toFixed(2)}</span>
       </span>
     </div>

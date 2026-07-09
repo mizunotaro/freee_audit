@@ -64,6 +64,26 @@ describe('DualCurrencyDisplay', () => {
 
     expect(container.querySelector('.custom-class')).not.toBeNull()
   })
+
+  it('labels the converted amount as a converted equivalent for screen readers (en)', () => {
+    const { container } = render(
+      <DualCurrencyDisplay amount={100000} currency="JPY" exchangeRate={150} showDual locale="en" />
+    )
+
+    const secondary = container.querySelector('.text-gray-500')
+    expect(secondary?.getAttribute('aria-label')).toBe(
+      `Converted: ${formatCurrency(100000 / 150, 'USD', 'en')} @ 150.00`
+    )
+  })
+
+  it('uses the localized converted-equivalent label (ja)', () => {
+    const { container } = render(
+      <DualCurrencyDisplay amount={1000} currency="USD" exchangeRate={150} showDual locale="ja" />
+    )
+
+    const secondary = container.querySelector('.text-gray-500')
+    expect(secondary?.getAttribute('aria-label')).toContain('換算')
+  })
 })
 
 describe('DualCurrencyInline', () => {
