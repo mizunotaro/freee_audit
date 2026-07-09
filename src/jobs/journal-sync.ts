@@ -96,6 +96,13 @@ export async function syncJournals(options: SyncOptions = {}): Promise<SyncResul
           const journals: FreeeJournal[] =
             (response as unknown as { journals: FreeeJournal[] }).journals || []
 
+          const freeeIds = journals.map((freeeJournal) => String(freeeJournal.id))
+          const existingRows = await prisma.journal.findMany({
+            where: { freeeJournalId: { in: freeeIds } },
+            select: { freeeJournalId: true },
+          })
+          const knownFreeeIds = new Set(existingRows.map((row) => row.freeeJournalId))
+
           for (const freeeJournal of journals) {
             try {
               const debitDetail = freeeJournal.details?.find(
@@ -105,9 +112,10 @@ export async function syncJournals(options: SyncOptions = {}): Promise<SyncResul
                 (d: { entry_side: string }) => d.entry_side === 'credit'
               )
 
+              const freeeJournalId = String(freeeJournal.id)
               const journalData = {
                 companyId: company.id,
-                freeeJournalId: String(freeeJournal.id),
+                freeeJournalId,
                 entryDate: new Date(freeeJournal.issue_date),
                 description: freeeJournal.description || '',
                 debitAccount: debitDetail?.account_item_name || '',
@@ -118,23 +126,19 @@ export async function syncJournals(options: SyncOptions = {}): Promise<SyncResul
                 syncedAt: new Date(),
               }
 
-              const existing = await prisma.journal.findUnique({
-                where: { freeeJournalId: String(freeeJournal.id) },
+              const isUpdate = knownFreeeIds.has(freeeJournalId)
+
+              await prisma.journal.upsert({
+                where: { freeeJournalId },
+                update: journalData,
+                create: journalData,
               })
 
-              if (existing) {
-                await prisma.journal.update({
-                  where: { id: existing.id },
-                  data: journalData,
-                })
+              if (isUpdate) {
                 result.updatedJournals++
               } else {
-                await prisma.journal.create({
-                  data: journalData,
-                })
                 result.newJournals++
               }
-
               result.totalSynced++
             } catch (journalError) {
               console.error(`[JournalSync] Error syncing journal ${freeeJournal.id}:`, journalError)

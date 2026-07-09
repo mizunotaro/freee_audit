@@ -18,6 +18,8 @@ interface ScheduledJob {
   enabled?: boolean
 }
 
+const runningJobs = new Set<string>()
+
 const jobs: ScheduledJob[] = [
   {
     name: 'journal-sync',
@@ -39,7 +41,7 @@ const jobs: ScheduledJob[] = [
   },
   {
     name: 'weekly-audit',
-    schedule: '0 2 * * 1',
+    schedule: '15 2 * * 1',
     handler: () => {
       const endDate = new Date()
       const startDate = subDays(endDate, 7)
@@ -54,7 +56,7 @@ const jobs: ScheduledJob[] = [
   },
   {
     name: 'monthly-audit',
-    schedule: '0 2 1 * *',
+    schedule: '30 2 1 * *',
     handler: () => {
       const lastMonth = subMonths(new Date(), 1)
       return runAuditJob({
@@ -82,8 +84,13 @@ export function startScheduler(): void {
     job.task = cron.schedule(
       job.schedule,
       async () => {
-        console.log(`[Scheduler] Running job: ${job.name}`)
+        if (runningJobs.has(job.name)) {
+          console.warn(`[Scheduler] Skipping ${job.name}: already running`)
+          return
+        }
+        runningJobs.add(job.name)
         const startTime = Date.now()
+        console.log(`[Scheduler] Running job: ${job.name}`)
 
         try {
           await job.handler()
@@ -92,6 +99,8 @@ export function startScheduler(): void {
         } catch (error) {
           const duration = Date.now() - startTime
           console.error(`[Scheduler] Job ${job.name} failed after ${duration}ms:`, error)
+        } finally {
+          runningJobs.delete(job.name)
         }
       },
       {

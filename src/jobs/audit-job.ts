@@ -9,6 +9,7 @@ import path from 'path'
 
 const DEFAULT_CONCURRENCY = 5
 const CONCURRENCY_LIMIT = parseInt(process.env.AUDIT_CONCURRENCY || String(DEFAULT_CONCURRENCY), 10)
+const PAGE_MULTIPLIER = 5
 
 export interface AuditJobOptions {
   companyId?: string
@@ -56,10 +57,9 @@ interface JournalWithDocument {
   amount: number
   taxAmount: number | null
   taxType: string | null
-  description: string | null
+  description: string
   documentId: string | null
   document: {
-    id: string
     filePath: string
   } | null
 }
@@ -247,70 +247,80 @@ export async function runAuditJob(options: AuditJobOptions = {}): Promise<AuditJ
     }
   }
 
-  const journals = await prisma.journal.findMany({
-    where: whereClause,
-    include: {
-      document: true,
-    },
-    orderBy: { entryDate: 'asc' },
-  })
-
-  console.log(`[AuditJob] Found ${journals.length} journals to audit`)
+  const totalToProcess = await prisma.journal.count({ where: whereClause })
+  console.log(`[AuditJob] Found ${totalToProcess} journals to audit`)
 
   const concurrency = options.concurrency ?? CONCURRENCY_LIMIT
-  console.log(`[AuditJob] Using concurrency: ${concurrency}`)
+  const pageSize = concurrency * PAGE_MULTIPLIER
+  console.log(`[AuditJob] Using concurrency: ${concurrency}, page size: ${pageSize}`)
 
-  if (journals.length > 100) {
+  if (totalToProcess > 100) {
     logMemoryUsage('Before processing')
   }
 
   const issues: AuditSummary['issues'] = []
   let processedCount = 0
+  let cursor: string | undefined = undefined
 
-  for (let i = 0; i < journals.length; i += concurrency) {
-    const batch = journals.slice(i, i + concurrency)
+  while (true) {
+    const page = (await prisma.journal.findMany({
+      where: whereClause,
+      include: { document: { select: { filePath: true } } },
+      orderBy: [{ entryDate: 'asc' }, { id: 'asc' }],
+      take: pageSize,
+      skip: cursor ? 1 : 0,
+      cursor: cursor ? { id: cursor } : undefined,
+    })) as unknown as JournalWithDocument[]
 
-    const batchResults = await Promise.allSettled(
-      batch.map((journal) => processJournal(journal, options, receiptAnalyzer, journalChecker))
-    )
+    if (page.length === 0) break
 
-    for (const settledResult of batchResults) {
-      processedCount++
-      result.totalProcessed++
+    for (let i = 0; i < page.length; i += concurrency) {
+      const batch = page.slice(i, i + concurrency)
 
-      if (settledResult.status === 'fulfilled') {
-        const { status, issues: validationIssues, error } = settledResult.value
+      const batchResults = await Promise.allSettled(
+        batch.map((journal) => processJournal(journal, options, receiptAnalyzer, journalChecker))
+      )
 
-        if (error) {
-          result.errors++
-        } else if (status === 'PASSED') {
-          result.passed++
-        } else {
-          result.failed++
-        }
+      for (const settledResult of batchResults) {
+        processedCount++
+        result.totalProcessed++
 
-        if (validationIssues.length > 0 && status === 'FAILED') {
-          const journal = batch.find((j) => j.id === settledResult.value.journalId)
-          if (journal) {
-            issues.push({
-              journalId: journal.freeeJournalId,
-              description: journal.description,
-              issues: validationIssues,
-            })
+        if (settledResult.status === 'fulfilled') {
+          const { status, issues: validationIssues, error } = settledResult.value
+
+          if (error) {
+            result.errors++
+          } else if (status === 'PASSED') {
+            result.passed++
+          } else {
+            result.failed++
           }
+
+          if (validationIssues.length > 0 && status === 'FAILED') {
+            const journal = batch.find((j) => j.id === settledResult.value.journalId)
+            if (journal) {
+              issues.push({
+                journalId: journal.freeeJournalId,
+                description: journal.description,
+                issues: validationIssues,
+              })
+            }
+          }
+        } else {
+          result.errors++
+          console.error('[AuditJob] Unexpected rejection:', settledResult.reason)
         }
-      } else {
-        result.errors++
-        console.error('[AuditJob] Unexpected rejection:', settledResult.reason)
+      }
+
+      if (processedCount % 50 === 0 || processedCount === totalToProcess) {
+        console.log(`[AuditJob] Progress: ${processedCount}/${totalToProcess}`)
+        if (totalToProcess > 100) {
+          logMemoryUsage(`After ${processedCount} journals`)
+        }
       }
     }
 
-    if (processedCount % 50 === 0 || processedCount === journals.length) {
-      console.log(`[AuditJob] Progress: ${processedCount}/${journals.length}`)
-      if (journals.length > 100) {
-        logMemoryUsage(`After ${processedCount} journals`)
-      }
-    }
+    cursor = page[page.length - 1].id
   }
 
   result.durationMs = Date.now() - startTime
