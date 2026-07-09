@@ -1,6 +1,4 @@
-import { prisma } from '@/lib/db'
-
-const DB_TIMEOUT_MS = 30000
+import { fetchBalancesByFiscalYear, type MonthlyBalanceRow } from '@/services/report/balance-loader'
 
 export interface PeriodicReportConfig {
   companyId: string
@@ -86,8 +84,16 @@ export async function generatePeriodicReport(
     includePreviousYear
   )
 
-  const periodDataPromises = periods.map((period) => getPeriodData(companyId, period))
-  const periodDataResults = await Promise.all(periodDataPromises)
+  const fiscalYears: number[] = []
+  for (const period of periods) {
+    fiscalYears.push(period.fiscalYear)
+    if (period.endMonth === 1) {
+      fiscalYears.push(period.fiscalYear - 1)
+    }
+  }
+
+  const balancesByKey = await loadPeriodBalances(companyId, fiscalYears)
+  const periodDataResults = periods.map((period) => getPeriodData(period, balancesByKey))
   const periodData = periodDataResults.filter((data): data is PeriodData => data !== null)
 
   const summary = generateSummary(periodData)
@@ -147,30 +153,51 @@ function calculatePeriods(
   return periods
 }
 
-async function getPeriodData(
+function periodBalancesKey(fiscalYear: number, month: number): string {
+  return `${fiscalYear}|${month}`
+}
+
+async function loadPeriodBalances(
   companyId: string,
-  period: { label: string; fiscalYear: number; startMonth: number; endMonth: number }
-): Promise<PeriodData | null> {
-  const balances = await prisma.$transaction(
-    async (tx) => {
-      return tx.monthlyBalance.findMany({
-        where: {
-          companyId,
-          fiscalYear: period.fiscalYear,
-          month: period.endMonth,
-        },
-      })
-    },
-    { maxWait: 5000, timeout: DB_TIMEOUT_MS }
+  fiscalYears: number[]
+): Promise<Map<string, MonthlyBalanceRow[]>> {
+  const byKey = new Map<string, MonthlyBalanceRow[]>()
+  const distinctFiscalYears = [...new Set(fiscalYears)].filter((fy) => Number.isFinite(fy))
+  if (distinctFiscalYears.length === 0) {
+    return byKey
+  }
+  const perYear = await Promise.all(
+    distinctFiscalYears.map((fy) => fetchBalancesByFiscalYear(companyId, fy))
   )
+  distinctFiscalYears.forEach((fiscalYear, index) => {
+    const result = perYear[index]
+    if (!result.success) return
+    for (const row of result.data) {
+      const key = periodBalancesKey(fiscalYear, row.month)
+      const list = byKey.get(key)
+      if (list) {
+        list.push(row)
+      } else {
+        byKey.set(key, [row])
+      }
+    }
+  })
+  return byKey
+}
+
+function getPeriodData(
+  period: { label: string; fiscalYear: number; startMonth: number; endMonth: number },
+  balancesByKey: Map<string, MonthlyBalanceRow[]>
+): PeriodData | null {
+  const balances = balancesByKey.get(periodBalancesKey(period.fiscalYear, period.endMonth)) ?? []
 
   if (balances.length === 0) {
     return generateSamplePeriodData(period)
   }
 
   const bs = mapToPeriodBS(balances)
-  const pl = await calculatePeriodPL(companyId, period.fiscalYear, period.endMonth)
-  const previousBS = await getPreviousMonthBS(companyId, period.fiscalYear, period.endMonth)
+  const pl = calculatePeriodPL(balances)
+  const previousBS = getPreviousMonthBS(period.fiscalYear, period.endMonth, balancesByKey)
 
   const cf = calculatePeriodCF(pl, bs, previousBS)
   const kpis = calculatePeriodKPIs(bs, pl, cf)
@@ -217,24 +244,7 @@ function mapToPeriodBS(balances: { category: string; amount: number }[]): Period
   }
 }
 
-async function calculatePeriodPL(
-  companyId: string,
-  fiscalYear: number,
-  month: number
-): Promise<PeriodPL> {
-  const balances = await prisma.$transaction(
-    async (tx) => {
-      return tx.monthlyBalance.findMany({
-        where: {
-          companyId,
-          fiscalYear,
-          month,
-        },
-      })
-    },
-    { maxWait: 5000, timeout: DB_TIMEOUT_MS }
-  )
-
+function calculatePeriodPL(balances: { category: string; amount: number }[]): PeriodPL {
   const revenue = balances
     .filter((b) => b.category === 'sales')
     .reduce((sum, b) => sum + b.amount, 0)
@@ -277,11 +287,11 @@ async function calculatePeriodPL(
   }
 }
 
-async function getPreviousMonthBS(
-  companyId: string,
+function getPreviousMonthBS(
   fiscalYear: number,
-  month: number
-): Promise<PeriodBS | null> {
+  month: number,
+  balancesByKey: Map<string, MonthlyBalanceRow[]>
+): PeriodBS | null {
   let prevYear = fiscalYear
   let prevMonth = month - 1
 
@@ -290,18 +300,7 @@ async function getPreviousMonthBS(
     prevYear -= 1
   }
 
-  const balances = await prisma.$transaction(
-    async (tx) => {
-      return tx.monthlyBalance.findMany({
-        where: {
-          companyId,
-          fiscalYear: prevYear,
-          month: prevMonth,
-        },
-      })
-    },
-    { maxWait: 5000, timeout: DB_TIMEOUT_MS }
-  )
+  const balances = balancesByKey.get(periodBalancesKey(prevYear, prevMonth)) ?? []
 
   if (balances.length === 0) {
     return null

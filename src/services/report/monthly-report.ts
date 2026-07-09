@@ -15,6 +15,7 @@ import { calculateRunway } from '@/services/cashflow/runway-calculator'
 import { calculateFinancialKPIs } from '@/services/analytics/financial-kpi'
 import { calculateActualVsBudget } from '@/services/budget/actual-vs-budget'
 import { prisma } from '@/lib/db'
+import { fetchBalancesByFiscalYear, type MonthlyBalanceRow } from '@/services/report/balance-loader'
 import {
   type AppError,
   type Result,
@@ -23,8 +24,6 @@ import {
   failure,
   success,
 } from '@/types/result'
-
-const DB_TIMEOUT_MS = 30000
 
 export interface MonthlyReportInput {
   companyId: string
@@ -35,33 +34,41 @@ export interface MonthlyReportInput {
 export async function generateMonthlyReport(
   input: MonthlyReportInput
 ): Promise<Result<MonthlyReport, AppError>> {
-  const company = await prisma.$transaction(
-    async (tx) => {
-      return tx.company.findFirst({
-        where: { id: input.companyId },
-      })
-    },
-    { maxWait: 5000, timeout: DB_TIMEOUT_MS }
-  )
+  const company = await prisma.company.findFirst({
+    where: { id: input.companyId },
+  })
 
   if (!company) {
     return failure(createAppError(ERROR_CODES.NOT_FOUND, 'Company not found'))
   }
 
-  const [balanceSheet, previousBS, profitLoss, previousPL] = await Promise.all([
-    getBalanceSheet(input.companyId, input.fiscalYear, input.month),
-    getBalanceSheet(input.companyId, input.fiscalYear, input.month - 1),
-    getProfitLoss(input.companyId, input.fiscalYear, input.month),
-    getProfitLoss(input.companyId, input.fiscalYear - 1, input.month),
-  ])
+  const balancesByMonth = await loadBalancesByMonth(input.companyId, input.fiscalYear)
+
+  const balanceSheet = balanceSheetFromBalances(
+    balancesByMonth.get(input.month),
+    input.fiscalYear,
+    input.month
+  )
+  const previousBS = balanceSheetFromBalances(
+    balancesByMonth.get(input.month - 1),
+    input.fiscalYear,
+    input.month - 1
+  )
+  const profitLoss = profitLossFromBalances(
+    balancesByMonth.get(input.month),
+    input.fiscalYear,
+    input.month
+  )
 
   const cashFlow = calculateCashFlow(profitLoss, balanceSheet, previousBS)
 
-  const yearCashFlows = await getYearCashFlows(input.companyId, input.fiscalYear)
+  const yearCashFlows = await getYearCashFlows(input.companyId, input.fiscalYear, balancesByMonth)
   const cashPosition = generateCashPosition(
     yearCashFlows,
     previousBS?.assets.current[0]?.amount || 0
   )
+
+  const previousPL = await getPreviousYearProfitLoss(input.companyId, input.fiscalYear, input.month)
 
   const kpis = calculateFinancialKPIs(balanceSheet, profitLoss, cashFlow, previousPL)
 
@@ -88,66 +95,70 @@ export async function generateMonthlyReport(
   })
 }
 
-async function getBalanceSheet(
+async function loadBalancesByMonth(
   companyId: string,
-  fiscalYear: number,
-  month: number
-): Promise<BalanceSheet> {
-  const balances = await prisma.$transaction(
-    async (tx) => {
-      return tx.monthlyBalance.findMany({
-        where: {
-          companyId,
-          fiscalYear,
-          month,
-        },
-      })
-    },
-    { maxWait: 5000, timeout: DB_TIMEOUT_MS }
-  )
-
-  if (balances.length === 0) {
-    return generateSampleBalanceSheet(fiscalYear, month)
+  fiscalYear: number
+): Promise<Map<number, MonthlyBalanceRow[]>> {
+  const byMonth = new Map<number, MonthlyBalanceRow[]>()
+  const result = await fetchBalancesByFiscalYear(companyId, fiscalYear)
+  if (!result.success) {
+    return byMonth
   }
-
-  return mapBalancesToBalanceSheet(balances, fiscalYear, month)
+  for (const row of result.data) {
+    const list = byMonth.get(row.month)
+    if (list) {
+      list.push(row)
+    } else {
+      byMonth.set(row.month, [row])
+    }
+  }
+  return byMonth
 }
 
-async function getProfitLoss(
+async function getPreviousYearProfitLoss(
   companyId: string,
   fiscalYear: number,
   month: number
 ): Promise<ProfitLoss> {
-  const balances = await prisma.$transaction(
-    async (tx) => {
-      return tx.monthlyBalance.findMany({
-        where: {
-          companyId,
-          fiscalYear,
-          month,
-        },
-      })
-    },
-    { maxWait: 5000, timeout: DB_TIMEOUT_MS }
-  )
+  const prevByMonth = await loadBalancesByMonth(companyId, fiscalYear - 1)
+  return profitLossFromBalances(prevByMonth.get(month), fiscalYear - 1, month)
+}
 
-  if (balances.length === 0) {
+function balanceSheetFromBalances(
+  balances: MonthlyBalanceRow[] | undefined,
+  fiscalYear: number,
+  month: number
+): BalanceSheet {
+  if (!balances || balances.length === 0) {
+    return generateSampleBalanceSheet(fiscalYear, month)
+  }
+  return mapBalancesToBalanceSheet(balances, fiscalYear, month)
+}
+
+function profitLossFromBalances(
+  balances: MonthlyBalanceRow[] | undefined,
+  fiscalYear: number,
+  month: number
+): ProfitLoss {
+  if (!balances || balances.length === 0) {
     return generateSampleProfitLoss(fiscalYear, month)
   }
-
   return mapBalancesToProfitLoss(balances, fiscalYear, month)
 }
 
 async function getYearCashFlows(
   companyId: string,
-  fiscalYear: number
+  fiscalYear: number,
+  balancesByMonth?: Map<number, MonthlyBalanceRow[]>
 ): Promise<CashFlowStatement[]> {
+  const byMonth = balancesByMonth ?? (await loadBalancesByMonth(companyId, fiscalYear))
   const cashFlows: CashFlowStatement[] = []
 
   for (let month = 1; month <= 12; month++) {
-    const bs = await getBalanceSheet(companyId, fiscalYear, month)
-    const previousBS = month > 1 ? await getBalanceSheet(companyId, fiscalYear, month - 1) : null
-    const pl = await getProfitLoss(companyId, fiscalYear, month)
+    const bs = balanceSheetFromBalances(byMonth.get(month), fiscalYear, month)
+    const previousBS =
+      month > 1 ? balanceSheetFromBalances(byMonth.get(month - 1), fiscalYear, month - 1) : null
+    const pl = profitLossFromBalances(byMonth.get(month), fiscalYear, month)
 
     cashFlows.push(calculateCashFlow(pl, bs, previousBS))
   }
@@ -415,11 +426,12 @@ export async function getMonthlyTrend(
   companyId: string,
   fiscalYear: number
 ): Promise<MonthlyTrend[]> {
+  const byMonth = await loadBalancesByMonth(companyId, fiscalYear)
   const trends: MonthlyTrend[] = []
 
   for (let month = 1; month <= 12; month++) {
-    const pl = await getProfitLoss(companyId, fiscalYear, month)
-    const bs = await getBalanceSheet(companyId, fiscalYear, month)
+    const pl = profitLossFromBalances(byMonth.get(month), fiscalYear, month)
+    const bs = balanceSheetFromBalances(byMonth.get(month), fiscalYear, month)
 
     trends.push({
       month: `${month}月`,
@@ -481,14 +493,9 @@ export async function getMultiMonthReport(
   endMonth: number,
   monthCount: 3 | 6 | 12
 ): Promise<Result<MultiMonthReport, AppError>> {
-  const company = await prisma.$transaction(
-    async (tx) => {
-      return tx.company.findFirst({
-        where: { id: companyId },
-      })
-    },
-    { maxWait: 5000, timeout: DB_TIMEOUT_MS }
-  )
+  const company = await prisma.company.findFirst({
+    where: { id: companyId },
+  })
 
   if (!company) {
     return failure(createAppError(ERROR_CODES.NOT_FOUND, 'Company not found'))
@@ -500,14 +507,19 @@ export async function getMultiMonthReport(
     months.push(m > 0 ? m : m + 12)
   }
 
+  const balancesByMonth = await loadBalancesByMonth(companyId, fiscalYear)
+
   const balanceSheets: BalanceSheet[] = []
   const profitLosses: ProfitLoss[] = []
   const cashFlows: CashFlowStatement[] = []
 
   for (const month of months) {
-    const bs = await getBalanceSheet(companyId, fiscalYear, month)
-    const previousBS = month > 1 ? await getBalanceSheet(companyId, fiscalYear, month - 1) : null
-    const pl = await getProfitLoss(companyId, fiscalYear, month)
+    const bs = balanceSheetFromBalances(balancesByMonth.get(month), fiscalYear, month)
+    const previousBS =
+      month > 1
+        ? balanceSheetFromBalances(balancesByMonth.get(month - 1), fiscalYear, month - 1)
+        : null
+    const pl = profitLossFromBalances(balancesByMonth.get(month), fiscalYear, month)
     const cf = calculateCashFlow(pl, bs, previousBS)
 
     balanceSheets.push(bs)
