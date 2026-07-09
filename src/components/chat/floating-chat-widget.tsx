@@ -137,12 +137,20 @@ export function FloatingChatWidget() {
   if (state === 'closed') {
     return (
       <div className="fixed bottom-6 right-6 z-50">
-        <Button onClick={toggle} className="h-14 w-14 rounded-full shadow-lg" size="icon">
-          <MessageCircle className="h-6 w-6" />
+        <Button
+          onClick={toggle}
+          className="h-14 w-14 rounded-full shadow-lg"
+          size="icon"
+          aria-label={
+            unreadCount > 0 ? `チャットを開く（未読 ${unreadCount}件）` : 'チャットを開く'
+          }
+        >
+          <MessageCircle className="h-6 w-6" aria-hidden="true" />
           {unreadCount > 0 && (
             <Badge
               className="absolute -right-1 -top-1 h-5 w-5 rounded-full p-0 text-xs"
               variant="destructive"
+              aria-hidden="true"
             >
               {unreadCount > 9 ? '9+' : unreadCount}
             </Badge>
@@ -154,18 +162,20 @@ export function FloatingChatWidget() {
 
   if (state === 'minimized') {
     return (
-      <div
+      <button
+        type="button"
         className="fixed bottom-6 right-6 z-50 flex h-12 cursor-pointer items-center gap-2 rounded-lg bg-primary px-4 text-primary-foreground shadow-lg"
         onClick={open}
+        aria-label={unreadCount > 0 ? `チャットを開く（未読 ${unreadCount}件）` : 'チャットを開く'}
       >
-        <MessageCircle className="h-5 w-5" />
+        <MessageCircle className="h-5 w-5" aria-hidden="true" />
         <span className="text-sm font-medium">財務AIアシスタント</span>
         {unreadCount > 0 && (
           <Badge className="ml-2 h-5 w-5 rounded-full p-0 text-xs" variant="destructive">
             {unreadCount > 9 ? '9+' : unreadCount}
           </Badge>
         )}
-      </div>
+      </button>
     )
   }
 
@@ -200,8 +210,9 @@ export function FloatingChatWidget() {
               e.stopPropagation()
               setShowMenu(!showMenu)
             }}
+            aria-label="会話をクリア"
           >
-            <Trash2 className="h-4 w-4" />
+            <Trash2 className="h-4 w-4" aria-hidden="true" />
           </Button>
           <Button
             variant="ghost"
@@ -211,8 +222,9 @@ export function FloatingChatWidget() {
               e.stopPropagation()
               minimize()
             }}
+            aria-label="最小化"
           >
-            <Minus className="h-4 w-4" />
+            <Minus className="h-4 w-4" aria-hidden="true" />
           </Button>
           <Button
             variant="ghost"
@@ -222,15 +234,21 @@ export function FloatingChatWidget() {
               e.stopPropagation()
               close()
             }}
+            aria-label="閉じる"
           >
-            <X className="h-4 w-4" />
+            <X className="h-4 w-4" aria-hidden="true" />
           </Button>
         </div>
       </div>
 
       {/* Messages */}
       <ScrollArea className="flex-1" style={{ height: size.height - 180 }}>
-        <div className="space-y-4 p-4">
+        <div
+          className="space-y-4 p-4"
+          role="log"
+          aria-live="polite"
+          aria-label="チャットのメッセージ"
+        >
           {messages.length === 0 && !isLoading && (
             <div className="text-center text-sm text-muted-foreground">
               <p className="mb-2">財務AIアシスタントへようこそ</p>
@@ -257,6 +275,7 @@ export function FloatingChatWidget() {
             onChange={(e) => setInputValue(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder="質問を入力..."
+            aria-label="メッセージを入力"
             className="flex-1 rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
             disabled={isLoading}
           />

@@ -23,6 +23,8 @@ import {
 import { MoreHorizontal, Edit, Trash2, Check, Eye, GitCompare } from 'lucide-react'
 import type { AccountMapping } from '@/types/conversion'
 import { ConfidenceIndicator } from './confidence-indicator'
+import { resolveListStatus } from './resolve-list-status'
+import { ListState } from './list-state'
 
 interface MappingListProps {
   mappings: AccountMapping[]
@@ -30,6 +32,8 @@ interface MappingListProps {
   onSelectionChange: (ids: string[]) => void
   onApprove: (id: string) => Promise<void>
   onDelete: (id: string) => Promise<void>
+  isLoading?: boolean
+  error?: string | null
 }
 
 export function MappingList({
@@ -38,6 +42,8 @@ export function MappingList({
   onSelectionChange,
   onApprove,
   onDelete,
+  isLoading = false,
+  error = null,
 }: MappingListProps) {
   const [processingId, setProcessingId] = useState<string | null>(null)
 
@@ -93,14 +99,19 @@ export function MappingList({
     return <Badge variant={config.variant}>{config.label}</Badge>
   }
 
-  if (mappings.length === 0) {
+  const resolved = resolveListStatus({
+    loading: isLoading,
+    error: error ?? null,
+    dataLength: mappings.length,
+  })
+  if (resolved.success && resolved.data !== 'ready') {
     return (
-      <div className="rounded-lg border border-dashed p-8 text-center">
-        <p className="text-muted-foreground">マッピングがありません</p>
-        <p className="mt-1 text-sm text-muted-foreground">
-          AI推論を実行するか、手動でマッピングを作成してください
-        </p>
-      </div>
+      <ListState
+        status={resolved.data}
+        error={error ?? undefined}
+        emptyTitle="マッピングがありません"
+        emptyMessage="AI推論を実行するか、手動でマッピングを作成してください"
+      />
     )
   }
 
@@ -170,7 +181,12 @@ export function MappingList({
               <TableCell>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="sm" disabled={processingId === mapping.id}>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      disabled={processingId === mapping.id}
+                      aria-label={`${mapping.sourceAccountName}の操作`}
+                    >
                       <MoreHorizontal className="h-4 w-4" />
                     </Button>
                   </DropdownMenuTrigger>

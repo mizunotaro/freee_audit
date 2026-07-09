@@ -85,4 +85,16 @@ describe('chat/progress-indicator — ProgressIndicator', () => {
     )
     expect(getByText('サーバーに接続しています...')).toBeInTheDocument()
   })
+
+  it('exposes the progress track as an accessible progressbar', () => {
+    const { getByRole } = render(
+      <ProgressIndicator progress={progressState('analyzing')} showPersonaAnimation={false} />
+    )
+
+    const bar = getByRole('progressbar')
+    expect(bar).toHaveAttribute('aria-valuenow', '10')
+    expect(bar).toHaveAttribute('aria-valuemin', '0')
+    expect(bar).toHaveAttribute('aria-valuemax', '100')
+    expect(bar).toHaveAttribute('aria-label', '分析中')
+  })
 })
