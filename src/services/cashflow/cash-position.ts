@@ -1,6 +1,16 @@
 import type { CashPosition, CashPositionMonthly, CashFlowStatement } from '@/types'
 import { sumValues } from '@/lib/utils'
 
+/**
+ * 月次キャッシュフローから翌月繰越を含むキャッシュポジションを生成する。
+ *
+ * 月次データを `month` 昇順に並べ、各月の期首現金・営業/投資/財務収支・純増減・期末現金を
+ * ローリングで算出する。入力は変更せずソート済みコピーを用いる。
+ *
+ * @param monthlyCashFlows - 月次キャッシュフロー計算書の配列
+ * @param beginningCash - 期首現金残高
+ * @returns 月次キャッシュポジションと年間合計
+ */
 export function generateCashPosition(
   monthlyCashFlows: CashFlowStatement[],
   beginningCash: number
@@ -85,6 +95,16 @@ export interface CashPositionDetail {
   categoryAnnual: number
 }
 
+/**
+ * 月次キャッシュフローから営業/投資/財務の項目別（月次・年間）明細を生成する。
+ *
+ * 各カテゴリの収支項目を 1〜12 月の月次配列と年間合計に展開する。
+ * 営業収支の内訳は推定比率に基づく近似値である点に注意。
+ *
+ * @param monthlyCashFlows - 月次キャッシュフロー計算書の配列
+ * @param _beginningCash - 期首現金残高（現状未使用、将来拡張用）
+ * @returns カテゴリ別の月次・年間明細
+ */
 export function generateDetailedCashPosition(
   monthlyCashFlows: CashFlowStatement[],
   _beginningCash: number

@@ -65,7 +65,19 @@ const KEIDANREN_COMPLIANCE_ITEMS: Array<{
   },
 ]
 
+/**
+ * 事業報告書の妥当性・法要件コンプライアンスを検証するサービス。
+ *
+ * シンプル型・経団連型それぞれの必須項目チェックと、会社法に基づく
+ * 開示要件の充足確認を行う。
+ */
 export class BusinessReportValidator {
+  /**
+   * シンプル型報告書の必須フィールドと推奨記載量を検証する。
+   *
+   * @param report - シンプル型報告書データ（部分）
+   * @returns 検証結果（必須フィールド欠落はエラー、記載不足は警告）
+   */
   validateSimpleReport(report: Partial<BusinessReportData>): ValidationResult {
     const errors: ValidationError[] = []
     const warnings: ValidationWarning[] = []
@@ -103,6 +115,12 @@ export class BusinessReportValidator {
     }
   }
 
+  /**
+   * 経団連型報告書の必須セクションと推奨記載内容を検証する。
+   *
+   * @param report - 経団連型報告書データ（部分）
+   * @returns 検証結果（必須セクション欠落はエラー、推奨項目不足は警告）
+   */
   validateKeidanrenReport(report: Partial<KeidanrenBusinessReport>): ValidationResult {
     const errors: ValidationError[] = []
     const warnings: ValidationWarning[] = []
@@ -150,6 +168,14 @@ export class BusinessReportValidator {
     }
   }
 
+  /**
+   * 経団連型報告書の会社法に基づく開示要件コンプライアンスをチェックする。
+   *
+   * 各要件について該当セクションの有無を確認し、pass/fail を判定する。
+   *
+   * @param report - 経団連型報告書データ（部分）
+   * @returns コンプライアンス結果（全要件充足時のみ `isCompliant: true`）
+   */
   checkKeidanrenCompliance(report: Partial<KeidanrenBusinessReport>): ComplianceResult {
     const checkedItems: ComplianceCheckItem[] = []
     const missingRequirements: string[] = []
@@ -179,6 +205,13 @@ export class BusinessReportValidator {
     }
   }
 
+  /**
+   * 単一文面の空欄・推奨最低文字数を検証する。
+   *
+   * @param content - 検証対象の文面
+   * @param minLength - 推奨最低文字数（既定 50）。未満の場合は警告。
+   * @returns 検証結果（空欄はエラー、文字数不足は警告）
+   */
   validateContent(content: string, minLength: number = 50): ValidationResult {
     const errors: ValidationError[] = []
     const warnings: ValidationWarning[] = []

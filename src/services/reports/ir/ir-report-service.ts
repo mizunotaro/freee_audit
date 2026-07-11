@@ -22,6 +22,14 @@ function getStorageKey(reportId: string): string {
   return `${STORAGE_KEY_PREFIX}${reportId}`
 }
 
+/**
+ * 指定IDのIRレポートをブラウザ localStorage から取得する。
+ *
+ * サーバサイド（`window` 未定義）では `null` を返す。
+ *
+ * @param reportId - レポートID
+ * @returns IRレポート。未登録やパース失敗時、サーバサイドでは `null`。
+ */
 export async function getReport(reportId: string): Promise<IRReport | null> {
   if (typeof window === 'undefined') {
     return null
@@ -41,6 +49,13 @@ export async function getReport(reportId: string): Promise<IRReport | null> {
   }
 }
 
+/**
+ * IRレポートを localStorage に保存する（更新日時・バージョンをインクリメント）。
+ *
+ * サーバサイドでは何もしない。
+ *
+ * @param report - 保存するIRレポート
+ */
 export async function saveReport(report: IRReport): Promise<void> {
   if (typeof window === 'undefined') {
     return
@@ -59,6 +74,12 @@ export async function saveReport(report: IRReport): Promise<void> {
   localStorage.setItem(key, JSON.stringify(updatedReport))
 }
 
+/**
+ * 新規IRレポート（draft・空セクション）を生成して localStorage に保存する。
+ *
+ * @param data - 企業ID・タイトル・年度・言語・作成者
+ * @returns 生成されたIRレポート
+ */
 export async function createReport(data: {
   companyId: string
   title: { ja: string; en: string }
@@ -93,6 +114,11 @@ export async function createReport(data: {
   return report
 }
 
+/**
+ * 指定IDのIRレポートを localStorage から削除する。サーバサイドでは何もしない。
+ *
+ * @param reportId - レポートID
+ */
 export async function deleteReport(reportId: string): Promise<void> {
   if (typeof window === 'undefined') {
     return
@@ -102,6 +128,14 @@ export async function deleteReport(reportId: string): Promise<void> {
   localStorage.removeItem(key)
 }
 
+/**
+ * localStorage 内の全IRレポートを一覧取得する（フィルタ・更新日時降順ソート付き）。
+ *
+ * サーバサイドでは空のレスポンスを返す。
+ *
+ * @param filter - ステータス/年度/言語/検索語のフィルタ（オプション）
+ * @returns レポート一覧と件数
+ */
 export async function listReports(filter?: IRReportListFilter): Promise<IRReportListResponse> {
   if (typeof window === 'undefined') {
     return { reports: [], total: 0, page: 1, pageSize: 20 }
@@ -157,6 +191,13 @@ export async function listReports(filter?: IRReportListFilter): Promise<IRReport
   }
 }
 
+/**
+ * IRレポートのステータスを更新する。`published` 時は公開日時を記録する。
+ *
+ * @param reportId - レポートID
+ * @param status - 新しいステータス
+ * @throws レポートが存在しない場合
+ */
 export async function updateReportStatus(reportId: string, status: ReportStatus): Promise<void> {
   const report = await getReport(reportId)
   if (!report) {
@@ -172,6 +213,14 @@ export async function updateReportStatus(reportId: string, status: ReportStatus)
   await saveReport(report)
 }
 
+/**
+ * 指定セクションの部分更新を適用して保存する。
+ *
+ * @param reportId - レポートID
+ * @param sectionId - セクションID
+ * @param updates - セクションの更新フィールド（部分）
+ * @throws レポートまたはセクションが存在しない場合
+ */
 export async function updateSection(
   reportId: string,
   sectionId: string,
@@ -195,6 +244,14 @@ export async function updateSection(
   await saveReport(report)
 }
 
+/**
+ * 新規セクション（ID・order 自動採番）をレポート末尾に追加する。
+ *
+ * @param reportId - レポートID
+ * @param section - ID/order 以外のセクションデータ
+ * @returns 追加されたセクション
+ * @throws レポートが存在しない場合
+ */
 export async function addSection(
   reportId: string,
   section: Omit<IRReportSection, 'id' | 'order'>
@@ -216,6 +273,13 @@ export async function addSection(
   return newSection
 }
 
+/**
+ * 指定セクションを削除し、残セクションの order を詰め直す。
+ *
+ * @param reportId - レポートID
+ * @param sectionId - 削除対象セクションID
+ * @throws レポートが存在しない場合
+ */
 export async function removeSection(reportId: string, sectionId: string): Promise<void> {
   const report = await getReport(reportId)
   if (!report) {
@@ -230,6 +294,13 @@ export async function removeSection(reportId: string, sectionId: string): Promis
   await saveReport(report)
 }
 
+/**
+ * レポートの財務ハイライト一覧を差し替えて保存する。
+ *
+ * @param reportId - レポートID
+ * @param highlights - 財務ハイライト配列
+ * @throws レポートが存在しない場合
+ */
 export async function updateFinancialHighlights(
   reportId: string,
   highlights: FinancialHighlight[]
@@ -243,6 +314,13 @@ export async function updateFinancialHighlights(
   await saveReport(report)
 }
 
+/**
+ * レポートの株主構成一覧を差し替えて保存する。
+ *
+ * @param reportId - レポートID
+ * @param composition - 株主構成データ配列
+ * @throws レポートが存在しない場合
+ */
 export async function updateShareholderComposition(
   reportId: string,
   composition: ShareholderData[]
@@ -256,6 +334,13 @@ export async function updateShareholderComposition(
   await saveReport(report)
 }
 
+/**
+ * レポートのIRイベント一覧を差し替えて保存する。
+ *
+ * @param reportId - レポートID
+ * @param events - IRイベント配列
+ * @throws レポートが存在しない場合
+ */
 export async function updateEvents(reportId: string, events: IREvent[]): Promise<void> {
   const report = await getReport(reportId)
   if (!report) {
@@ -266,6 +351,13 @@ export async function updateEvents(reportId: string, events: IREvent[]): Promise
   await saveReport(report)
 }
 
+/**
+ * レポートのFAQ一覧を差し替えて保存する。
+ *
+ * @param reportId - レポートID
+ * @param faqs - FAQアイテム配列
+ * @throws レポートが存在しない場合
+ */
 export async function updateFAQs(reportId: string, faqs: FAQItem[]): Promise<void> {
   const report = await getReport(reportId)
   if (!report) {
@@ -276,6 +368,14 @@ export async function updateFAQs(reportId: string, faqs: FAQItem[]): Promise<voi
   await saveReport(report)
 }
 
+/**
+ * セクション種別に応じた本文を生成する（モック実装）。
+ *
+ * 実際の LLM 呼出しではなく、セクション種別ごとの定型テンプレートを返す。
+ *
+ * @param request - AI生成リクエスト
+ * @returns 生成結果（常に `success: true`、テンプレート本文・推定トークン数）
+ */
 export async function generateSectionContent(
   request: AIGenerationRequest
 ): Promise<AIGenerationResult> {
@@ -328,6 +428,11 @@ export async function generateSectionContent(
   }
 }
 
+/**
+ * ブラウザ localStorage を永続化先とするIRレポート操作サービス。
+ *
+ * 上記 CRUD/更新関数をまとめたオブジェクト。サーバサイドでは取得系は空/null を返す。
+ */
 export const irReportService = {
   getReport,
   saveReport,

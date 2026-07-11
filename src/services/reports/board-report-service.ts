@@ -135,6 +135,12 @@ export interface GenerateReportOptions {
   detailLevel: 'summary' | 'detailed'
 }
 
+/**
+ * 企業の取締役会報告資料一覧を取得する（年度・月の降順、セクション付き）。
+ *
+ * @param companyId - 企業ID
+ * @returns 取締役会報告資料の配列（セクションは sortOrder 昇順）
+ */
 export async function getBoardReports(companyId: string): Promise<BoardReportDetail[]> {
   const reports = await prisma.$transaction(
     async (tx) => {
@@ -173,6 +179,12 @@ export async function getBoardReports(companyId: string): Promise<BoardReportDet
   }))
 }
 
+/**
+ * 指定IDの取締役会報告資料を取得する（セクション付き）。
+ *
+ * @param id - 報告資料ID
+ * @returns 報告資料詳細。存在しない場合は `null`。
+ */
 export async function getBoardReport(id: string): Promise<BoardReportDetail | null> {
   const report = await prisma.$transaction(
     async (tx) => {
@@ -212,6 +224,19 @@ export async function getBoardReport(id: string): Promise<BoardReportDetail | nu
   }
 }
 
+/**
+ * 財務データから取締役会報告資料を生成し、DRAFT として保存する。
+ *
+ * 月次決算サマリー・予実分析・キャッシュポジション・資金繰り・主要KPIの各セクションを
+ * 生成し、`includeLlmAnalysis` が真の場合は AI 分析セクションを追加する。
+ *
+ * @param companyId - 企業ID
+ * @param fiscalYear - 会計年度
+ * @param month - 月（1〜12）
+ * @param financialData - PL/BS/月次CF の財務データ
+ * @param options - 言語・詳細度・AI分析含有フラグ等の生成オプション
+ * @returns 生成された報告資料（ステータス `DRAFT`）
+ */
 export async function generateBoardReport(
   companyId: string,
   fiscalYear: number,
@@ -693,6 +718,15 @@ ${metricsTable}
   }
 }
 
+/**
+ * 取締役会報告資料のメタ情報（タイトル/要約/ステータス/承認者/報告日）を更新する。
+ *
+ * `approvedBy` を指定した場合は承認日時を自動で記録する。
+ *
+ * @param id - 報告資料ID
+ * @param data - 更新対象フィールド（部分更新）
+ * @returns 更新後の報告資料
+ */
 export async function updateBoardReport(
   id: string,
   data: Partial<{
@@ -751,6 +785,12 @@ export async function updateBoardReport(
   }
 }
 
+/**
+ * 取締役会報告資料の個別セクション（タイトル/本文）を更新する。
+ *
+ * @param sectionId - セクションID
+ * @param data - 更新対象フィールド（部分更新）
+ */
 export async function updateBoardReportSection(
   sectionId: string,
   data: Partial<{
@@ -769,6 +809,11 @@ export async function updateBoardReportSection(
   )
 }
 
+/**
+ * 取締役会報告資料を削除する（セクション含む）。
+ *
+ * @param id - 報告資料ID
+ */
 export async function deleteBoardReport(id: string): Promise<void> {
   await prisma.$transaction(
     async (tx) => {

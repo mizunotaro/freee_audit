@@ -13,7 +13,20 @@ import type {
   MonthlyBalanceData,
 } from '@/types/reports/business'
 
+/**
+ * 事業報告書生成用に企業の各種データを並列収集・集計するサービス。
+ *
+ * 企業情報・財務データ・株主構成・役員・取締役会・仕訳・固定資産・関連当事者を
+ * 取得し、主要財務指標（成長率・マージン・ROE/ROA 等）を算出する。
+ */
 export class BusinessReportDataAggregator {
+  /**
+   * 事業報告書用データを並列収集し集計結果を返す。
+   *
+   * @param companyId - 企業ID
+   * @param fiscalYear - 会計年度
+   * @returns 収集・集計済みの報告書データ。企業が存在しない場合はエラーを送出する。
+   */
   async aggregate(companyId: string, fiscalYear: number): Promise<AggregatedReportData> {
     const [
       companyInfo,
@@ -280,6 +293,12 @@ export class BusinessReportDataAggregator {
     }
   }
 
+  /**
+   * 集計データの妥当性を検証する（必須項目の欠落をエラー、未登録データを警告）。
+   *
+   * @param data - 集計済み報告書データ
+   * @returns 妥当性・エラー一覧・警告一覧
+   */
   validateData(data: AggregatedReportData): {
     isValid: boolean
     errors: string[]
@@ -312,4 +331,7 @@ export class BusinessReportDataAggregator {
   }
 }
 
+/**
+ * {@link BusinessReportDataAggregator} のシングルトンインスタンス。
+ */
 export const businessReportDataAggregator = new BusinessReportDataAggregator()

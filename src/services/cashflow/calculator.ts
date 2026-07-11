@@ -303,6 +303,12 @@ function calculateOtherNonCashItems(
   return other
 }
 
+/**
+ * フリーキャッシュフロー（営業CF + 投資CF）を算出する。
+ *
+ * @param cf - キャッシュフロー計算書
+ * @returns フリーキャッシュフロー額（営業・投資活動が未設定の場合は 0 を前提とする）
+ */
 export function calculateFreeCashFlow(cf: CashFlowStatement): number {
   return (
     (cf.operatingActivities?.netCashFromOperating ?? 0) +

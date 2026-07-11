@@ -29,6 +29,18 @@ export interface RunwayCalculationOptions {
   }
 }
 
+/**
+ * 現金残高と月次キャッシュフローから資金繰り余力（Runway）を算出する。
+ *
+ * 月次営業CFの平均から基準バーンレートを求め、シナリオ調整倍率（楽観/現実/悲観）を
+ * 適用して各シナリオの Runway 月数と現金枯渇予定日を計算する。
+ * 調整倍率が 1.0 以外の場合は理由の併記が必要（未指定時は既定値 1.0 に戻す）。
+ *
+ * @param currentCash - 現在の現金残高
+ * @param monthlyCashFlows - 月次キャッシュフロー計算書の配列（空の場合は空結果を返す）
+ * @param options - シナリオ調整倍率とその理由
+ * @returns Runway 計算結果（月次バーンレート・Runway 月数・枯渇予定日・3 シナリオ）
+ */
 export function calculateRunway(
   currentCash: number,
   monthlyCashFlows: CashFlowStatement[],
@@ -153,6 +165,15 @@ export interface RunwayAlert {
   recommendation: string
 }
 
+/**
+ * Runway 月数に応じた資金繰りアラートを返す。
+ *
+ * 12ヶ月以上で `safe`、6ヶ月以上で `warning`、3ヶ月以上で `critical`、
+ * それ未満は資金ショート高危険の `critical` となる。
+ *
+ * @param runwayMonths - 資金繰り余力月数
+ * @returns アラートレベル・メッセージ・推奨アクション
+ */
 export function getRunwayAlert(runwayMonths: number): RunwayAlert {
   if (runwayMonths >= 12) {
     return {
@@ -181,6 +202,15 @@ export function getRunwayAlert(runwayMonths: number): RunwayAlert {
   }
 }
 
+/**
+ * 直近3ヶ月と直前3ヶ月のバーンレートを比較してトレンドを判定する。
+ *
+ * 変化率が +10% 超で `increasing`、-10% 未満で `decreasing`、
+ * それ以外は `stable` とする。データが3ヶ月未満の場合は `stable`。
+ *
+ * @param cashFlows - 月次キャッシュフロー計算書の配列
+ * @returns トレンド方向と変化率（%）
+ */
 export function calculateBurnRateTrend(cashFlows: CashFlowStatement[]): {
   trend: 'increasing' | 'stable' | 'decreasing'
   rate: number

@@ -22,7 +22,21 @@ const METRIC_NAMES: Record<string, string> = {
   inventory_turnover: '棚卸資産回転率',
 }
 
+/**
+ * 企業の財務比率を業種別・企業規模別のベンチマークと比較するサービス。
+ *
+ * 業種および企業規模の参照データ（四分位数）に対する自社値のパーセンタイル・
+ * 偏差・zスコアを算出し、強み・弱事を抽出する。
+ */
 export class BenchmarkService {
+  /**
+   * 自社の財務比率を業種別・企業規模別ベンチマークと比較する。
+   *
+   * @param ratios - 比較対象の財務比率（metricId -> 値）
+   * @param options - 業種・企業規模・対象メトリクス等の比較条件
+   * @returns 比較結果。ベンチマーク未検出や例外時は `success: false` となり
+   *   `error.code` に `benchmark_not_found` / `benchmark_comparison_failed` が格納される。
+   */
   compare(ratios: Record<string, number>, options: BenchmarkOptions = {}): BenchmarkResult {
     try {
       const sector = options.sector ?? 'other'
@@ -163,6 +177,11 @@ export class BenchmarkService {
     }
   }
 
+  /**
+   * ベンチマーク対象として選択可能な業種一覧を返す。
+   *
+   * @returns 業種コードと表示名の配列
+   */
   getAvailableSectors(): { sector: IndustrySector; name: string }[] {
     return [
       { sector: 'manufacturing', name: '製造業' },
@@ -179,10 +198,24 @@ export class BenchmarkService {
   }
 }
 
+/**
+ * BenchmarkService の新しいインスタンスを生成する。
+ *
+ * @returns ベンチマーク比較サービス
+ */
 export function createBenchmarkService(): BenchmarkService {
   return new BenchmarkService()
 }
 
+/**
+ * 自社の財務比率をベンチマークと比較するユーティリティ関数。
+ *
+ * 内部で BenchmarkService を生成して比較を実行する。
+ *
+ * @param ratios - 比較対象の財務比率（metricId -> 値）
+ * @param options - 業種・企業規模・対象メトリクス等の比較条件
+ * @returns 比較結果。ベンチマーク未検出や例外時は `success: false` となる（詳細は {@link BenchmarkService.compare} 参照）。
+ */
 export function compareWithBenchmark(
   ratios: Record<string, number>,
   options?: BenchmarkOptions

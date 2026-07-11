@@ -13,6 +13,11 @@ const createBenchmark = (values: number[]): BenchmarkRange => {
   }
 }
 
+/**
+ * 業種別の財務比率ベンチマークデータ。
+ *
+ * 各業種について主要財務指標の min/Q1/median/Q3/max を保持する。
+ */
 export const INDUSTRY_BENCHMARKS: Record<IndustrySector, IndustryBenchmarkData> = {
   manufacturing: {
     sector: 'manufacturing',
@@ -215,14 +220,32 @@ export const INDUSTRY_BENCHMARKS: Record<IndustrySector, IndustryBenchmarkData> 
   },
 }
 
+/**
+ * 指定業種のベンチマークデータを取得する。
+ *
+ * @param sector - 業種コード
+ * @returns 業種のベンチマークデータ。未定義の業種の場合は `undefined`。
+ */
 export function getIndustryBenchmark(sector: IndustrySector): IndustryBenchmarkData | undefined {
   return INDUSTRY_BENCHMARKS[sector]
 }
 
+/**
+ * 全業種のベンチマークデータを配列で取得する。
+ *
+ * @returns 全業種のベンチマークデータ配列
+ */
 export function getAllIndustryBenchmarks(): IndustryBenchmarkData[] {
   return Object.values(INDUSTRY_BENCHMARKS)
 }
 
+/**
+ * 指定業種の特定メトリクスのベンチマークレンジを取得する。
+ *
+ * @param sector - 業種コード
+ * @param metricId - メトリクスID（例: `current_ratio`）
+ * @returns メトリクスのベンチマークレンジ。未定義の場合は `undefined`。
+ */
 export function getMetricBenchmark(
   sector: IndustrySector,
   metricId: string

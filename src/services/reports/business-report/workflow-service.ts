@@ -1,6 +1,12 @@
 import { prisma } from '@/lib/db'
 import type { ApprovalStep, WorkflowResult, BusinessReportStatus } from '@/types/reports/business'
 
+/**
+ * 事業報告書の承認ワークフロー（作成→レビュー→承認→確定）を管理するサービス。
+ *
+ * 4段階の承認ステップ（preparer/reviewer/approver/final_approver）に沿って
+ * ステータス遷移と承認記録を DB に保持する。
+ */
 export class BusinessReportWorkflowService {
   private readonly approvalSteps: ApprovalStep[] = [
     { role: 'preparer', action: 'review', required: true },
@@ -9,6 +15,13 @@ export class BusinessReportWorkflowService {
     { role: 'final_approver', action: 'final_approve', required: false },
   ]
 
+  /**
+   * 報告書の承認ワークフローを開始し、ステータスを `under_review` にする。
+   *
+   * @param reportId - 報告書ID
+   * @param userId - 実行者ID
+   * @returns ワークフロー結果。報告書不存在や例外時は `success: false`。
+   */
   async initiateWorkflow(reportId: string, userId: string): Promise<WorkflowResult> {
     try {
       const report = await prisma.businessReport.findUnique({
@@ -54,6 +67,14 @@ export class BusinessReportWorkflowService {
     }
   }
 
+  /**
+   * 現在の承認ステップを承認し、次ステップへ進める。最終ステップでは `approved` にする。
+   *
+   * @param reportId - 報告書ID
+   * @param userId - 承認者ID
+   * @param comment - 承認コメント（オプション）
+   * @returns ワークフロー結果。全ステップ完了時や例外時は `success: false`。
+   */
   async approve(reportId: string, userId: string, comment?: string): Promise<WorkflowResult> {
     try {
       const approvals = await prisma.businessReportApproval.findMany({
@@ -115,6 +136,14 @@ export class BusinessReportWorkflowService {
     }
   }
 
+  /**
+   * 報告書を差戻し、ステータスを `draft` に戻す。
+   *
+   * @param reportId - 報告書ID
+   * @param userId - 実行者ID
+   * @param reason - 差戻し理由
+   * @returns ワークフロー結果。例外時は `success: false`。
+   */
   async reject(reportId: string, userId: string, reason: string): Promise<WorkflowResult> {
     try {
       const approvals = await prisma.businessReportApproval.findMany({
@@ -155,6 +184,12 @@ export class BusinessReportWorkflowService {
     }
   }
 
+  /**
+   * 報告書の現在の承認ステップと承認履歴を取得する。
+   *
+   * @param reportId - 報告書ID
+   * @returns ワークフロー状態。`success`・`currentStep`/`totalSteps`・承認履歴、例外時は `success: false`。
+   */
   async getWorkflowStatus(reportId: string): Promise<{
     success: boolean
     currentStep?: number
@@ -194,6 +229,12 @@ export class BusinessReportWorkflowService {
     }
   }
 
+  /**
+   * 承認済みの報告書を確定（`finalized`）する。
+   *
+   * @param reportId - 報告書ID
+   * @returns ワークフロー結果。報告書不存在・未承認・例外時は `success: false`。
+   */
   async finalize(reportId: string): Promise<WorkflowResult> {
     try {
       const report = await prisma.businessReport.findUnique({
