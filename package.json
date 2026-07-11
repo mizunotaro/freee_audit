@@ -28,7 +28,7 @@
     "db:seed": "tsx prisma/seed.ts",
     "db:studio": "prisma studio",
     "db:reset": "prisma migrate reset --force",
-    "audit:check": "pnpm audit --audit-level=moderate || true",
+    "audit:check": "pnpm audit --audit-level=critical",
     "security:scan": "npx better-npm-audit audit",
     "prepare": "husky"
   },
@@ -80,8 +80,8 @@
     "isomorphic-dompurify": "^3.1.0",
     "jsonwebtoken": "^9.0.2",
     "lucide-react": "^0.575.0",
-    "mathjs": "^15.1.1",
-    "next": "^16.1.6",
+    "mathjs": "^15.2.0",
+    "next": "^16.2.3",
     "next-intl": "^3.15.0",
     "next-themes": "^0.4.6",
     "node-cron": "^4.2.1",
@@ -124,10 +124,10 @@
     "@typescript-eslint/eslint-plugin": "^8.56.1",
     "@typescript-eslint/parser": "^8.56.1",
     "@vitejs/plugin-react": "^5.1.4",
-    "@vitest/coverage-v8": "^4.0.18",
+    "@vitest/coverage-v8": "^4.1.0",
     "autoprefixer": "^10.4.0",
     "eslint": "^9.39.4",
-    "eslint-config-next": "^16.1.6",
+    "eslint-config-next": "^16.2.3",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-react": "^7.37.5",
     "eslint-plugin-react-hooks": "^7.0.1",
@@ -143,7 +143,7 @@
     "tailwindcss": "^3.4.0",
     "tsx": "^4.19.2",
     "typescript": "^5.4.0",
-    "vitest": "^4.0.18",
+    "vitest": "^4.1.0",
     "vitest-mock-extended": "^2.0.2"
   },
   "engines": {
@@ -164,8 +164,14 @@
       "glob": "^10.5.0",
       "minimatch": "^9.0.7",
       "esbuild": "^0.25.0",
-      "undici": "^7.24.0",
-      "flatted": "^3.4.0"
+      "undici": "^7.28.0",
+      "flatted": "^3.4.2",
+      "axios": "^1.15.1",
+      "form-data": "^4.0.6",
+      "tmp": "^0.2.6",
+      "lodash": "^4.18.1",
+      "picomatch@2.3.1": "2.3.2",
+      "picomatch@4.0.3": "4.0.4"
     }
   }
 }
