@@ -300,4 +300,38 @@ describe('DetailedActualVsBudgetService', () => {
       expect(result).toBeDefined()
     })
   })
+
+  describe('favorable sign convention (proposal §6.2)', () => {
+    it('classifies stage-level variances by P&L direction', async () => {
+      vi.mocked(getBudgetsByMonth).mockResolvedValue(mockBudgets as any)
+
+      const result = await calculateDetailedActualVsBudget(mockCompanyId, 2024, 12, mockPL)
+
+      const byStage = (stage: string) => result.stageLevel.find((s) => s.stage === stage)!
+      // 売上高: actual 10M < budget 12M → revenue under budget → unfavorable.
+      expect(byStage('売上高').favorable).toBe(false)
+      // 売上原価: actual 6M < budget 7M → expense under budget → favorable.
+      expect(byStage('売上原価').favorable).toBe(true)
+      // 販売管理費: actual 2M === budget 2M → zero variance → null.
+      expect(byStage('販売管理費').favorable).toBeNull()
+      // 営業利益: actual 2M < budget 3M → profit under budget → unfavorable.
+      expect(byStage('営業利益').favorable).toBe(false)
+    })
+
+    it('classifies account-level variances by P&L direction', async () => {
+      vi.mocked(getBudgetsByMonth).mockResolvedValue(mockBudgets as any)
+
+      const result = await calculateDetailedActualVsBudget(mockCompanyId, 2024, 12, mockPL)
+
+      const byCode = (code: string) => result.accountLevel.find((a) => a.code === code)!
+      // Revenue under budget → unfavorable.
+      expect(byCode('400').favorable).toBe(false)
+      // Cost of sales under budget → favorable.
+      expect(byCode('500').favorable).toBe(true)
+      // SGA over budget (1.5M > 1.4M) → unfavorable.
+      expect(byCode('610').favorable).toBe(false)
+      // SGA under budget (0.5M < 0.6M) → favorable.
+      expect(byCode('620').favorable).toBe(true)
+    })
+  })
 })
