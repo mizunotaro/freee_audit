@@ -7,7 +7,6 @@ import {
   DEFAULT_MODELS,
   DEFAULT_TEMPERATURE,
   DEFAULT_MAX_TOKENS,
-  getDefaultModel,
   getDefaultTemperature,
   getDefaultMaxTokens,
   isValidProvider,
@@ -193,6 +192,34 @@ describe('ModelConfigService', () => {
       vi.advanceTimersByTime(600)
       await dbService.getConfig('openai')
       expect(dbFetcher).toHaveBeenCalledTimes(2)
+    })
+  })
+
+  describe('getCacheStats', () => {
+    it('returns empty stats before any config is resolved', () => {
+      const stats = service.getCacheStats()
+      expect(stats.size).toBe(0)
+      expect(stats.keys).toEqual([])
+    })
+
+    it('reflects cached entries after resolving configs', async () => {
+      await service.getConfig('openai')
+      await service.getConfig('openai', { userId: 'user1' })
+
+      const stats = service.getCacheStats()
+      expect(stats.size).toBe(2)
+      expect(stats.keys).toContain('openai')
+      expect(stats.keys).toContain('openai:user:user1')
+    })
+
+    it('returns to empty after clearCache', async () => {
+      await service.getConfig('openai')
+      expect(service.getCacheStats().size).toBe(1)
+
+      service.clearCache()
+      const stats = service.getCacheStats()
+      expect(stats.size).toBe(0)
+      expect(stats.keys).toEqual([])
     })
   })
 
