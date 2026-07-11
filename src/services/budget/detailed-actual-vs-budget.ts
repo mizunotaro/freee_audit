@@ -35,6 +35,22 @@ export interface DetailedActualVsBudget {
   }
 }
 
+/**
+ * Compares actual P&L against budget at two levels: a stage-level summary (revenue,
+ * cost of sales, gross profit, SGA, operating income, net income) and a per-account
+ * breakdown, each carrying a good/warning/bad status.
+ *
+ * Budget category mapping uses account-code prefixes: 4xx revenue, 5xx cost of
+ * sales, 6xx/7xx SGA.
+ *
+ * @param companyId - Company id.
+ * @param fiscalYear - Fiscal year.
+ * @param month - Month (1-12).
+ * @param actualPL - Actual profit & loss for the month.
+ * @returns DetailedActualVsBudget with stage-level, account-level, and summary
+ *   comparisons.
+ * @throws Rejected with a Prisma error if the budget lookup fails.
+ */
 export async function calculateDetailedActualVsBudget(
   companyId: string,
   fiscalYear: number,

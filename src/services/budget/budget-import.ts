@@ -14,6 +14,16 @@ export interface BudgetImportResult {
   errors: string[]
 }
 
+/**
+ * Parses budget CSV content into row objects.
+ *
+ * Column 1 is the account code, column 2 the account name, and each subsequent
+ * "N月" header column is a monthly amount. Empty/short rows are skipped and
+ * unparseable numeric cells become 0.
+ *
+ * @param content - Raw CSV text.
+ * @returns Parsed BudgetImportRow array (empty if there is no data row).
+ */
 export function parseBudgetCsv(content: string): BudgetImportRow[] {
   const rows = parseCsv(content)
   if (rows.length < 2) {
@@ -58,6 +68,17 @@ export function parseBudgetCsv(content: string): BudgetImportRow[] {
   return result
 }
 
+/**
+ * Parses CSV content and bulk-imports the resulting budget entries for a company
+ * and fiscal year. Zero-amount month cells are skipped.
+ *
+ * @param content - Raw CSV text.
+ * @param companyId - Company id.
+ * @param fiscalYear - Fiscal year.
+ * @param departmentId - Optional department tagged onto every imported row.
+ * @returns BudgetImportResult reporting success, row counts, and any errors. A
+ *   thrown error is captured and returned as a failed result rather than rejected.
+ */
 export async function importBudgetFromCsv(
   content: string,
   companyId: string,
@@ -126,6 +147,12 @@ export async function importBudgetFromCsv(
   }
 }
 
+/**
+ * Returns a sample budget CSV (header plus representative revenue/expense rows) for
+ * use as a download template.
+ *
+ * @returns CSV text with 12 monthly columns.
+ */
 export function generateBudgetTemplate(): string {
   const header = '勘定科目コード,勘定科目名,1月,2月,3月,4月,5月,6月,7月,8月,9月,10月,11月,12月'
   const rows = [
@@ -144,6 +171,13 @@ export function generateBudgetTemplate(): string {
   return [header, ...rows].join('\n')
 }
 
+/**
+ * Validates budget CSV structure and cell contents without importing.
+ *
+ * @param content - Raw CSV text.
+ * @returns `{ valid, errors }`; `valid` is true only when `errors` is empty. Errors
+ *   are human-readable (Japanese) messages identifying the offending row/column.
+ */
 export function validateBudgetCsv(content: string): { valid: boolean; errors: string[] } {
   const errors: string[] = []
   const rows = parseCsv(content)

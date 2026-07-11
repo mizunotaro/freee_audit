@@ -17,9 +17,27 @@ import {
   success,
 } from '@/types/result'
 
+/**
+ * CurrencyConverter implementation that performs conversions against a pluggable
+ * ExchangeRateService, returning Result values instead of throwing.
+ */
 export class DefaultCurrencyConverter implements CurrencyConverter {
   constructor(private rateService: ExchangeRateService) {}
 
+  /**
+   * Converts an amount using an explicit exchange rate.
+   *
+   * Same-currency conversions return the amount unchanged. Otherwise the rate is
+   * applied directly (amount / rate) when the pair matches, or inversely
+   * (amount * rate) when reversed.
+   *
+   * @param amount - Amount to convert.
+   * @param from - Source currency.
+   * @param to - Target currency.
+   * @param rate - Exchange rate to apply.
+   * @returns success with the CurrencyConversion, or failure with
+   *   BUSINESS_LOGIC_ERROR when the rate's currency pair cannot bridge `from`→`to`.
+   */
   convert(
     amount: number,
     from: Currency,
@@ -68,6 +86,15 @@ export class DefaultCurrencyConverter implements CurrencyConverter {
     })
   }
 
+  /**
+   * Converts an amount using the latest rate fetched from the rate service.
+   *
+   * @param amount - Amount to convert.
+   * @param from - Source currency.
+   * @param to - Target currency.
+   * @returns success with the CurrencyConversion (same-currency pairs
+   *   short-circuit), or failure with EXTERNAL_SERVICE_ERROR if the rate lookup throws.
+   */
   async convertWithLatestRate(
     amount: number,
     from: Currency,
@@ -106,6 +133,14 @@ export class DefaultCurrencyConverter implements CurrencyConverter {
   }
 }
 
+/**
+ * Builds a DefaultCurrencyConverter, creating a default BOJ rate service when one
+ * is not supplied.
+ *
+ * @param service - Optional ExchangeRateService to inject.
+ * @returns success with the converter, or failure forwarding the rate-service
+ *   creation error.
+ */
 export function createCurrencyConverter(
   service?: ExchangeRateService
 ): Result<CurrencyConverter, AppError> {
@@ -122,6 +157,15 @@ export function createCurrencyConverter(
   return success(new DefaultCurrencyConverter(rateService))
 }
 
+/**
+ * Calculates cash runway: months of cash remaining at the current net burn rate
+ * (monthly expenses minus monthly revenue).
+ *
+ * @param currentCash - Cash balance at the start.
+ * @param averageMonthlyRevenue - Average monthly revenue.
+ * @param averageMonthlyExpenses - Average monthly expenses.
+ * @returns RunwayCalculation; `runwayMonths` is `Infinity` when not burning cash.
+ */
 export function calculateRunway(
   currentCash: number,
   averageMonthlyRevenue: number,
@@ -137,6 +181,16 @@ export function calculateRunway(
   }
 }
 
+/**
+ * Formats an amount in its base currency alongside the converted JPY/USD equivalent,
+ * using locale-aware currency formatting.
+ *
+ * @param amount - Amount in the base currency.
+ * @param baseCurrency - Base currency code (JPY converts to USD, anything else to JPY).
+ * @param exchangeRate - Rate used for the conversion (shown to 2 dp).
+ * @param locale - Display locale, 'ja' or 'en' (default 'ja').
+ * @returns Formatted dual-currency string.
+ */
 export function formatDualCurrency(
   amount: number,
   baseCurrency: Currency,
@@ -151,6 +205,14 @@ export function formatDualCurrency(
   return `${baseFormatted} (${convertedFormatted} @${exchangeRate.toFixed(2)})`
 }
 
+/**
+ * Formats a numeric amount as a locale-aware currency string (JPY uses 0 decimals).
+ *
+ * @param amount - Amount to format.
+ * @param currency - Currency code.
+ * @param locale - Display locale, 'ja' or 'en' (default 'ja').
+ * @returns Formatted currency string.
+ */
 export function formatCurrency(
   amount: number,
   currency: Currency,

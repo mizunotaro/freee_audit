@@ -2,6 +2,19 @@ import type { ActualVsBudget, BudgetItem, ProfitLoss } from '@/types'
 import { safeDivide } from '@/lib/utils'
 import { getBudgetsByMonth, getBudgetsByFiscalYear } from './budget-service'
 
+/**
+ * Compares actual P&L figures against budgeted amounts for a single month,
+ * producing per-account variance and achievement rates plus revenue/expense/
+ * operating-income totals.
+ *
+ * @param companyId - Company id.
+ * @param fiscalYear - Fiscal year.
+ * @param month - Month (1-12).
+ * @param actualPL - Actual profit & loss for the month.
+ * @returns ActualVsBudget with line items and totals. Accounts without a budget
+ *   report a 0 budget amount (and 0 achievement rate).
+ * @throws Rejected with a Prisma error if the budget lookup fails.
+ */
 export async function calculateActualVsBudget(
   companyId: string,
   fiscalYear: number,
@@ -142,6 +155,15 @@ export interface BudgetVarianceAnalysis {
   }
 }
 
+/**
+ * Extracts budget variances that exceed a percentage threshold, sorted by absolute
+ * variance percent (largest first).
+ *
+ * @param budgetVsActual - Precomputed actual-vs-budget result.
+ * @param thresholdPercent - Minimum |variance %| to flag (default 10).
+ * @returns BudgetVarianceAnalysis of significant over/under variances plus a total
+ *   summary. Zero-budget items are skipped.
+ */
 export function analyzeBudgetVariance(
   budgetVsActual: ActualVsBudget,
   thresholdPercent: number = 10
@@ -192,6 +214,16 @@ export interface MonthlyBudgetTrend {
   rate: number
 }
 
+/**
+ * Builds a 12-month budget-vs-actual trend (months 1-12).
+ *
+ * @param companyId - Company id.
+ * @param fiscalYear - Fiscal year.
+ * @param monthlyActuals - Map of month number to actual P&L; months without an
+ *   entry are treated as 0 actual.
+ * @returns MonthlyBudgetTrend entries for months 1-12.
+ * @throws Rejected with a Prisma error if the budget lookup fails.
+ */
 export async function getMonthlyBudgetTrend(
   companyId: string,
   fiscalYear: number,

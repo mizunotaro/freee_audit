@@ -15,9 +15,22 @@ import {
   success,
 } from '@/types/result'
 
+/**
+ * ExchangeRateService backed by Bank of Japan rates. Uses an in-process cache and
+ * returns mock-derived rates (intended for development) when no live fetch occurs.
+ */
 export class BOJExchangeRateService implements ExchangeRateService {
   private baseUrl = 'https://www.boj.or.jp/statistics'
 
+  /**
+   * Resolves an exchange rate for a date and pair, returning a cached value when
+   * available and otherwise fetching (currently mock-derived) a BOJ rate.
+   *
+   * @param date - Target date.
+   * @param from - Source currency.
+   * @param to - Target currency.
+   * @returns The resolved ExchangeRate.
+   */
   async getRate(date: Date, from: Currency, to: Currency): Promise<ExchangeRate> {
     const cacheKey = `${date.toISOString()}-${from}-${to}`
 
@@ -32,11 +45,25 @@ export class BOJExchangeRateService implements ExchangeRateService {
     return rate
   }
 
+  /**
+   * Resolves the rate for the most recent business day.
+   *
+   * @param from - Source currency.
+   * @param to - Target currency.
+   * @returns The resolved ExchangeRate.
+   */
   async getLatestRate(from: Currency, to: Currency): Promise<ExchangeRate> {
     const lastBusinessDay = this.getLastBusinessDay(new Date())
     return this.getRate(lastBusinessDay, from, to)
   }
 
+  /**
+   * Collects JPY/USD rates for every business day in a month.
+   *
+   * @param year - Calendar year.
+   * @param month - Calendar month (1-12).
+   * @returns ExchangeRate records for each business day with data; failed days are skipped.
+   */
   async getMonthlyRates(year: number, month: number): Promise<ExchangeRate[]> {
     const rates: ExchangeRate[] = []
     const date = new Date(year, month - 1, 1)
@@ -57,6 +84,15 @@ export class BOJExchangeRateService implements ExchangeRateService {
     return rates
   }
 
+  /**
+   * Collects rates for a currency pair on every business day in a range.
+   *
+   * @param startDate - Range start (inclusive).
+   * @param endDate - Range end (inclusive).
+   * @param from - Source currency code.
+   * @param to - Target currency code.
+   * @returns ExchangeRate records for each business day with data; failed days are skipped.
+   */
   async getRatesInRange(
     startDate: Date,
     endDate: Date,
@@ -81,6 +117,13 @@ export class BOJExchangeRateService implements ExchangeRateService {
     return rates
   }
 
+  /**
+   * Returns the supplied rate with generated id/timestamps (no persistence in this
+   * mock-oriented implementation).
+   *
+   * @param rate - ExchangeRate fields (id/timestamps are generated).
+   * @returns The augmented ExchangeRate.
+   */
   async saveRate(
     rate: Omit<ExchangeRate, 'id' | 'createdAt' | 'updatedAt'>
   ): Promise<ExchangeRate> {
@@ -142,6 +185,14 @@ export class BOJExchangeRateService implements ExchangeRateService {
   }
 }
 
+/**
+ * Factory for exchange-rate services by source.
+ *
+ * @param source - Desired rate source (default 'BOJ').
+ * @returns success with the service for 'BOJ', or failure with BUSINESS_LOGIC_ERROR
+ *   for unimplemented sources (ECB, MURC, OPEN_EXCHANGE, MANUAL). Unknown sources
+ *   fall back to the BOJ service.
+ */
 export function createExchangeRateService(
   source: ExchangeRateSource = 'BOJ'
 ): Result<ExchangeRateService, AppError> {

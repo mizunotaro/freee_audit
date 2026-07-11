@@ -26,6 +26,13 @@ export interface BudgetFilter {
   accountCode?: string
 }
 
+/**
+ * Creates a single budget entry.
+ *
+ * @param data - Budget fields (company, fiscal year, month, account, amount).
+ * @returns The created Budget record.
+ * @throws Rejected with a Prisma error if the write fails or a constraint is violated.
+ */
 export async function createBudget(data: CreateBudgetInput): Promise<Budget> {
   return prisma.budget.create({
     data: {
@@ -41,6 +48,13 @@ export async function createBudget(data: CreateBudgetInput): Promise<Budget> {
   })
 }
 
+/**
+ * Bulk-inserts budget entries via `createMany`.
+ *
+ * @param data - Budget entries to insert.
+ * @returns The number of rows actually created.
+ * @throws Rejected with a Prisma error on failure.
+ */
 export async function createBudgetBatch(data: CreateBudgetInput[]): Promise<number> {
   const result = await prisma.budget.createMany({
     data: data.map((item) => ({
@@ -57,6 +71,14 @@ export async function createBudgetBatch(data: CreateBudgetInput[]): Promise<numb
   return result.count
 }
 
+/**
+ * Updates the amount, department, and/or note of an existing budget entry.
+ *
+ * @param id - Budget record id.
+ * @param data - Fields to update.
+ * @returns The updated Budget record.
+ * @throws Rejected with a Prisma error (e.g. P2025) if the id does not exist.
+ */
 export async function updateBudget(id: string, data: UpdateBudgetInput): Promise<Budget> {
   return prisma.budget.update({
     where: { id },
@@ -68,6 +90,15 @@ export async function updateBudget(id: string, data: UpdateBudgetInput): Promise
   })
 }
 
+/**
+ * Creates or updates a budget entry keyed by the unique constraint
+ * (companyId, fiscalYear, month, departmentId, accountCode). A missing
+ * `departmentId` is normalized to an empty string.
+ *
+ * @param data - Budget fields.
+ * @returns The created or updated Budget record.
+ * @throws Rejected with a Prisma error on failure.
+ */
 export async function upsertBudget(data: CreateBudgetInput): Promise<Budget> {
   return prisma.budget.upsert({
     where: {
@@ -97,12 +128,27 @@ export async function upsertBudget(data: CreateBudgetInput): Promise<Budget> {
   })
 }
 
+/**
+ * Fetches a single budget entry by id.
+ *
+ * @param id - Budget record id.
+ * @returns The Budget record, or `null` if not found.
+ * @throws Rejected with a Prisma error on failure.
+ */
 export async function getBudgetById(id: string): Promise<Budget | null> {
   return prisma.budget.findUnique({
     where: { id },
   })
 }
 
+/**
+ * Lists budget entries for a company, optionally filtered by fiscal year, month,
+ * department, or account-code prefix (`startsWith`).
+ *
+ * @param filter - Filter criteria; `companyId` is required.
+ * @returns Matching Budget records ordered by accountCode.
+ * @throws Rejected with a Prisma error on failure.
+ */
 export async function getBudgets(filter: BudgetFilter): Promise<Budget[]> {
   return prisma.budget.findMany({
     where: {
@@ -116,6 +162,14 @@ export async function getBudgets(filter: BudgetFilter): Promise<Budget[]> {
   })
 }
 
+/**
+ * Lists all budget entries for a company in a fiscal year.
+ *
+ * @param companyId - Company id.
+ * @param fiscalYear - Fiscal year.
+ * @returns Budget records ordered by month then accountCode.
+ * @throws Rejected with a Prisma error on failure.
+ */
 export async function getBudgetsByFiscalYear(
   companyId: string,
   fiscalYear: number
@@ -129,6 +183,15 @@ export async function getBudgetsByFiscalYear(
   })
 }
 
+/**
+ * Lists budget entries for a specific company and month within a fiscal year.
+ *
+ * @param companyId - Company id.
+ * @param fiscalYear - Fiscal year.
+ * @param month - Month (1-12).
+ * @returns Budget records ordered by accountCode.
+ * @throws Rejected with a Prisma error on failure.
+ */
 export async function getBudgetsByMonth(
   companyId: string,
   fiscalYear: number,
@@ -144,12 +207,26 @@ export async function getBudgetsByMonth(
   })
 }
 
+/**
+ * Deletes a single budget entry.
+ *
+ * @param id - Budget record id.
+ * @throws Rejected with a Prisma error (e.g. P2025) if the id does not exist.
+ */
 export async function deleteBudget(id: string): Promise<void> {
   await prisma.budget.delete({
     where: { id },
   })
 }
 
+/**
+ * Deletes all budget entries for a company in a fiscal year.
+ *
+ * @param companyId - Company id.
+ * @param fiscalYear - Fiscal year.
+ * @returns The number of records deleted.
+ * @throws Rejected with a Prisma error on failure.
+ */
 export async function deleteBudgetsByFiscalYear(
   companyId: string,
   fiscalYear: number
@@ -163,6 +240,15 @@ export async function deleteBudgetsByFiscalYear(
   return result.count
 }
 
+/**
+ * Aggregates a company's budget for a specific month by account code.
+ *
+ * @param companyId - Company id.
+ * @param fiscalYear - Fiscal year.
+ * @param month - Month (1-12).
+ * @returns One summary row per account code with the total budgeted amount.
+ * @throws Rejected with a Prisma error on failure.
+ */
 export async function getBudgetSummary(
   companyId: string,
   fiscalYear: number,

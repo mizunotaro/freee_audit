@@ -9,6 +9,11 @@ import {
 import { BOJRateProvider } from './providers/boj-rate-provider'
 import { prisma } from '@/lib/db'
 
+/**
+ * ExchangeRateService that resolves rates from a local DB cache first, then falls
+ * back across prioritized providers (default: BOJ), recursing to the previous
+ * business day when no rate is found.
+ */
 export class ExchangeRateAggregator implements ExchangeRateService {
   private providers: ExchangeRateProvider[]
 
@@ -16,6 +21,17 @@ export class ExchangeRateAggregator implements ExchangeRateService {
     this.providers = providers.sort((a, b) => a.priority - b.priority)
   }
 
+  /**
+   * Resolves an exchange rate for a date and currency pair, preferring a cached DB
+   * rate, then querying each provider in priority order; recurses to the previous
+   * business day if no provider has the rate.
+   *
+   * @param date - Target date.
+   * @param from - Source currency.
+   * @param to - Target currency.
+   * @returns The resolved ExchangeRate.
+   * @throws Rejected if the lookup fails or no rate is ever found.
+   */
   async getRate(date: Date, from: Currency, to: Currency): Promise<ExchangeRate> {
     const cachedRate = await this.getFromDB(date, from, to)
     if (cachedRate) {
@@ -36,11 +52,26 @@ export class ExchangeRateAggregator implements ExchangeRateService {
     return this.getRate(previousBusinessDay, from, to)
   }
 
+  /**
+   * Resolves the most recent rate (as of the last business day) for a pair.
+   *
+   * @param from - Source currency.
+   * @param to - Target currency.
+   * @returns The resolved ExchangeRate.
+   */
   async getLatestRate(from: Currency, to: Currency): Promise<ExchangeRate> {
     const lastBusinessDay = this.getPreviousBusinessDay(new Date())
     return this.getRate(lastBusinessDay, from, to)
   }
 
+  /**
+   * Loads all cached exchange rates within a calendar month.
+   *
+   * @param year - Calendar year.
+   * @param month - Calendar month (1-12).
+   * @returns ExchangeRate records ordered by date.
+   * @throws Rejected with a Prisma error if the query fails.
+   */
   async getMonthlyRates(year: number, month: number): Promise<ExchangeRate[]> {
     const startDate = new Date(year, month - 1, 1)
     const endDate = new Date(year, month, 0)
@@ -58,6 +89,16 @@ export class ExchangeRateAggregator implements ExchangeRateService {
     }))
   }
 
+  /**
+   * Loads cached exchange rates for a currency pair within a date range.
+   *
+   * @param startDate - Range start (inclusive).
+   * @param endDate - Range end (inclusive).
+   * @param from - Source currency code.
+   * @param to - Target currency code.
+   * @returns ExchangeRate records ordered by date.
+   * @throws Rejected with a Prisma error if the query fails.
+   */
   async getRatesInRange(
     startDate: Date,
     endDate: Date,
@@ -79,6 +120,13 @@ export class ExchangeRateAggregator implements ExchangeRateService {
     }))
   }
 
+  /**
+   * Persists an exchange rate record.
+   *
+   * @param rate - ExchangeRate fields (id/timestamps are generated).
+   * @returns The saved ExchangeRate.
+   * @throws Rejected with a Prisma error if the write fails.
+   */
   async saveRate(
     rate: Omit<ExchangeRate, 'id' | 'createdAt' | 'updatedAt'>
   ): Promise<ExchangeRate> {
@@ -157,4 +205,7 @@ export class ExchangeRateAggregator implements ExchangeRateService {
   }
 }
 
+/**
+ * Shared ExchangeRateAggregator instance with the default BOJ provider.
+ */
 export const exchangeRateService = new ExchangeRateAggregator()
