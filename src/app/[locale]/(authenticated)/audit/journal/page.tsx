@@ -70,7 +70,7 @@ export default function JournalAuditPage() {
   const handleAnalyze = async () => {
     setAnalyzing(true)
     try {
-      const res = await fetch('/api/audit/journal/analyze', {
+      const res = await fetch('/api/audit/journal', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ fiscalYear, month }),
