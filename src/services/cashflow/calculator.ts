@@ -309,3 +309,102 @@ export function calculateFreeCashFlow(cf: CashFlowStatement): number {
     (cf.investingActivities?.netCashFromInvesting ?? 0)
   )
 }
+
+// ── FIN-IMPL-02: burn-rate run-rate derivation from historical CF statements ──
+
+export interface BurnRunRateMonth {
+  /** Source month label (1–12) when available, else null. */
+  month: number | null
+  /** Operating net cash flow for the month (= inflow − outflow). */
+  operatingNet: number
+  /** Gross burn = total operating cash outflow (positive magnitude). */
+  grossBurn: number
+  /** Net burn = max(0, −operatingNet). 0 when operations are cash-positive. */
+  netBurn: number
+}
+
+export interface BurnRunRate {
+  monthly: BurnRunRateMonth[]
+  /** Mean monthly operating cash inflow (proxy for the revenue/collection base). */
+  avgInflow: number
+  /** Mean monthly gross burn (= mean operating outflow). */
+  avgGrossBurn: number
+  /** Mean monthly net burn. */
+  avgNetBurn: number
+  /** Number of months observed. */
+  dataPoints: number
+}
+
+/**
+ * Derive a historical burn-rate run-rate from indirect-method cash-flow statements.
+ *
+ * Standard definitions:
+ *  • Net burn   = max(0, −net operating cash flow)              (Investopedia, "Burn Rate")
+ *  • Gross burn = total operating cash outflow (positive spend)  (Investopedia / Carta)
+ *
+ * The operating cash-flow statement is built by the indirect method, so a direct
+ * gross-outflow total is not reported. Here the operating components are partitioned
+ * by sign: positive components → inflow, |negative components| → outflow. This
+ * partition reconciles exactly to `netCashFromOperating` (inflow − outflow = net),
+ * giving an exact net burn and a defensible gross-burn proxy.
+ *
+ * // PENDING HUMAN DETERMINATION: gross burn derived this way classifies non-cash
+ * // add-backs (e.g. depreciation) as inflow, so it is an upper-bound proxy for
+ * // true direct cash outflows. Where a direct-method cash collection/payment split
+ * // is available, prefer it. Net burn is exact regardless.
+ */
+export function deriveBurnRunRate(cashFlows: CashFlowStatement[]): BurnRunRate {
+  const monthly: BurnRunRateMonth[] = []
+
+  for (const cf of cashFlows) {
+    const op = cf.operatingActivities
+    if (!op) {
+      // No indirect-method breakdown — fall back to the reported net only.
+      const operatingNet = cf.operating?.netCashFromOperating ?? 0
+      monthly.push({
+        month: cf.month ?? null,
+        operatingNet,
+        grossBurn: 0,
+        netBurn: Math.max(0, -operatingNet),
+      })
+      continue
+    }
+
+    const components = [
+      op.netIncome,
+      op.depreciation,
+      op.amortization,
+      op.deferredTaxChange,
+      op.increaseInReceivables,
+      op.decreaseInInventory,
+      op.increaseInPayables,
+      op.otherNonCash,
+    ]
+
+    let inflow = 0
+    let outflow = 0
+    for (const c of components) {
+      if (c > 0) inflow += c
+      else if (c < 0) outflow += -c
+    }
+    const operatingNet = inflow - outflow // == netCashFromOperating
+    const grossBurn = outflow
+    const netBurn = Math.max(0, -operatingNet)
+
+    monthly.push({ month: cf.month ?? null, operatingNet, grossBurn, netBurn })
+  }
+
+  const n = Math.max(1, monthly.length)
+  // Inflow reconstructed from the reconciliation identity: inflow = outflow + net.
+  const avgInflow = monthly.reduce((s, m) => s + Math.max(0, m.grossBurn + m.operatingNet), 0) / n
+  const avgGrossBurn = monthly.reduce((s, m) => s + m.grossBurn, 0) / n
+  const avgNetBurn = monthly.reduce((s, m) => s + m.netBurn, 0) / n
+
+  return {
+    monthly,
+    avgInflow,
+    avgGrossBurn,
+    avgNetBurn,
+    dataPoints: monthly.length,
+  }
+}

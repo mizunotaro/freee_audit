@@ -1,6 +1,22 @@
 import type { RunwayCalculation, CashFlowStatement } from '@/types'
 import { addMonths, sumValues } from '@/lib/utils'
 
+/**
+ * Cash runway in months from a cash balance and an average net burn rate.
+ *
+ * Standard definition (Investopedia, "Cash Runway"):
+ *   runway = cash balance ÷ net burn rate
+ *
+ * Returns `Infinity` when the entity is not burning cash (net burn ≤ 0) or when
+ * the cash balance is non-finite. Returns 0 when there is cash but the burn rate
+ * is not a positive, finite number it can divide by safely.
+ */
+export function computeRunwayMonths(currentCash: number, avgNetBurn: number): number {
+  if (!Number.isFinite(currentCash)) return Infinity
+  if (!Number.isFinite(avgNetBurn) || avgNetBurn <= 0) return Infinity
+  return currentCash / avgNetBurn
+}
+
 export interface RunwayCalculationOptions {
   scenarioAdjustments?: {
     optimistic: number
