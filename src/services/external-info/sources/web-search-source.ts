@@ -52,6 +52,7 @@ export class WebSearchInfoSource extends BaseInfoSource {
     }
 
     try {
+      this.assertOutboundRateLimit()
       const result = await this.retryWithBackoff(
         () => this.executeSearch(query),
         this.config.maxRetries,

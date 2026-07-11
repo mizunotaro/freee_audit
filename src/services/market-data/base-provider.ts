@@ -8,6 +8,12 @@ import type {
   MarketDataResult,
   ProviderConfig,
 } from './types'
+import {
+  assertOutboundAllowed,
+  outboundRateLimiters,
+  resolveOutboundHost,
+  withOutboundUserAgent,
+} from '@/lib/api/outbound-rate-limiter'
 
 export abstract class BaseMarketDataProvider {
   abstract readonly name: MarketDataProviderType
@@ -35,12 +41,15 @@ export abstract class BaseMarketDataProvider {
     options: RequestInit = {},
     timeout = this.config.timeout
   ): Promise<T> {
+    assertOutboundAllowed(outboundRateLimiters.marketData(), resolveOutboundHost(url))
+
     const controller = new AbortController()
     const timeoutId = setTimeout(() => controller.abort(), timeout)
 
     try {
       const response = await fetch(url, {
         ...options,
+        headers: withOutboundUserAgent(options.headers),
         signal: controller.signal,
       })
 
