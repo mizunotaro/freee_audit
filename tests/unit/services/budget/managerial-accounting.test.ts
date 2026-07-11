@@ -93,6 +93,7 @@ function buildStages(
       variance: 5000000,
       rate: 0,
       status: 'good',
+      favorable: true,
     },
     売上原価: {
       stage: '売上原価',
@@ -101,6 +102,7 @@ function buildStages(
       variance: 2000000,
       rate: 0,
       status: 'good',
+      favorable: true,
     },
     売上総利益: {
       stage: '売上総利益',
@@ -109,6 +111,7 @@ function buildStages(
       variance: 3000000,
       rate: 0,
       status: 'good',
+      favorable: true,
     },
     販売管理費: {
       stage: '販売管理費',
@@ -117,6 +120,7 @@ function buildStages(
       variance: 1430000,
       rate: 0,
       status: 'good',
+      favorable: true,
     },
     営業利益: {
       stage: '営業利益',
@@ -125,6 +129,7 @@ function buildStages(
       variance: 1570000,
       rate: 0,
       status: 'good',
+      favorable: true,
     },
     当期純利益: {
       stage: '当期純利益',
@@ -133,6 +138,7 @@ function buildStages(
       variance: 1099000,
       rate: 0,
       status: 'good',
+      favorable: true,
     },
   }
   for (const [key, val] of Object.entries(overrides)) {
