@@ -1,6 +1,7 @@
 import type { ProfitLoss } from '@/types'
 import { safeDivide } from '@/lib/utils'
 import { getBudgetsByMonth } from './budget-service'
+import { classifyFavorable } from './variance-attribution'
 
 export interface StageLevelComparison {
   stage: string
@@ -9,6 +10,14 @@ export interface StageLevelComparison {
   variance: number
   rate: number
   status: 'good' | 'warning' | 'bad'
+  /**
+   * Favorable/unfavorable classification by P&L direction (proposal §6.2). `true` when the
+   * variance increases operating income relative to budget (revenue/profit over budget is
+   * favorable; expense under budget is favorable), `false` when unfavorable, `null` when the
+   * variance is zero. Replaces the ambiguous over/under-by-sign labeling for consumers that
+   * need the standard sign convention.
+   */
+  favorable: boolean | null
 }
 
 export interface AccountLevelComparison {
@@ -20,6 +29,11 @@ export interface AccountLevelComparison {
   variance: number
   rate: number
   status: 'good' | 'warning' | 'bad'
+  /**
+   * Favorable/unfavorable classification by P&L direction (proposal §6.2). See
+   * {@link StageLevelComparison.favorable}.
+   */
+  favorable: boolean | null
 }
 
 export interface DetailedActualVsBudget {
@@ -83,6 +97,7 @@ export async function calculateDetailedActualVsBudget(
       variance: totalRevenueActual - totalRevenueBudget,
       rate: safeDivide(totalRevenueActual, totalRevenueBudget) * 100,
       status: getRevenueStatus(totalRevenueActual, totalRevenueBudget),
+      favorable: classifyFavorable(totalRevenueActual, totalRevenueBudget, 'revenue'),
     },
     {
       stage: '売上原価',
@@ -91,6 +106,7 @@ export async function calculateDetailedActualVsBudget(
       variance: totalCostActual - totalCostBudget,
       rate: safeDivide(totalCostActual, totalCostBudget) * 100,
       status: getExpenseStatus(totalCostActual, totalCostBudget),
+      favorable: classifyFavorable(totalCostActual, totalCostBudget, 'expense'),
     },
     {
       stage: '売上総利益',
@@ -99,6 +115,7 @@ export async function calculateDetailedActualVsBudget(
       variance: grossProfitActual - grossProfitBudget,
       rate: safeDivide(grossProfitActual, grossProfitBudget) * 100,
       status: getRevenueStatus(grossProfitActual, grossProfitBudget),
+      favorable: classifyFavorable(grossProfitActual, grossProfitBudget, 'revenue'),
     },
     {
       stage: '販売管理費',
@@ -107,6 +124,7 @@ export async function calculateDetailedActualVsBudget(
       variance: totalSgaActual - totalSgaBudget,
       rate: safeDivide(totalSgaActual, totalSgaBudget) * 100,
       status: getExpenseStatus(totalSgaActual, totalSgaBudget),
+      favorable: classifyFavorable(totalSgaActual, totalSgaBudget, 'expense'),
     },
     {
       stage: '営業利益',
@@ -115,6 +133,7 @@ export async function calculateDetailedActualVsBudget(
       variance: operatingIncomeActual - operatingIncomeBudget,
       rate: safeDivide(operatingIncomeActual, operatingIncomeBudget) * 100,
       status: getRevenueStatus(operatingIncomeActual, operatingIncomeBudget),
+      favorable: classifyFavorable(operatingIncomeActual, operatingIncomeBudget, 'revenue'),
     },
     {
       stage: '当期純利益',
@@ -123,6 +142,7 @@ export async function calculateDetailedActualVsBudget(
       variance: actualPL.netIncome - operatingIncomeBudget * 0.7,
       rate: safeDivide(actualPL.netIncome, operatingIncomeBudget * 0.7) * 100,
       status: getRevenueStatus(actualPL.netIncome, operatingIncomeBudget * 0.7),
+      favorable: classifyFavorable(actualPL.netIncome, operatingIncomeBudget * 0.7, 'revenue'),
     },
   ]
 
@@ -139,6 +159,7 @@ export async function calculateDetailedActualVsBudget(
       variance: item.amount - budget,
       rate: safeDivide(item.amount, budget) * 100,
       status: getRevenueStatus(item.amount, budget),
+      favorable: classifyFavorable(item.amount, budget, 'revenue'),
     })
   }
 
@@ -153,6 +174,7 @@ export async function calculateDetailedActualVsBudget(
       variance: item.amount - budget,
       rate: safeDivide(item.amount, budget) * 100,
       status: getExpenseStatus(item.amount, budget),
+      favorable: classifyFavorable(item.amount, budget, 'expense'),
     })
   }
 
@@ -167,6 +189,7 @@ export async function calculateDetailedActualVsBudget(
       variance: item.amount - budget,
       rate: safeDivide(item.amount, budget) * 100,
       status: getExpenseStatus(item.amount, budget),
+      favorable: classifyFavorable(item.amount, budget, 'expense'),
     })
   }
 
