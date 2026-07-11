@@ -3,7 +3,7 @@ import {
   AccountingExpertPersona,
   accountingExpertPersona,
 } from '@/lib/ai/personas/accounting-expert'
-import type { PromptVariables } from '@/lib/ai/personas/types'
+import type { PromptVariables, PersonaBuildContext } from '@/lib/ai/personas/types'
 
 describe('AccountingExpertPersona', () => {
   let persona: AccountingExpertPersona
@@ -146,6 +146,70 @@ describe('AccountingExpertPersona', () => {
       expect(result.success).toBe(false)
       if (!result.success) {
         expect(result.error.message).toContain('confidence must be a number between 0 and 1')
+      }
+    })
+  })
+
+  describe('buildPrompt', () => {
+    it('builds a Japanese prompt by default with the output format appended', () => {
+      const context: PersonaBuildContext = { query: '交通費の仕訳を提案してください' }
+      const result = persona.buildPrompt(context)
+
+      expect(result.success).toBe(true)
+      if (result.success) {
+        expect(result.data.personaType).toBe('cpa')
+        expect(result.data.personaVersion).toBe('1.0.0')
+        expect(result.data.userPrompt).toBe('交通費の仕訳を提案してください')
+        expect(result.data.systemPrompt).toContain('公認会計士・税理士')
+        expect(result.data.systemPrompt).toContain('JGAAP')
+        expect(result.data.systemPrompt).toContain('## 出力形式（JSON）')
+        expect(result.data.estimatedTokens).toBeGreaterThan(0)
+      }
+    })
+
+    it('uses the English system prompt when language is en', () => {
+      const context: PersonaBuildContext = {
+        query: 'Propose a journal entry',
+        language: 'en',
+      }
+      const result = persona.buildPrompt(context)
+
+      expect(result.success).toBe(true)
+      if (result.success) {
+        expect(result.data.systemPrompt).toContain('Certified Public Accountant')
+        expect(result.data.systemPrompt).not.toContain('公認会計士・税理士')
+        expect(result.data.systemPrompt).toContain('## 出力形式（JSON）')
+        expect(result.data.userPrompt).toBe('Propose a journal entry')
+      }
+    })
+
+    it('rejects an empty query with a validation_error', () => {
+      const result = persona.buildPrompt({ query: '' })
+
+      expect(result.success).toBe(false)
+      if (!result.success) {
+        expect(result.error.code).toBe('validation_error')
+        expect(result.error.message).toContain('Query is required and must be a string')
+      }
+    })
+
+    it('rejects a non-string query with a validation_error', () => {
+      const result = persona.buildPrompt({ query: null as unknown as string })
+
+      expect(result.success).toBe(false)
+      if (!result.success) {
+        expect(result.error.code).toBe('validation_error')
+        expect(result.error.message).toContain('Query is required and must be a string')
+      }
+    })
+
+    it('sanitizes overly long queries down to the limit', () => {
+      const longQuery = 'あ'.repeat(20000)
+      const result = persona.buildPrompt({ query: longQuery })
+
+      expect(result.success).toBe(true)
+      if (result.success) {
+        expect(result.data.userPrompt.length).toBe(10000)
       }
     })
   })
