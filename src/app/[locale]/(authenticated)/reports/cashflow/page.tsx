@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import { CashFlowChart } from '@/components/charts/CashFlowChart'
+import { RunwayScenarioChart } from '@/components/charts/RunwayScenarioChart'
 import { formatCurrency } from '@/lib/utils'
 import { fetchWithTimeout, FetchTimeoutError } from '@/lib/api/fetch-with-timeout'
 import type {
@@ -234,6 +235,19 @@ export default function CashflowPage() {
                       {formatCurrency(runway.monthlyBurnRate)}/月
                     </span>
                   </div>
+                </div>
+
+                <div className="border-t pt-4">
+                  <div className="mb-2 text-sm font-medium text-gray-700">
+                    現金残高推移予測（楽観/現実/悲観バンド）
+                  </div>
+                  <RunwayScenarioChart
+                    runway={runway}
+                    currentCash={
+                      cashPosition?.months[cashPosition.months.length - 1]?.endingCash ?? 0
+                    }
+                    height={260}
+                  />
                 </div>
               </div>
             )}

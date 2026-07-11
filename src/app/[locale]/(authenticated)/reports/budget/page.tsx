@@ -5,6 +5,8 @@ import { Pencil, Trash2, Plus, Upload } from 'lucide-react'
 import { toast } from 'sonner'
 import { AppLayout } from '@/components/layout/AppLayout'
 import { BudgetVsActualHorizontalChart } from '@/components/charts/BudgetVsActualChart'
+import { VarianceBridgeChart } from '@/components/charts/VarianceBridgeChart'
+import { ManagerialAccountingCards } from '@/components/reports/ManagerialAccountingCards'
 import { BudgetForm } from '@/components/budget/BudgetForm'
 import { CSVUpload } from '@/components/budget/CSVUpload'
 import { Button } from '@/components/ui/button'
@@ -22,6 +24,7 @@ import {
 } from '@/components/ui/alert-dialog'
 import { formatCurrency, formatPercent } from '@/lib/utils'
 import { fetchWithTimeout, FetchTimeoutError } from '@/lib/api/fetch-with-timeout'
+import { useManagerialAccounting } from '@/hooks/reports/use-managerial-accounting'
 import type { BudgetRecord, BudgetVsActual, DetailedBudget, VarianceData } from '@/types/reports'
 
 export default function BudgetPage() {
@@ -37,6 +40,13 @@ export default function BudgetPage() {
   const [csvOpen, setCSVOpen] = useState(false)
   const [editingBudget, setEditingBudget] = useState<BudgetRecord | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<BudgetRecord | null>(null)
+
+  const {
+    metrics: managerialMetrics,
+    bridge: varianceBridge,
+    loading: managerialLoading,
+    error: managerialError,
+  } = useManagerialAccounting(fiscalYear, month)
 
   const fetchData = useCallback(async () => {
     setLoading(true)
@@ -205,6 +215,7 @@ export default function BudgetPage() {
           <TabsTrigger value="stage">段階損益レベル</TabsTrigger>
           <TabsTrigger value="account">勘定科目レベル</TabsTrigger>
           <TabsTrigger value="chart">グラフ</TabsTrigger>
+          <TabsTrigger value="managerial">経営分析</TabsTrigger>
           <TabsTrigger value="list">予算一覧</TabsTrigger>
         </TabsList>
 
@@ -449,6 +460,35 @@ export default function BudgetPage() {
               </div>
             </div>
           )}
+        </TabsContent>
+
+        <TabsContent value="managerial">
+          <div className="space-y-6">
+            <div className="rounded-lg bg-white p-6 shadow">
+              <h3 className="mb-1 text-lg font-medium text-gray-900">営業利益 予実ブリッジ</h3>
+              <p className="mb-4 text-sm text-gray-500">
+                予算から実績への差異を要因別に分解（売上高・売上原価・販売管理費）
+              </p>
+              <VarianceBridgeChart
+                bridge={varianceBridge}
+                loading={managerialLoading}
+                error={managerialError}
+                height={300}
+              />
+            </div>
+
+            <div className="rounded-lg bg-white p-6 shadow">
+              <h3 className="mb-1 text-lg font-medium text-gray-900">管理会計指標（CVP分析）</h3>
+              <p className="mb-4 text-sm text-gray-500">
+                限界利益・損益分岐点・安全余裕率（売上原価=変動費、販売管理費=固定費とみなす簡易分類）
+              </p>
+              <ManagerialAccountingCards
+                metrics={managerialMetrics}
+                loading={managerialLoading}
+                error={managerialError}
+              />
+            </div>
+          </div>
         </TabsContent>
 
         <TabsContent value="list">
