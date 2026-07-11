@@ -113,6 +113,16 @@ const SECTION_VALIDATION_RULES: Record<BusinessReportSectionType, SectionValidat
   },
 }
 
+/**
+ * 生成されたセクション本文をセクション種別ごとのルールで検証する。
+ *
+ * 文字数の過不足・必須キーワード・数値形式・プレースホルダー残存をチェックし、
+ * エラー（hard）と警告（soft）に振り分ける。ルール未定義のセクションは `isValid: true`。
+ *
+ * @param sectionType - セクション種別（経団連型のドット区切りキー）
+ * @param content - 検証対象の本文
+ * @returns 検証結果（`isValid` はエラー0件の場合に真）
+ */
 export function validateGeneratedContent(
   sectionType: BusinessReportSectionType,
   content: string
@@ -199,6 +209,17 @@ export function validateGeneratedContent(
   }
 }
 
+/**
+ * セクション本文の生成信頼度（0〜1）を算出する。
+ *
+ * 検証エラー・警告・ソースデータ有無・文字数・プレースホルダー残数をペナルティとして
+ * 1.0 から減点し、[0, 1] の範囲にクリップして返す。
+ *
+ * @param sectionType - セクション種別
+ * @param content - 評価対象の本文
+ * @param hasSourceData - 集計されたソースデータが存在するか
+ * @returns 信頼度スコア（0〜1、高いほど信頼できる）
+ */
 export function calculateConfidence(
   sectionType: BusinessReportSectionType,
   content: string,
@@ -230,6 +251,12 @@ const LEGAL_TERMS: Record<string, string[]> = {
   governance: ['内部統制', 'コンプライアンス', 'リスク管理'],
 }
 
+/**
+ * 本文に含まれる法定用語（会社法・会計・ガバナンス）の出現状況を調べる。
+ *
+ * @param content - 検査対象の本文
+ * @returns `used` に本文中で使用された用語のリストを返す（`missing` は現状未使用、空配列）
+ */
 export function checkLegalTerminology(content: string): {
   used: string[]
   missing: string[]
@@ -247,6 +274,14 @@ export function checkLegalTerminology(content: string): {
   return { used, missing }
 }
 
+/**
+ * 事業報告書全体の必須セクション充足状況を検証する。
+ *
+ * 必須セクションの過不足と本文50文字以上の充足率（completeness, %）を算出する。
+ *
+ * @param sections - セクションキー -> 本文 のマップ
+ * @returns 妥当性・充足率・欠落セクション一覧・警告
+ */
 export function validateCompleteReport(sections: Record<string, string>): {
   isValid: boolean
   completeness: number

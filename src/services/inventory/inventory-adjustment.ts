@@ -28,6 +28,14 @@ export interface InventoryAlert {
   details?: Record<string, unknown>
 }
 
+/**
+ * 指定月の棚卸調整が存在するか確認する。
+ *
+ * @param companyId - 企業ID
+ * @param fiscalYear - 会計年度
+ * @param month - 月（1〜12）
+ * @returns 調整が存在する場合は `hasAdjustment: true` と調整データ、未登録時は `hasAdjustment: false`
+ */
 export async function checkInventoryAdjustmentStatus(
   companyId: string,
   fiscalYear: number,
@@ -62,6 +70,13 @@ export async function checkInventoryAdjustmentStatus(
   }
 }
 
+/**
+ * 指定年度の全月次棚卸調整を月昇順で取得する。
+ *
+ * @param companyId - 企業ID
+ * @param fiscalYear - 会計年度
+ * @returns 棚卸調整の配列（月昇順）
+ */
 export async function getInventoryAdjustments(
   companyId: string,
   fiscalYear: number
@@ -88,6 +103,15 @@ export async function getInventoryAdjustments(
   }))
 }
 
+/**
+ * 棚卸調整を作成または更新する（upsert）。
+ *
+ * 期末・期首残高の差額を `adjustment` として計算し、ステータス `PENDING` で登録する。
+ * 同一企業/年度/月のレコードが存在する場合は更新する。
+ *
+ * @param data - 棚卸調整データ（企業ID・年度・月・期首/期末残高）
+ * @returns 作成/更新された棚卸調整
+ */
 export async function createInventoryAdjustment(
   data: InventoryAdjustmentData
 ): Promise<InventoryAdjustmentResult> {
@@ -130,6 +154,18 @@ export async function createInventoryAdjustment(
   }
 }
 
+/**
+ * 棚卸調整から仕訳（借方/貸方勘定・金額・摘要）を生成する。
+ *
+ * 棚卸増加（正の差異）は 棚卸資産/借方・売上原価/貸方、
+ * 棚卸減少（負の差異）は 売上原価/借方・棚卸資産/貸方とする。
+ * 差異が 0 の場合は仕訳不要として `null` を返す。
+ *
+ * @param adjustment - 棚卸調整結果
+ * @param inventoryAccountId - 棚卸資産の勘定科目ID
+ * @param cogsAccountId - 売上原価の勘定科目ID
+ * @returns 仕訳データ。差異が 0 の場合は `null`。
+ */
 export function generateInventoryJournalEntry(
   adjustment: InventoryAdjustmentResult,
   inventoryAccountId: string,
@@ -161,6 +197,12 @@ export function generateInventoryJournalEntry(
   }
 }
 
+/**
+ * 棚卸調整に仕訳IDを紐付け、ステータスを `COMPLETED` に更新する。
+ *
+ * @param adjustmentId - 棚卸調整ID
+ * @param journalEntryId - 作成された仕訳ID
+ */
 export async function markJournalCreated(
   adjustmentId: string,
   journalEntryId: string
@@ -174,6 +216,18 @@ export async function markJournalCreated(
   })
 }
 
+/**
+ * 指定年度の1月から currentMonth までの棚卸に関するアラートを検出する。
+ *
+ * 未実施（NO_INVENTORY_COUNT）、仕訳未作成（MISSING_JOURNAL）、
+ * 大幅な差異（LARGE_VARIANCE）の3種別を順にチェックする。
+ *
+ * @param companyId - 企業ID
+ * @param fiscalYear - 会計年度
+ * @param currentMonth - チェック対象の直近月（1〜12）
+ * @param varianceThreshold - 差異率の閾値（既定 0.2 = 20%）。期首残高に対する差異の絶対値比で超過時にアラート
+ * @returns 検出されたアラートの配列
+ */
 export async function detectInventoryAlerts(
   companyId: string,
   fiscalYear: number,
@@ -234,6 +288,16 @@ export async function detectInventoryAlerts(
   return alerts
 }
 
+/**
+ * 指定年度の棚卸残高・調整額のトレンドを分析する。
+ *
+ * 平均残高・調整額合計・月次データを算出し、直近3ヶ月の増減傾向から
+ * `increasing`/`decreasing`/`stable` を判定する。データが3ヶ月未満の場合は `stable`。
+ *
+ * @param companyId - 企業ID
+ * @param fiscalYear - 会計年度
+ * @returns 平均残高・調整額合計・トレンド方向・月次データ
+ */
 export async function analyzeInventoryTrend(
   companyId: string,
   fiscalYear: number
@@ -285,6 +349,16 @@ export async function analyzeInventoryTrend(
   }
 }
 
+/**
+ * 指定月の棚卸調整をスキップ扱い（ステータス `SKIPPED`）で登録する。
+ *
+ * 既存レコードがある場合はステータスのみ更新し、未登録の場合は残高 0 で新規作成する。
+ *
+ * @param companyId - 企業ID
+ * @param fiscalYear - 会計年度
+ * @param month - 月（1〜12）
+ * @param _reason - スキップ理由（現状未使用、将来の監査ログ用）
+ */
 export async function skipInventoryAdjustment(
   companyId: string,
   fiscalYear: number,

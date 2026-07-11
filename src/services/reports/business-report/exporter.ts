@@ -13,7 +13,20 @@ export interface ExportResult {
   error?: string
 }
 
+/**
+ * 事業報告書を各種形式へエクスポートするサービス。
+ *
+ * 現状は HTML 形式のみ実装済み。PDF/Word/XBRL は追加依存が必要なため未実装。
+ */
 export class BusinessReportExporter {
+  /**
+   * 報告書を指定形式でエクスポートする。
+   *
+   * @param report - 事業報告書データ（シンプル型または経団連型）
+   * @param options - 形式・言語等のエクスポートオプション
+   * @returns エクスポート結果。成功時は `success: true` と Blob/ファイル名、
+   *   未対応形式や例外時は `success: false` と `error` メッセージを返す。
+   */
   async export(report: AnyReport, options: ExportOptions): Promise<ExportResult> {
     try {
       switch (options.format) {

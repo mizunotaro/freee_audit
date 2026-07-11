@@ -59,6 +59,15 @@ function formatDate(date: Date | string, language: 'ja' | 'en'): string {
     : d.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
 }
 
+/**
+ * タイトルスライド（会社名・タイトル・年度・作成日）を生成する。
+ *
+ * @param pptx - PptxGenJS インスタンス
+ * @param title - レポートタイトル
+ * @param fiscalYear - 会計年度
+ * @param companyName - 会社名
+ * @param language - 出力言語
+ */
 function createTitleSlide(
   pptx: PptxGenJS,
   title: string,
@@ -118,6 +127,15 @@ function createTitleSlide(
   })
 }
 
+/**
+ * セクション本文スライド（ヘッダ・タイトル・本文・ページ番号）を生成する。
+ *
+ * @param pptx - PptxGenJS インスタンス
+ * @param section - セクションデータ
+ * @param language - 出力言語
+ * @param companyName - 会社名
+ * @param slideIndex - スライド番号
+ */
 function createSectionSlide(
   pptx: PptxGenJS,
   section: IRReportSection,
@@ -190,6 +208,14 @@ function createSectionSlide(
   })
 }
 
+/**
+ * 目次スライド（セクション一覧）を生成する。
+ *
+ * @param pptx - PptxGenJS インスタンス
+ * @param sections - セクション配列
+ * @param language - 出力言語
+ * @param companyName - 会社名
+ */
 function createTOCSlide(
   pptx: PptxGenJS,
   sections: IRReportSection[],
@@ -245,6 +271,14 @@ function createTOCSlide(
   })
 }
 
+/**
+ * 財務ハイライトスライド（項目・値・変化率のテーブル）を生成する。
+ *
+ * @param pptx - PptxGenJS インスタンス
+ * @param highlights - 財務ハイライト項目の配列
+ * @param language - 出力言語
+ * @param companyName - 会社名
+ */
 function createFinancialHighlightsSlide(
   pptx: PptxGenJS,
   highlights: Array<{ label: string; value: number; unit: string; change?: number }>,
@@ -382,6 +416,17 @@ async function generatePPTXWithTimeout(
   return Promise.race([generationPromise(), timeoutPromise])
 }
 
+/**
+ * IRレポートを PPTX 形式でエクスポートする。
+ *
+ * レポート本体の検証後、タイトルスライド・目次・各セクションスライドを生成し、
+ * 生成タイムアウト（60秒）付きで Buffer を返す。
+ *
+ * @param report - IRレポートデータ
+ * @param options - 言語・会社名・タイトルスライド含有等のエクスポートオプション
+ * @returns `Result`。成功時は PPTX バッファ・ファイル名・MIMEタイプ、
+ *   検証失敗やタイムアウト・例外時は `failure` となる。
+ */
 export async function exportIRReportToPPTX(
   report: IRReport,
   options: PPTXExportOptions = { language: 'ja' }
@@ -411,6 +456,16 @@ export async function exportIRReportToPPTX(
   }
 }
 
+/**
+ * セクション配列とメタデータから一時的なIRレポートを構築して PPTX エクスポートする。
+ *
+ * {@link exportIRReportToPPTX} のラッパー。セクション数上限（100）を超える場合は `failure`。
+ *
+ * @param sections - エクスポート対象のセクション配列
+ * @param metadata - タイトル・会計年度・会社名
+ * @param options - 言語等のエクスポートオプション
+ * @returns `Result`。成功時は PPTX バッファ等、配列でない・上限超過時は `failure`。
+ */
 export async function exportIRReportSectionsToPPTX(
   sections: IRReportSection[],
   metadata: {

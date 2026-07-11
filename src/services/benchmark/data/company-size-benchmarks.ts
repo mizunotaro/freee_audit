@@ -13,6 +13,12 @@ const createBenchmark = (values: number[]): BenchmarkRange => {
   }
 }
 
+/**
+ * 企業規模別の財務比率ベンチマークデータ。
+ *
+ * micro/small/medium/large の各規模について従業員数・売上高の範囲と
+ * 主要財務指標の min/Q1/median/Q3/max を保持する。
+ */
 export const COMPANY_SIZE_BENCHMARKS: Record<CompanySize, CompanySizeBenchmarkData> = {
   micro: {
     size: 'micro',
@@ -87,10 +93,25 @@ export const COMPANY_SIZE_BENCHMARKS: Record<CompanySize, CompanySizeBenchmarkDa
   },
 }
 
+/**
+ * 指定企業規模のベンチマークデータを取得する。
+ *
+ * @param size - 企業規模（micro/small/medium/large）
+ * @returns 企業規模のベンチマークデータ。未定義の場合は `undefined`。
+ */
 export function getCompanySizeBenchmark(size: CompanySize): CompanySizeBenchmarkData | undefined {
   return COMPANY_SIZE_BENCHMARKS[size]
 }
 
+/**
+ * 従業員数または年間売上高から企業規模を判定する。
+ *
+ * 従業員数を優先し、未指定の場合は売上高で判定する。両方未指定の場合は `small` を返す。
+ *
+ * @param employeeCount - 従業員数（オプション）
+ * @param annualRevenue - 年間売上高（オプション）
+ * @returns 判定された企業規模
+ */
 export function determineCompanySize(employeeCount?: number, annualRevenue?: number): CompanySize {
   if (employeeCount !== undefined) {
     if (employeeCount <= 9) return 'micro'
@@ -109,6 +130,11 @@ export function determineCompanySize(employeeCount?: number, annualRevenue?: num
   return 'small'
 }
 
+/**
+ * 全企業規模のベンチマークデータを配列で取得する。
+ *
+ * @returns 全企業規模のベンチマークデータ配列
+ */
 export function getAllCompanySizeBenchmarks(): CompanySizeBenchmarkData[] {
   return Object.values(COMPANY_SIZE_BENCHMARKS)
 }
