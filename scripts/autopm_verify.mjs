@@ -84,6 +84,8 @@ async function main() {
   log(`buckets: ${JSON.stringify({
     ts: buckets.ts.length,
     tests: buckets.tests.length,
+    bench: buckets.bench.length,
+    benchSupport: buckets.benchSupport.length,
     python: buckets.python.length,
     r: buckets.r.length,
     prisma: buckets.prisma.length,
@@ -92,9 +94,15 @@ async function main() {
 
   let ok = true
 
+  const hasTsLike =
+    buckets.ts.length > 0 || buckets.tests.length > 0 ||
+    buckets.bench.length > 0 || buckets.benchSupport.length > 0
+
   // Step 1: TypeScript (whole-repo, error filter by changed files)
-  if (buckets.ts.length > 0 || buckets.tests.length > 0) {
-    const step = await runTypecheckFiltered(new Set([...buckets.ts, ...buckets.tests]))
+  if (hasTsLike) {
+    const step = await runTypecheckFiltered(
+      new Set([...buckets.ts, ...buckets.tests, ...buckets.bench, ...buckets.benchSupport])
+    )
     summary.steps.push(step)
     if (!step.ok) ok = false
   } else {
@@ -102,8 +110,8 @@ async function main() {
   }
 
   // Step 2: ESLint on changed TS/TSX files
-  if (buckets.ts.length > 0 || buckets.tests.length > 0) {
-    const targets = [...buckets.ts, ...buckets.tests].filter(f => existsSync(absPath(f)))
+  if (hasTsLike) {
+    const targets = [...buckets.ts, ...buckets.tests, ...buckets.bench, ...buckets.benchSupport].filter(f => existsSync(absPath(f)))
     if (targets.length === 0) {
       summary.steps.push({ name: 'eslint', ok: true, skipped: 'no extant TS targets' })
     } else {
@@ -127,6 +135,15 @@ async function main() {
     }
   } else {
     summary.steps.push({ name: 'vitest', ok: true, skipped: 'no TS/TSX diff' })
+  }
+
+  // Step 3b: Vitest (benchmark specs under tests/benchmark/*.bench.ts).
+  // These run under a dedicated config (jsdom, sequential) and are excluded from
+  // the default unit shards, so they need their own invocation.
+  if (buckets.bench.length > 0) {
+    const step = await runVitestBench(buckets.bench)
+    summary.steps.push(step)
+    if (!step.ok) ok = false
   }
 
   // Step 4: Python (only if python-service changed)
@@ -236,15 +253,24 @@ function classifyChanged(files) {
   const r = []
   const prisma = []
   const other = []
+  const bench = []
+  const benchSupport = []
   for (const f of files) {
     if (/\.(test|spec)\.(ts|tsx)$/.test(f)) tests.push(f)
     else if (/\.(ts|tsx)$/.test(f) && f.startsWith('src/')) ts.push(f)
+    else if (f.startsWith('tests/benchmark/')) {
+      // *.bench.ts specs run under the dedicated vitest.bench.config.ts; other
+      // TS helpers there are typechecked + linted but not executed.
+      if (/\.bench\.(ts|tsx)$/.test(f)) bench.push(f)
+      else if (/\.(ts|tsx)$/.test(f)) benchSupport.push(f)
+      else other.push(f)
+    }
     else if (f.startsWith('python-service/')) python.push(f)
     else if (f.startsWith('r-service/')) r.push(f)
     else if (f === 'prisma/schema.prisma') prisma.push(f)
     else other.push(f)
   }
-  return { ts, tests, python, r, prisma, other }
+  return { ts, tests, python, r, prisma, other, bench, benchSupport }
 }
 
 function resolveTestFiles(srcFiles, changedTests) {
@@ -346,6 +372,20 @@ async function runVitest(testFiles) {
     rawExit: r.code,
     tail: tail(r.stdout + r.stderr, 80),
     resolved: testFiles,
+  }
+}
+
+async function runVitestBench(benchFiles) {
+  log(`vitest-bench: ${benchFiles.length} bench file(s) under vitest.bench.config.ts`)
+  if (VERBOSE) benchFiles.forEach(t => log('  → ' + t))
+  const quoted = benchFiles.map(f => `"${f}"`).join(' ')
+  const r = await runCmd(`${PNPM} exec vitest run --config vitest.bench.config.ts ${quoted}`)
+  return {
+    name: 'vitest-bench',
+    ok: r.code === 0,
+    rawExit: r.code,
+    tail: tail(r.stdout + r.stderr, 80),
+    resolved: benchFiles,
   }
 }
 
