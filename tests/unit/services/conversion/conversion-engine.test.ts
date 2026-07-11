@@ -1,29 +1,17 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import {
-  ConversionEngine,
-  conversionEngine,
-  type ConversionProgress,
-  type DryRunResult,
-} from '@/services/conversion/conversion-engine'
+import { ConversionEngine, conversionEngine } from '@/services/conversion/conversion-engine'
 import {
   JournalConverter,
   journalConverter,
-  type UnmappedAccount,
   type BatchResult,
 } from '@/services/conversion/journal-converter'
 import {
   FinancialStatementConverter,
   financialStatementConverter,
-  type ComparisonReport,
 } from '@/services/conversion/financial-statement-converter'
 import { prisma } from '@/lib/db'
 import { isSuccess, isFailure } from '@/types/result'
-import type {
-  AccountMapping,
-  JournalConversion,
-  ConvertedJournalLine,
-  ConversionSettings,
-} from '@/types/conversion'
+import type { AccountMapping, JournalConversion, ConversionSettings } from '@/types/conversion'
 
 vi.mock('@/lib/db', () => ({
   prisma: {
@@ -172,7 +160,9 @@ describe('ConversionEngine', () => {
     it('should convert journals successfully', async () => {
       vi.mocked(prisma.conversionProject.findUnique).mockResolvedValue(mockProject as any)
       vi.mocked(prisma.journal.count).mockResolvedValue(2)
-      vi.mocked(prisma.journal.findMany).mockResolvedValue(mockJournals as any)
+      vi.mocked(prisma.journal.findMany)
+        .mockResolvedValueOnce(mockJournals as any)
+        .mockResolvedValue([] as any)
       vi.mocked(prisma.accountMapping.findMany).mockResolvedValue([])
       vi.mocked(prisma.accountMapping.count).mockResolvedValue(mockMappings.length)
       vi.mocked(prisma.accountMapping.groupBy).mockResolvedValue([])
@@ -241,7 +231,9 @@ describe('ConversionEngine', () => {
     it('should handle partial failures', async () => {
       vi.mocked(prisma.conversionProject.findUnique).mockResolvedValue(mockProject as any)
       vi.mocked(prisma.journal.count).mockResolvedValue(2)
-      vi.mocked(prisma.journal.findMany).mockResolvedValue(mockJournals as any)
+      vi.mocked(prisma.journal.findMany)
+        .mockResolvedValueOnce(mockJournals as any)
+        .mockResolvedValue([] as any)
       vi.mocked(prisma.accountMapping.findMany).mockResolvedValue([])
       vi.mocked(prisma.accountMapping.count).mockResolvedValue(0)
       vi.mocked(prisma.accountMapping.groupBy).mockResolvedValue([])
@@ -293,19 +285,31 @@ describe('ConversionEngine', () => {
       vi.mocked(prisma.conversionProject.findUnique).mockResolvedValue(mockProject as any)
       vi.mocked(prisma.conversionProject.update).mockResolvedValue({} as any)
       vi.mocked(prisma.journal.count).mockResolvedValue(10000)
-      vi.mocked(prisma.journal.findMany).mockResolvedValue([] as any)
       vi.mocked(prisma.accountMapping.findMany).mockResolvedValue([])
       vi.mocked(prisma.accountMapping.count).mockResolvedValue(0)
       vi.mocked(prisma.accountMapping.groupBy).mockResolvedValue([])
       vi.mocked(prisma.accountMapping.aggregate).mockResolvedValue({
         _avg: { confidence: 0 },
       } as any)
+      // Stream the first journal page, then issue the real abort on the second
+      // page request. By then execute() has registered its AbortController, so
+      // the abort lands deterministically and the signal.aborted check in
+      // convertJournals fires. execute() resolves with a failure Result (its
+      // contract never rejects) — the failure originates from the abort path.
+      vi.mocked(prisma.journal.findMany)
+        .mockResolvedValueOnce(mockJournals as any)
+        .mockImplementationOnce((async () => {
+          await engine.abort('project-1')
+          return mockJournals
+        }) as never)
+        .mockResolvedValue([] as any)
 
-      const executePromise = engine.execute('project-1')
+      const result = await engine.execute('project-1', { skipValidation: true })
 
-      await engine.abort('project-1')
-
-      await expect(executePromise).rejects.toThrow()
+      expect(isFailure(result)).toBe(true)
+      if (isFailure(result)) {
+        expect(result.error.message).toBe('Conversion aborted')
+      }
     })
   })
 
@@ -366,7 +370,9 @@ describe('ConversionEngine', () => {
       } as any)
       vi.mocked(prisma.conversionProject.update).mockResolvedValue({} as any)
       vi.mocked(prisma.journal.count).mockResolvedValue(2)
-      vi.mocked(prisma.journal.findMany).mockResolvedValue(mockJournals as any)
+      vi.mocked(prisma.journal.findMany)
+        .mockResolvedValueOnce(mockJournals as any)
+        .mockResolvedValue([] as any)
       vi.mocked(prisma.accountMapping.findMany).mockResolvedValue(
         mockMappings.map((m) => ({
           id: m.id,
@@ -796,6 +802,7 @@ describe('FinancialStatementConverter', () => {
       const balanceCheck =
         Math.abs(result.totalAssets - result.totalLiabilities - result.totalEquity) < 0.01
 
+      expect(balanceCheck).toBe(true)
       expect(typeof result.totalAssets).toBe('number')
       expect(typeof result.totalLiabilities).toBe('number')
       expect(typeof result.totalEquity).toBe('number')

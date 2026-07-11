@@ -38,7 +38,8 @@ export function useAnalysis(period: FiscalPeriod) {
     if (abortControllerRef.current) {
       abortControllerRef.current.abort()
     }
-    abortControllerRef.current = new AbortController()
+    const controller = new AbortController()
+    abortControllerRef.current = controller
 
     setState((prev) => ({ ...prev, isLoading: true, error: null }))
 
@@ -129,7 +130,7 @@ export function useAnalysis(period: FiscalPeriod) {
             sector: 'manufacturing',
           },
         }),
-        signal: abortControllerRef.current.signal,
+        signal: controller.signal,
       })
 
       const data = await response.json()
@@ -146,7 +147,15 @@ export function useAnalysis(period: FiscalPeriod) {
         error: data.success ? null : (data.error?.message ?? 'Unknown error'),
       })
     } catch (err) {
-      if (err instanceof Error && err.name === 'AbortError') {
+      if (
+        err != null &&
+        typeof err === 'object' &&
+        (err as { name?: unknown }).name === 'AbortError'
+      ) {
+        if (abortControllerRef.current !== controller) {
+          return
+        }
+        setState((prev) => ({ ...prev, isLoading: false, error: null }))
         return
       }
       setState((prev) => ({
@@ -155,7 +164,7 @@ export function useAnalysis(period: FiscalPeriod) {
         error: err instanceof Error ? err.message : 'Unknown error',
       }))
     }
-  }, [period, cacheTtlMs])
+  }, [period.fiscalYear, period.month, cacheTtlMs])
 
   useEffect(() => {
     fetchData()
@@ -171,7 +180,7 @@ export function useAnalysis(period: FiscalPeriod) {
     const cacheKey = `analysis_${period.fiscalYear}_${period.month}`
     cacheRef.current.delete(cacheKey)
     fetchData()
-  }, [fetchData, period])
+  }, [fetchData, period.fiscalYear, period.month])
 
   return {
     ...state,
