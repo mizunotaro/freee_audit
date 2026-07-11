@@ -3,6 +3,7 @@
 import {
   Sparkles,
   AlertTriangle,
+  AlertCircle,
   CheckCircle2,
   Info,
   Lightbulb,
@@ -16,11 +17,13 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { cn } from '@/lib/utils'
 import type { WACCAdviceResponse, ValuationQAResult } from '@/services/valuation'
+import { resolveDisplayState } from '@/components/valuation/resolve-display-state'
 
 interface ValuationAIAdvisorProps {
   advice: WACCAdviceResponse | null
   qaResult: ValuationQAResult | null
   isLoading: boolean
+  error?: string | null
   onRefresh?: () => void
   className?: string
 }
@@ -29,12 +32,25 @@ export function ValuationAIAdvisor({
   advice,
   qaResult,
   isLoading,
+  error = null,
   onRefresh,
   className,
 }: ValuationAIAdvisorProps) {
-  if (isLoading) {
+  const state = resolveDisplayState({
+    loading: isLoading,
+    error,
+    hasData: Boolean(advice || qaResult),
+  })
+  const status = state.success ? state.data : 'ready'
+
+  if (status === 'loading') {
     return (
-      <Card className={cn('w-full', className)}>
+      <Card
+        className={cn('w-full', className)}
+        role="status"
+        aria-busy="true"
+        aria-label="Loading AI advisor"
+      >
         <CardHeader>
           <div className="flex items-center gap-2">
             <Sparkles className="h-5 w-5 text-yellow-500" />
@@ -50,7 +66,31 @@ export function ValuationAIAdvisor({
     )
   }
 
-  if (!advice && !qaResult) {
+  if (status === 'error') {
+    return (
+      <Card className={cn('w-full', className)}>
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <Sparkles className="h-5 w-5 text-yellow-500" />
+            <CardTitle className="text-base">AI Advisor</CardTitle>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-col items-center gap-2 py-6 text-center" role="alert">
+            <AlertCircle className="h-6 w-6 text-destructive" />
+            <p className="text-sm text-destructive">{error || 'Failed to load AI advisor'}</p>
+            {onRefresh && (
+              <Button variant="ghost" size="sm" onClick={onRefresh}>
+                Retry
+              </Button>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+    )
+  }
+
+  if (status === 'empty') {
     return (
       <Card className={cn('w-full', className)}>
         <CardHeader>
@@ -61,7 +101,7 @@ export function ValuationAIAdvisor({
           <CardDescription>Industry-specific recommendations</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="flex flex-col items-center justify-center py-6 text-center">
+          <div className="flex flex-col items-center justify-center py-6 text-center" role="status">
             <Lightbulb className="mb-2 h-8 w-8 text-muted-foreground" />
             <p className="text-sm text-muted-foreground">
               Select an industry and enter parameters to receive AI-powered recommendations
@@ -129,7 +169,14 @@ function QASection({ qaResult }: { qaResult: ValuationQAResult }) {
           <span className="text-sm text-muted-foreground">Quality Score</span>
           <span className="text-lg font-bold">{qaResult.score}/100</span>
         </div>
-        <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
+        <div
+          className="h-2 w-full overflow-hidden rounded-full bg-muted"
+          role="progressbar"
+          aria-valuenow={qaResult.score}
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-label={`Quality score ${qaResult.score} of 100`}
+        >
           <div
             className={cn(
               'h-full transition-all',
