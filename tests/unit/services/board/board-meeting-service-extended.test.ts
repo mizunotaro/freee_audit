@@ -86,12 +86,14 @@ describe('BoardMeetingServiceExtended', () => {
         hasInvestors: false,
       })
 
+      expect(result.success).toBe(true)
+      if (!result.success) return
       // discussion 分岐（resolution / report は既存テストで網羅済み）
-      expect(result).toContain('協議事項')
+      expect(result.data).toContain('協議事項')
       expect(mockPrisma.agendaItem.update).toHaveBeenCalledWith(
         expect.objectContaining({
           where: { id: mockAgendaItemId },
-          data: expect.objectContaining({ aiAnalysis: result }),
+          data: expect.objectContaining({ aiAnalysis: result.data }),
         })
       )
     })
@@ -106,7 +108,9 @@ describe('BoardMeetingServiceExtended', () => {
         hasInvestors: false,
       })
 
-      expect(result).not.toContain('法的期限を守って')
+      expect(result.success).toBe(true)
+      if (!result.success) return
+      expect(result.data).not.toContain('法的期限を守って')
     })
 
     it('should note investor impact without agreement clause when investors lack an agreement', async () => {
@@ -128,8 +132,10 @@ describe('BoardMeetingServiceExtended', () => {
         hasInvestors: true,
       })
 
-      expect(result).toContain('投資家')
-      expect(result).not.toContain('出資契約書')
+      expect(result.success).toBe(true)
+      if (!result.success) return
+      expect(result.data).toContain('投資家')
+      expect(result.data).not.toContain('出資契約書')
     })
   })
 })

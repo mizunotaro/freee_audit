@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { validateSession } from '@/lib/auth'
 import { prisma } from '@/lib/db'
+import { ERROR_CODES } from '@/types/result'
 import { BoardMeetingService } from '@/services/board/board-meeting-service'
 import { logRouteAudit } from '@/lib/route-audit'
 
@@ -36,7 +37,21 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
       return NextResponse.json({ error: 'companyInfo is required' }, { status: 400 })
     }
 
-    const analysis = await BoardMeetingService.analyzeAgendaItemWithAI(params.id, companyInfo)
+    const result = await BoardMeetingService.analyzeAgendaItemWithAI(params.id, companyInfo)
+
+    if (!result.success) {
+      const status = result.error.code === ERROR_CODES.NOT_FOUND ? 404 : 500
+      await logRouteAudit({
+        request,
+        action: 'BOARD_AGENDA_ITEM_ANALYZE',
+        resource: 'board_agenda_item',
+        resourceId: params.id,
+        result: 'FAILURE',
+        details: { error: result.error.message },
+      })
+      return NextResponse.json({ error: result.error.message }, { status })
+    }
+
     await logRouteAudit({
       request,
       userId: user.id,
@@ -44,7 +59,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
       resource: 'board_agenda_item',
       resourceId: params.id,
     })
-    return NextResponse.json({ analysis })
+    return NextResponse.json({ analysis: result.data })
   } catch (error) {
     await logRouteAudit({
       request,
