@@ -248,7 +248,13 @@ function classifyChanged(files) {
 }
 
 function resolveTestFiles(srcFiles, changedTests) {
-  const out = new Set(changedTests.filter(t => existsSync(absPath(t))))
+  // Vitest owns `*.test.ts(x)` only (see vitest.config.ts `include`). `*.spec.ts`
+  // files are Playwright E2E specs (tests/e2e/**); vitest cannot collect them
+  // and exits 1 ("No test files found"), so never route them to the vitest step.
+  // They are still typechecked + linted above; the CI `e2e-tests` job runs them.
+  const out = new Set(
+    changedTests.filter(t => /\.test\.(ts|tsx)$/.test(t) && existsSync(absPath(t)))
+  )
   for (const f of srcFiles) {
     const rel = f.replace(/^src\//, '').replace(/\.(ts|tsx)$/, '')
     const stems = new Set([rel])
