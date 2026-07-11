@@ -1,6 +1,9 @@
 import { randomBytes } from 'crypto'
 import { prisma } from '@/lib/db'
 import { auditLogger } from '@/lib/audit/audit-logger'
+import { secureLogger } from '@/lib/utils/secure-logger'
+
+const COMPONENT = 'InvitationService'
 
 export const INVITATION_TOKEN_BYTES = 32
 export const INVITATION_EXPIRY_DAYS = 7
@@ -95,7 +98,11 @@ export async function createInvitation(input: CreateInvitationInput): Promise<In
       invitationId: invitation.id,
     }
   } catch (error) {
-    console.error('Failed to create invitation:', error)
+    secureLogger.error('Failed to create invitation', {
+      component: COMPONENT,
+      operation: 'createInvitation',
+      error,
+    })
     return { success: false, error: 'Failed to create invitation' }
   }
 }
@@ -133,7 +140,11 @@ export async function validateInvitationToken(token: string): Promise<ValidateTo
       },
     }
   } catch (error) {
-    console.error('Failed to validate invitation token:', error)
+    secureLogger.error('Failed to validate invitation token', {
+      component: COMPONENT,
+      operation: 'validateInvitationToken',
+      error,
+    })
     return { valid: false, error: 'Failed to validate token' }
   }
 }
@@ -191,7 +202,11 @@ export async function acceptInvitation(
 
     return { success: true, userId: user.id }
   } catch (error) {
-    console.error('Failed to accept invitation:', error)
+    secureLogger.error('Failed to accept invitation', {
+      component: COMPONENT,
+      operation: 'acceptInvitation',
+      error,
+    })
     return { success: false, error: 'Failed to accept invitation' }
   }
 }
@@ -242,7 +257,12 @@ export async function revokeInvitation(invitationId: string, revokedBy: string):
 
     return true
   } catch (error) {
-    console.error('Failed to revoke invitation:', error)
+    secureLogger.error('Failed to revoke invitation', {
+      component: COMPONENT,
+      operation: 'revokeInvitation',
+      invitationId,
+      error,
+    })
     return false
   }
 }
@@ -274,7 +294,11 @@ export async function cleanupExpiredInvitations(): Promise<number> {
     })
     return result.count
   } catch (error) {
-    console.error('Failed to cleanup expired invitations:', error)
+    secureLogger.error('Failed to cleanup expired invitations', {
+      component: COMPONENT,
+      operation: 'cleanupExpiredInvitations',
+      error,
+    })
     return 0
   }
 }

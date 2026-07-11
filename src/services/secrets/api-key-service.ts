@@ -3,6 +3,9 @@ import { decrypt } from '@/lib/crypto'
 import { encryptForCache, decryptFromCache } from '@/lib/crypto/encryption-v2'
 import { prisma } from '@/lib/db'
 import type { AIProviderType } from '@/lib/ai/config/types'
+import { secureLogger } from '@/lib/utils/secure-logger'
+
+const COMPONENT = 'APIKeyService'
 
 export type AIProvider = AIProviderType
 
@@ -62,7 +65,12 @@ class APIKeyService {
           },
         }
       } catch (error) {
-        console.error('[APIKeyService] Failed to decrypt cached config:', error)
+        secureLogger.error('Failed to decrypt cached config', {
+          component: COMPONENT,
+          operation: 'getAPIKey',
+          provider,
+          error,
+        })
         this.cache.delete(cacheKey)
       }
     }
@@ -77,7 +85,12 @@ class APIKeyService {
           expiresAt: Date.now() + this.cacheTTL,
         })
       } catch (error) {
-        console.error('[APIKeyService] Failed to encrypt config for cache:', error)
+        secureLogger.error('Failed to encrypt config for cache', {
+          component: COMPONENT,
+          operation: 'getAPIKey',
+          provider,
+          error,
+        })
       }
     }
 
@@ -153,7 +166,12 @@ class APIKeyService {
         },
       }
     } catch (error) {
-      console.error(`Failed to get ${provider} API key from secret manager:`, error)
+      secureLogger.error('Failed to get API key from secret manager', {
+        component: COMPONENT,
+        operation: 'getFromSecretManager',
+        provider,
+        error,
+      })
       return null
     }
   }
@@ -200,7 +218,12 @@ class APIKeyService {
 
       return config
     } catch (error) {
-      console.error(`Failed to get ${provider} API key from database:`, error)
+      secureLogger.error('Failed to get API key from database', {
+        component: COMPONENT,
+        operation: 'getFromDatabase',
+        provider,
+        error,
+      })
       return null
     }
   }

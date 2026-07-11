@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { ExternalInfoService, createExternalInfoService } from '@/services/external-info'
+import { getSecureLogger } from '@/lib/utils/secure-logger'
 import type { ExternalInfoQuery } from '@/services/external-info/types'
 
 describe('ExternalInfoService', () => {
@@ -117,6 +118,27 @@ describe('ExternalInfoService', () => {
       expect(stats).toHaveProperty('hits')
       expect(stats).toHaveProperty('misses')
       expect(stats).toHaveProperty('hitRate')
+    })
+  })
+
+  describe('logging', () => {
+    it('emits a structured warn for an unimplemented source on init', () => {
+      const warnSpy = vi.spyOn(getSecureLogger(), 'warn').mockImplementation(() => {})
+
+      createExternalInfoService({
+        enabledSources: ['mof'],
+        useCache: false,
+      })
+
+      expect(warnSpy).toHaveBeenCalledWith(
+        'External info source not implemented',
+        expect.objectContaining({
+          component: 'ExternalInfoService',
+          sourceId: 'mof',
+        })
+      )
+
+      warnSpy.mockRestore()
     })
   })
 })

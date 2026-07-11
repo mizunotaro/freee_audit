@@ -1,5 +1,6 @@
 import { freeeClient } from '@/integrations/freee/client'
 import { prisma } from '@/lib/db'
+import { secureLogger } from '@/lib/utils/secure-logger'
 
 export interface AccountItem {
   id: string
@@ -97,7 +98,11 @@ export async function syncAccountItemsFromFreee(
 
     return { success: true, imported }
   } catch (error) {
-    console.error('Failed to sync account items:', error)
+    secureLogger.error('Failed to sync account items', {
+      component: 'AccountItemsService',
+      operation: 'syncAccountItems',
+      error,
+    })
     return {
       success: false,
       imported: 0,

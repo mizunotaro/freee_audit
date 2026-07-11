@@ -4,6 +4,7 @@ import {
   getRunwayAlert,
   calculateBurnRateTrend,
 } from '@/services/cashflow/runway-calculator'
+import { getSecureLogger } from '@/lib/utils/secure-logger'
 import type { CashFlowStatement } from '@/types'
 
 function createMockCashFlows(
@@ -146,6 +147,32 @@ describe('calculateRunway', () => {
       expect(warnSpy).toHaveBeenCalledTimes(2)
 
       warnSpy.mockRestore()
+    })
+
+    it('emits a structured warn per adjustment provided without reason', () => {
+      const loggerWarnSpy = vi.spyOn(getSecureLogger(), 'warn').mockImplementation(() => {})
+
+      const cashFlows = createMockCashFlows([{ month: 1, operatingCF: -1000000 }])
+
+      calculateRunway(5000000, cashFlows, {
+        scenarioAdjustments: {
+          optimistic: 0.5,
+          realistic: 1.0,
+          pessimistic: 1.5,
+        },
+      })
+
+      expect(loggerWarnSpy).toHaveBeenCalledTimes(2)
+      const scenarios = loggerWarnSpy.mock.calls.map(
+        (call) => (call[1] as { scenario: string }).scenario
+      )
+      expect(scenarios).toEqual(expect.arrayContaining(['optimistic', 'pessimistic']))
+      expect(loggerWarnSpy.mock.calls[0][1]).toMatchObject({
+        component: 'RunwayCalculator',
+        provided: expect.any(Number),
+      })
+
+      loggerWarnSpy.mockRestore()
     })
 
     it('should use default 1.0 adjustments when not provided', () => {

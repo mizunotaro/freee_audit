@@ -9,6 +9,7 @@ import type {
 import { BaseInfoSource, MockInfoSource, NtaInfoSource, WebSearchInfoSource } from './sources'
 import { getInfoCache } from './cache'
 import { DEFAULT_SOURCE_CONFIGS } from './types'
+import { secureLogger } from '@/lib/utils/secure-logger'
 
 export interface ExternalInfoServiceConfig {
   enabledSources: InfoSourceId[]
@@ -42,7 +43,10 @@ export class ExternalInfoService {
     for (const sourceId of this.config.enabledSources) {
       const sourceConfig = DEFAULT_SOURCE_CONFIGS[sourceId]
       if (!sourceConfig) {
-        console.warn(`Unknown source: ${sourceId}`)
+        secureLogger.warn('Unknown external info source - skipping', {
+          component: 'ExternalInfoService',
+          sourceId,
+        })
         continue
       }
 
@@ -62,7 +66,10 @@ export class ExternalInfoService {
       case 'web_search':
         return new WebSearchInfoSource(config)
       default:
-        console.warn(`Source not implemented: ${sourceId}`)
+        secureLogger.warn('External info source not implemented', {
+          component: 'ExternalInfoService',
+          sourceId,
+        })
         return null
     }
   }

@@ -3,6 +3,7 @@ import type { AccountingStandard, AccountingStandardConfig } from '@/types/accou
 import { getAccountingStandardConfig } from '@/types/accounting-standard'
 import { getPersona } from '@/lib/ai/personas'
 import { createAIProviderFromEnv } from '@/lib/integrations/ai'
+import { secureLogger } from '@/lib/utils/secure-logger'
 
 export interface CalculationValidationInput {
   standard: AccountingStandard
@@ -190,7 +191,11 @@ export class CalculationValidator {
 
       return []
     } catch (error) {
-      console.error('LLM validation failed:', error)
+      secureLogger.error('LLM validation failed', {
+        component: 'CalculationValidator',
+        persona: personaType,
+        error,
+      })
       return []
     }
   }

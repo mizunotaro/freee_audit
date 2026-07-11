@@ -1,5 +1,6 @@
 import type { RunwayCalculation, CashFlowStatement } from '@/types'
 import { addMonths, sumValues } from '@/lib/utils'
+import { secureLogger } from '@/lib/utils/secure-logger'
 
 /**
  * Cash runway in months from a cash balance and an average net burn rate.
@@ -143,12 +144,20 @@ function validateAndApplyAdjustments(
   let pessimistic = adjustments.pessimistic
 
   if (optimistic !== 1.0 && !reasons?.optimistic) {
-    console.warn('Optimistic adjustment without reason - using default 1.0')
+    secureLogger.warn('Scenario adjustment provided without reason - using default 1.0', {
+      component: 'RunwayCalculator',
+      scenario: 'optimistic',
+      provided: optimistic,
+    })
     optimistic = 1.0
   }
 
   if (pessimistic !== 1.0 && !reasons?.pessimistic) {
-    console.warn('Pessimistic adjustment without reason - using default 1.0')
+    secureLogger.warn('Scenario adjustment provided without reason - using default 1.0', {
+      component: 'RunwayCalculator',
+      scenario: 'pessimistic',
+      provided: pessimistic,
+    })
     pessimistic = 1.0
   }
 

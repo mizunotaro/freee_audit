@@ -1,9 +1,10 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi, afterEach } from 'vitest'
 import {
   RatioAnalyzer,
   createRatioAnalyzer,
   analyzeRatios,
 } from '@/services/ai/analyzers/ratio-analyzer'
+import { getSecureLogger } from '@/lib/utils/secure-logger'
 import type { BalanceSheet, ProfitLoss } from '@/types'
 
 describe('RatioAnalyzer', () => {
@@ -264,6 +265,60 @@ describe('RatioAnalyzer', () => {
 
       expect(result.success).toBe(true)
       expect(result.data).toBeDefined()
+    })
+  })
+
+  describe('logging', () => {
+    afterEach(() => {
+      vi.restoreAllMocks()
+    })
+
+    it('emits a structured warn for missing balance sheet', () => {
+      const warnSpy = vi.spyOn(getSecureLogger(), 'warn').mockImplementation(() => {})
+      const analyzer = new RatioAnalyzer()
+
+      analyzer.analyze({ bs: undefined as unknown as BalanceSheet, pl: createMockProfitLoss() })
+
+      expect(warnSpy).toHaveBeenCalledWith(
+        'Validation failed: BalanceSheet is required',
+        expect.objectContaining({ component: 'RatioAnalyzer', reason: 'missing_balance_sheet' })
+      )
+    })
+
+    it('emits a structured warn for non-positive total assets', () => {
+      const warnSpy = vi.spyOn(getSecureLogger(), 'warn').mockImplementation(() => {})
+      const analyzer = new RatioAnalyzer()
+
+      analyzer.analyze({
+        bs: createMockBalanceSheet({ totalAssets: 0 }),
+        pl: createMockProfitLoss(),
+      })
+
+      expect(warnSpy).toHaveBeenCalledWith(
+        'Validation failed: totalAssets must be positive',
+        expect.objectContaining({
+          component: 'RatioAnalyzer',
+          reason: 'non_positive_total_assets',
+          totalAssets: 0,
+        })
+      )
+    })
+
+    it('emits info lifecycle events on a successful analysis', () => {
+      const infoSpy = vi.spyOn(getSecureLogger(), 'info').mockImplementation(() => {})
+      const analyzer = new RatioAnalyzer()
+
+      analyzer.analyze({ bs: createMockBalanceSheet(), pl: createMockProfitLoss() })
+
+      const messages = infoSpy.mock.calls.map((call) => call[0])
+      expect(messages).toContain('Analysis started')
+      expect(messages).toContain('Analysis completed')
+      const completedCall = infoSpy.mock.calls.find((c) => c[0] === 'Analysis completed')
+      expect(completedCall?.[1]).toMatchObject({
+        component: 'RatioAnalyzer',
+        totalRatios: expect.any(Number),
+        durationMs: expect.any(Number),
+      })
     })
   })
 })

@@ -7,6 +7,9 @@ import {
   calculateEfficiencyRatios,
   calculateGrowthRatios,
 } from './ratios'
+import { secureLogger } from '@/lib/utils/secure-logger'
+
+const COMPONENT = 'RatioAnalyzer'
 
 /**
  * 財務比率分析のオプション
@@ -72,7 +75,10 @@ export class RatioAnalyzer {
 
     // 入力バリデーション
     if (!options.bs) {
-      console.error('[RatioAnalyzer] Validation failed: BalanceSheet is required')
+      secureLogger.warn('Validation failed: BalanceSheet is required', {
+        component: COMPONENT,
+        reason: 'missing_balance_sheet',
+      })
       return {
         success: false,
         error: {
@@ -83,7 +89,10 @@ export class RatioAnalyzer {
     }
 
     if (!options.pl) {
-      console.error('[RatioAnalyzer] Validation failed: ProfitLoss is required')
+      secureLogger.warn('Validation failed: ProfitLoss is required', {
+        component: COMPONENT,
+        reason: 'missing_profit_loss',
+      })
       return {
         success: false,
         error: {
@@ -95,7 +104,11 @@ export class RatioAnalyzer {
 
     // 基本的なデータ整合性チェック
     if (options.bs.totalAssets <= 0) {
-      console.error('[RatioAnalyzer] Validation failed: totalAssets must be positive')
+      secureLogger.warn('Validation failed: totalAssets must be positive', {
+        component: COMPONENT,
+        reason: 'non_positive_total_assets',
+        totalAssets: options.bs.totalAssets,
+      })
       return {
         success: false,
         error: {
@@ -105,7 +118,8 @@ export class RatioAnalyzer {
       }
     }
 
-    console.log('[RatioAnalyzer] Analysis started', {
+    secureLogger.info('Analysis started', {
+      component: COMPONENT,
       fiscalYear: options.bs.fiscalYear,
       month: options.bs.month,
       hasPreviousData: !!(options.prevBS && options.prevPL),
@@ -140,8 +154,9 @@ export class RatioAnalyzer {
       const summary = this.calculateSummary(allRatios)
       const duration = Date.now() - startTime
 
-      console.log('[RatioAnalyzer] Analysis completed', {
-        duration: `${duration}ms`,
+      secureLogger.info('Analysis completed', {
+        component: COMPONENT,
+        durationMs: duration,
         totalRatios: allRatios.length,
         overallScore: summary.overallScore,
         excellentCount: summary.excellentCount,
@@ -164,10 +179,10 @@ export class RatioAnalyzer {
       const duration = Date.now() - startTime
       const errorMessage = error instanceof Error ? error.message : 'Unknown error'
 
-      console.error('[RatioAnalyzer] Analysis failed', {
-        duration: `${duration}ms`,
-        error: errorMessage,
-        stack: error instanceof Error ? error.stack : undefined,
+      secureLogger.error('Analysis failed', {
+        component: COMPONENT,
+        durationMs: duration,
+        error,
       })
 
       return {
