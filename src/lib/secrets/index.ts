@@ -204,13 +204,17 @@ export class LocalSecretProvider extends BaseSecretProvider {
 
   constructor(config: LocalSecretConfig) {
     super(config)
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error(
+        'LocalSecretProvider reads secrets from a plaintext JSON file and must not be used in production. Set SECRET_PROVIDER to a managed provider (env, gcp_secret, aws_secrets, azure_keyvault, onepassword).'
+      )
+    }
     this.loadSecrets()
   }
 
   private loadSecrets(): void {
     const secretsPath = process.env.LOCAL_SECRETS_PATH || './secrets.json'
     try {
-       
       const fs = require('fs')
       if (fs.existsSync(secretsPath)) {
         const data = fs.readFileSync(secretsPath, 'utf-8')

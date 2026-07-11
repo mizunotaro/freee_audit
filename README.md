@@ -460,8 +460,9 @@ NEXTAUTH_SECRET="dev-secret-key-for-mock-environment"
 NEXTAUTH_URL="http://localhost:3000"
 JWT_SECRET="dev-jwt-secret-key-for-mock-environment"
 
-# Encryption (32バイトの16進数)
-ENCRYPTION_KEY="0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+# Encryption (32バイトの16進数) — generate your own; never reuse the example value
+# node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+ENCRYPTION_KEY="<generate-32-byte-hex-string>"
 ```
 
 #### モック化される機能
