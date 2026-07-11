@@ -12,6 +12,7 @@ import {
   INVITATION_EXPIRY_DAYS,
 } from '@/services/investor/invitation-service'
 import { prisma } from '@/lib/db'
+import { getSecureLogger } from '@/lib/utils/secure-logger'
 
 vi.mock('@/lib/db', () => ({
   prisma: {
@@ -382,6 +383,28 @@ describe('invitation-service', () => {
       ])
 
       expect(result1.success || result2.success).toBe(true)
+    })
+  })
+
+  describe('logging', () => {
+    it('emits a structured error log when invitation creation fails', async () => {
+      const errorSpy = vi.spyOn(getSecureLogger(), 'error').mockImplementation(() => {})
+      const dbError = new Error('database unavailable')
+      ;(prisma.investorInvitation.create as ReturnType<typeof vi.fn>).mockRejectedValue(dbError)
+
+      const result = await createInvitation({ email: 'investor@example.com', invitedBy: 'admin-1' })
+
+      expect(result.success).toBe(false)
+      expect(errorSpy).toHaveBeenCalledWith(
+        'Failed to create invitation',
+        expect.objectContaining({
+          component: 'InvitationService',
+          operation: 'createInvitation',
+          error: dbError,
+        })
+      )
+
+      errorSpy.mockRestore()
     })
   })
 })
