@@ -430,6 +430,48 @@ describe('audit-job parallel processing', () => {
     expect(calls[1]?.[0]?.skip).toBe(1)
   })
 
+  it('bounds every page query to pageSize so heap stays O(pageSize), not O(N) (PERF-03-01)', async () => {
+    const journals = Array.from({ length: 130 }, (_, i) => createMockJournal(`journal-${i}`))
+
+    setupJournals(journals)
+
+    await runAuditJob({ concurrency: 5 }) // pageSize = concurrency(5) * PAGE_MULTIPLIER(5) = 25
+
+    // Core PERF-03-01 invariant: every findMany must carry a bounded `take`.
+    // Removing `take` would revert the memory fix (back to loading the whole set).
+    const takes = findManyMock.mock.calls.map((c) => c[0]?.take)
+    expect(takes.length).toBeGreaterThan(0)
+    for (const take of takes) {
+      expect(take).toBe(25)
+    }
+  })
+
+  it('pages to completion, processing each journal exactly once across a non-multiple page count (PERF-03-01)', async () => {
+    const journals = Array.from({ length: 130 }, (_, i) => createMockJournal(`journal-${i}`))
+
+    setupJournals(journals)
+
+    const processedIds: string[] = []
+    mockJournalChecker.check.mockImplementation(async (entry: { id: string }) => {
+      processedIds.push(entry.id)
+      return { isValid: true, issues: [] }
+    })
+
+    const result = await runAuditJob({ concurrency: 5 })
+
+    // 6 data pages (25 * 5 + 5) + 1 terminating empty page = 7 findMany calls.
+    expect(findManyMock.mock.calls.length).toBe(7)
+    expect(result.totalProcessed).toBe(130)
+    // Cursor skip:1 must prevent the boundary row from being re-read on the next page.
+    expect(processedIds.length).toBe(130)
+    expect(new Set(processedIds).size).toBe(130)
+    // No journal skipped by an off-by-one cursor.
+    const expectedIds = new Set(journals.map((j) => j.id))
+    for (const id of processedIds) {
+      expect(expectedIds.has(id)).toBe(true)
+    }
+  })
+
   it('should project only filePath from the document relation (PERF-03-05)', async () => {
     const journals: MockJournal[] = [
       {
