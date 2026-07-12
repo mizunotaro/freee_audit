@@ -45,7 +45,21 @@ export interface CalculationValidationResult {
   validatedAt: Date
 }
 
+/**
+ * Validates cash-flow calculations and accounting-standard compliance by combining
+ * arithmetic consistency checks with an optional LLM (CPA persona) review, returning
+ * a confidence-scored ValidationIssue list.
+ */
 export class CalculationValidator {
+  /**
+   * Validates a cash-flow statement: checks operating-CF and cash-rollforward
+   * consistency, standard-compliance deviations, and LLM-reviewed issues, then
+   * aggregates them into a confidence-scored result.
+   *
+   * @param input - Financial statements, KPIs, and formulas to validate.
+   * @returns CalculationValidationResult; `isValid` is false when any error-severity
+   *   issue is found. LLM failures are swallowed (no issues added).
+   */
   async validateCashFlow(input: CalculationValidationInput): Promise<CalculationValidationResult> {
     const config = getAccountingStandardConfig(input.standard)
     const issues: ValidationIssue[] = []
@@ -287,4 +301,7 @@ ${input.calculationFormulas.map((f) => `- ${f.name}: ${f.formula} = ${f.output}`
   }
 }
 
+/**
+ * Shared CalculationValidator instance.
+ */
 export const calculationValidator = new CalculationValidator()

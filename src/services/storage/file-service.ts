@@ -9,6 +9,10 @@ const DEFAULT_FILE_SERVICE_CONFIG: StorageConfig = {
   retentionDays: 30,
 }
 
+/**
+ * High-level file service that delegates to a LocalStorageProvider, enforcing the
+ * default size/type/retention config and company-scoped access on every call.
+ */
 export class FileService {
   private provider: LocalStorageProvider
 
@@ -16,6 +20,18 @@ export class FileService {
     this.provider = new LocalStorageProvider(config)
   }
 
+  /**
+   * Stores a file under the given company/user scope.
+   *
+   * @param data - File contents.
+   * @param originalName - Original filename.
+   * @param contentType - MIME type (must be in the allowed-types config).
+   * @param companyId - Owning company.
+   * @param userId - Uploading user.
+   * @param metadata - Optional extra metadata to persist.
+   * @returns success with the file id and metadata, or failure forwarding the
+   *   provider error (e.g. size/type validation or write failure).
+   */
   async putFile(
     data: Buffer,
     originalName: string,
@@ -46,6 +62,14 @@ export class FileService {
     }
   }
 
+  /**
+   * Retrieves a file's contents and metadata, scoped to a company.
+   *
+   * @param id - File identifier.
+   * @param companyId - Company that must own the file.
+   * @returns success with id/metadata/data, or failure forwarding the provider error
+   *   (e.g. not found or company mismatch).
+   */
   async getFile(
     id: string,
     companyId: string
@@ -67,14 +91,34 @@ export class FileService {
     }
   }
 
+  /**
+   * Deletes a file, scoped to a company.
+   *
+   * @param id - File identifier.
+   * @param companyId - Company that must own the file.
+   * @returns success on deletion, or failure forwarding the provider error.
+   */
   async deleteFile(id: string, companyId: string): Promise<Result<void>> {
     return this.provider.deleteFile(id, { companyId })
   }
 
+  /**
+   * Checks whether a file exists (not company-scoped).
+   *
+   * @param id - File identifier.
+   * @returns True if the file exists.
+   */
   async exists(id: string): Promise<boolean> {
     return this.provider.exists(id)
   }
 
+  /**
+   * Retrieves a file's metadata only, scoped to a company.
+   *
+   * @param id - File identifier.
+   * @param companyId - Company that must own the file.
+   * @returns success with the metadata, or failure forwarding the provider error.
+   */
   async getMetadata(id: string, companyId: string): Promise<Result<FileMetadata>> {
     return this.provider.getMetadata(id, { companyId })
   }

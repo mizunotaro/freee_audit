@@ -62,6 +62,17 @@ export interface TimingDifference {
   type: 'asset' | 'liability'
 }
 
+/**
+ * Generates fiscal-year-end closing entries (depreciation, allowance for doubtful
+ * accounts, accrued officer bonuses) for a company, derived from FixedAsset and
+ * MonthlyBalance records. Zero-amount adjustments are omitted.
+ *
+ * @param companyId - Company to generate entries for.
+ * @param fiscalYear - Fiscal year of the closing.
+ * @param closingMonth - Month number stamped on each generated entry.
+ * @returns Generated ClosingEntry array (may be empty).
+ * @throws Rejected with a Prisma error if any underlying lookup fails.
+ */
 export async function generateClosingEntries(
   companyId: string,
   fiscalYear: number,
@@ -200,6 +211,17 @@ async function calculateAccruedBonus(
   }
 }
 
+/**
+ * Computes deferred tax assets/liabilities from book-vs-tax timing differences
+ * (depreciation, allowance for doubtful accounts, accrued officer bonuses) and
+ * upserts the result for the company/fiscal year.
+ *
+ * @param companyId - Company to calculate for.
+ * @param fiscalYear - Fiscal year of the calculation.
+ * @param effectiveTaxRate - Tax rate applied to timing differences (default 0.3).
+ * @returns The TaxEffectCalc with persisted deferred-tax figures.
+ * @throws Rejected with a Prisma error if the lookup or upsert fails.
+ */
 export async function calculateTaxEffectAccounting(
   companyId: string,
   fiscalYear: number,
@@ -304,6 +326,17 @@ export async function calculateTaxEffectAccounting(
   }
 }
 
+/**
+ * Loads previously persisted tax-effect accounting records for a year range
+ * (inclusive), ordered by fiscal year. Timing-difference detail is not reloaded
+ * (returned as an empty array per record).
+ *
+ * @param companyId - Company to query.
+ * @param startYear - First fiscal year (inclusive).
+ * @param endYear - Last fiscal year (inclusive).
+ * @returns TaxEffectCalc records in ascending fiscal-year order.
+ * @throws Rejected with a Prisma error if the query fails.
+ */
 export async function getTaxEffectHistory(
   companyId: string,
   startYear: number,
@@ -332,6 +365,15 @@ export async function getTaxEffectHistory(
   }))
 }
 
+/**
+ * Builds the closing journal entry for deferred tax from a TaxEffectCalc: a net
+ * deferred tax asset debits 繰延税金資産, a net liability credits 繰延税金負債.
+ *
+ * @param taxEffect - Computed tax-effect figures.
+ * @param fiscalYear - Fiscal year stamped on the entry.
+ * @param closingMonth - Month stamped on the entry.
+ * @returns A `tax_effect` ClosingEntry (amount is the absolute net deferred tax).
+ */
 export function generateTaxEffectJournalEntry(
   taxEffect: TaxEffectCalc,
   fiscalYear: number,
@@ -370,6 +412,16 @@ export interface PrepaidExpenseCheck {
   monthlyAmortization: number
 }
 
+/**
+ * Scans current-asset balances for prepaid-expense keywords (前払/保険/リース/賃借)
+ * and suggests a 12-month amortization treatment for each positive balance.
+ *
+ * @param companyId - Company to scan.
+ * @param fiscalYear - Fiscal year of the balances.
+ * @param month - Month of the balances.
+ * @returns PrepaidExpenseCheck entries for each matched account.
+ * @throws Rejected with a Prisma error if the lookup fails.
+ */
 export async function checkPrepaidExpenses(
   companyId: string,
   fiscalYear: number,
