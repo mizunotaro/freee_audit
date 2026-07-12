@@ -405,10 +405,12 @@ DD実行
 
 ### 6.1 前提条件
 
-- Node.js 20.x LTS
-- pnpm 8.x
+- Node.js >= 20（CIは20）
+- pnpm >= 8（CIは9; `corepack` 経由で導入可）
 - （本番）PostgreSQL データベース
 - （本番）freee API アクセストークン
+
+> 開発参加者は [CONTRIBUTING.md](./CONTRIBUTING.md)（セットアップ・スクリプト・テスト実行・CI・Class-A境界）を参照してください。
 
 ### 6.2 インストール
 
@@ -555,7 +557,7 @@ DATABASE_URL="postgresql://user:password@host:5432/dbname"
 
 | 技術 | バージョン | 用途 |
 |------|-----------|------|
-| Next.js | 14.x | フルスタックフレームワーク（App Router） |
+| Next.js | 16.x | フルスタックフレームワーク（App Router） |
 | TypeScript | 5.x | 型安全な開発 |
 | Tailwind CSS | 3.x | スタイリング |
 | Recharts | 2.x | グラフ描画 |
@@ -565,7 +567,7 @@ DATABASE_URL="postgresql://user:password@host:5432/dbname"
 
 | 技術 | バージョン | 用途 |
 |------|-----------|------|
-| Next.js API Routes | 14.x | RESTful API |
+| Next.js API Routes | 16.x | RESTful API |
 | Prisma | 5.x | ORM |
 | Node.js | 20.x LTS | ランタイム |
 
@@ -826,17 +828,27 @@ pnpm start
 
 ### 11.4 CI/CDパイプライン
 
-1. **Lint**: ESLintによるコード品質チェック
-2. **TypeCheck**: TypeScript型チェック
-3. **Unit Tests**: Vitestによる単体テスト
-4. **Integration Tests**: 統合テスト
-5. **E2E Tests**: PlaywrightによるE2Eテスト
-6. **Security Audit**: 依存パッケージ脆弱性チェック
-7. **Build**: 本番ビルド
+CI定義: [`.github/workflows/ci.yml`](./.github/workflows/ci.yml)（Node 20 / pnpm 9）。push・PR（master, develop）で駆動。
+
+| ジョブ | 内容 |
+|--------|------|
+| Lint | `pnpm lint`（ESLint） |
+| Type Check | `pnpm db:generate` → `pnpm typecheck` |
+| Unit Tests（32シャード） | `pnpm test -- --shard=N/32` |
+| Unit Tests（集約） | 全シャード成功を必須とするステータスゲート |
+| Integration Tests | `pnpm test:integration` |
+| E2E Tests | `pnpm build` → `pnpm e2e`（Playwright / chromium） |
+| Security Audit | `pnpm audit:check`（依存パッケージ脆弱性） |
+| Build | `pnpm build`（Lint / Type Check / Unit Tests / Security Audit の成功が前提） |
+
+> **シャード分割の理由**: 単体テスト（6000+件）を単一プロセスで実行すると、jsdom・MSW・AIプロバイダーシングルトンが蓄積しV8ワーカーヒープがOOMする。32シャード＋`NODE_OPTIONS=--max-old-space-size=6144`で各ワーカーを予算内に収める。
 
 ```bash
-# CIと同等のチェックをローカルで実行
-pnpm lint && pnpm typecheck && pnpm test:coverage && pnpm build
+# ローカルで差分スコープの検証を行う（CI相当を部分実行）
+node scripts/autopm_verify.mjs --changed-only
+
+# CI相当のフルチェック（時間・メモリ消費大）
+pnpm lint && pnpm typecheck && pnpm build
 ```
 
 ---
@@ -967,7 +979,7 @@ AI分析は「意思決定の支援」であり、最終判断は人間が行う
 
 ### 14.3 テストカバレッジ
 
-目標: **80%以上**
+CIで強制される下限閾値（`vitest.config.ts`）: **lines 60 / functions 65 / branches 55 / statements 60**。目標（アスピレーション）: 80%以上。
 
 ```bash
 pnpm test:coverage
@@ -978,35 +990,49 @@ open coverage/index.html
 
 ### 14.4 開発コマンド
 
+> スクリプト・テスト実行・CI・Class-A境界の完全な説明は [CONTRIBUTING.md](./CONTRIBUTING.md) を参照。
+
 ```bash
 # 開発
-pnpm dev              # 開発サーバー起動
+pnpm dev              # 開発サーバー起動（next dev --webpack）
 pnpm build            # 本番ビルド
 pnpm start            # 本番サーバー起動
 
 # 品質チェック
-pnpm lint             # ESLint実行
+pnpm lint             # ESLint実行（src/）
 pnpm lint:fix         # ESLint自動修正
-pnpm typecheck        # TypeScript型チェック
-pnpm format           # Prettierフォーマット
+pnpm typecheck        # TypeScript型チェック（tsc --noEmit）
+pnpm format           # Prettierフォーマット（書き込み）
+pnpm format:check     # Prettierフォーマット（検証のみ）
 
-# テスト
-pnpm test             # 単体テスト実行
+# テスト（Vitest）
+pnpm test             # 単体テスト実行（tests/**）
+pnpm test:unit        # tests/unit のみ
 pnpm test:watch       # テスト監視モード
-pnpm test:coverage    # カバレッジ付きテスト
-pnpm test:integration # 統合テスト
-pnpm e2e              # E2Eテスト（Playwright）
+pnpm test:coverage    # カバレッジ付きテスト（閾値 60/65/55/60）
+pnpm test:integration # 統合テスト（tests/integration）
+pnpm test:conversion  # 会計基準変換関連を一括実行
+pnpm test:bench       # ベンチマーク（専用config・逐次実行）
 
-# データベース
-pnpm db:generate      # Prismaクライアント生成
+# E2E（Playwright / chromium）
+pnpm e2e              # ヘッドレス実行
+pnpm e2e:ui           # UIモード
+pnpm e2e:debug        # デバッグモード
+
+# データベース（Prisma）
+pnpm db:generate      # Prismaクライアント生成（typecheck/testの前に必須）
 pnpm db:migrate       # マイグレーション実行
-pnpm db:push          # スキーマ直接反映
-pnpm db:studio        # Prisma Studio起動
+pnpm db:push          # スキーマ直接反映（開発用）
 pnpm db:seed          # シードデータ投入
+pnpm db:studio        # Prisma Studio起動
 pnpm db:reset         # データベースリセット
 
 # セキュリティ
-pnpm audit:check      # 依存パッケージ脆弱性チェック
+pnpm audit:check      # 依存パッケージ脆弱性チェック（critical以上）
+pnpm security:scan    # 脆弱性スキャン（better-npm-audit）
+
+# ローカル品質ゲート（差分スコープ）
+node scripts/autopm_verify.mjs --changed-only
 ```
 
 ---
