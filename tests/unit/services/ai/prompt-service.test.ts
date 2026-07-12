@@ -10,6 +10,7 @@ import {
   DEFAULT_PROMPTS,
 } from '@/services/ai/prompt-service'
 import { prisma } from '@/lib/db'
+import { ERROR_CODES } from '@/types/result'
 
 vi.mock('@/lib/db', () => ({
   prisma: {
@@ -149,9 +150,12 @@ describe('PromptService', () => {
 
       const result = await getPrompt('FINANCIAL_ANALYSIS', 'company-1')
 
-      expect(result.id).toBe('prompt-1')
-      expect(result.companyId).toBe('company-1')
-      expect(result.name).toBe('財務分析')
+      expect(result.success).toBe(true)
+      if (!result.success) return
+
+      expect(result.data.id).toBe('prompt-1')
+      expect(result.data.companyId).toBe('company-1')
+      expect(result.data.name).toBe('財務分析')
     })
 
     it('should return default prompt when no custom prompt exists', async () => {
@@ -159,20 +163,32 @@ describe('PromptService', () => {
 
       const result = await getPrompt('FINANCIAL_ANALYSIS', 'company-1')
 
-      expect(result.id).toBe('default')
-      expect(result.companyId).toBeNull()
-      expect(result.name).toBe('財務分析')
+      expect(result.success).toBe(true)
+      if (!result.success) return
+
+      expect(result.data.id).toBe('default')
+      expect(result.data.companyId).toBeNull()
+      expect(result.data.name).toBe('財務分析')
     })
 
     it('should return default prompt when no company specified', async () => {
       const result = await getPrompt('FINANCIAL_ANALYSIS')
 
-      expect(result.id).toBe('default')
-      expect(result.companyId).toBeNull()
+      expect(result.success).toBe(true)
+      if (!result.success) return
+
+      expect(result.data.id).toBe('default')
+      expect(result.data.companyId).toBeNull()
     })
 
-    it('should throw error for unknown analysis type', async () => {
-      await expect(getPrompt('UNKNOWN_TYPE' as any)).rejects.toThrow('Unknown analysis type')
+    it('should return failure for unknown analysis type', async () => {
+      const result = await getPrompt('UNKNOWN_TYPE' as any)
+
+      expect(result.success).toBe(false)
+      if (result.success) return
+
+      expect(result.error.code).toBe(ERROR_CODES.BUSINESS_LOGIC_ERROR)
+      expect(result.error.message).toBe('Unknown analysis type: UNKNOWN_TYPE')
     })
 
     it('should parse variables JSON correctly', async () => {
@@ -180,8 +196,11 @@ describe('PromptService', () => {
 
       const result = await getPrompt('FINANCIAL_ANALYSIS', 'company-1')
 
-      expect(Array.isArray(result.variables)).toBe(true)
-      expect(result.variables[0].name).toBe('variable')
+      expect(result.success).toBe(true)
+      if (!result.success) return
+
+      expect(Array.isArray(result.data.variables)).toBe(true)
+      expect(result.data.variables[0].name).toBe('variable')
     })
   })
 
@@ -511,7 +530,10 @@ describe('PromptService', () => {
 
       const result = await getPrompt('FINANCIAL_ANALYSIS', 'company-1')
 
-      expect(result.variables).toEqual([])
+      expect(result.success).toBe(true)
+      if (!result.success) return
+
+      expect(result.data.variables).toEqual([])
     })
 
     it('should handle complex variable values', () => {

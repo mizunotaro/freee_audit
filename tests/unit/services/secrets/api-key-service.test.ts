@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { apiKeyService, getAPIKey, requireAPIKey } from '@/services/secrets/api-key-service'
+import { ERROR_CODES } from '@/types/result'
 import { getSecretsManager } from '@/lib/secrets'
 import { decrypt } from '@/lib/crypto'
 import { prisma } from '@/lib/db'
@@ -297,10 +298,13 @@ describe('requireAPIKey', () => {
 
     const result = await requireAPIKey('openai')
 
-    expect(result).toBe('test-key')
+    expect(result.success).toBe(true)
+    if (!result.success) return
+
+    expect(result.data).toBe('test-key')
   })
 
-  it('should throw error when no key', async () => {
+  it('should return failure when no key is configured', async () => {
     delete process.env.OPENAI_API_KEY
 
     vi.mocked(getSecretsManager).mockReturnValue({
@@ -309,9 +313,14 @@ describe('requireAPIKey', () => {
 
     vi.mocked(prisma.settings.findFirst).mockResolvedValue(null)
 
-    await expect(requireAPIKey('openai')).rejects.toThrow(
-      'openai API key is required but not configured'
-    )
+    const result = await requireAPIKey('openai')
+
+    expect(result.success).toBe(false)
+    if (result.success) return
+
+    expect(result.error.code).toBe(ERROR_CODES.VALIDATION_ERROR)
+    expect(result.error.message).toBe('openai API key is required but not configured')
+    expect(result.error.details).toEqual({ provider: 'openai' })
   })
 })
 

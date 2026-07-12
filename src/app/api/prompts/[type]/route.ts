@@ -20,8 +20,11 @@ async function handler(request: NextRequest, { params }: { params: Promise<{ typ
 
   if (request.method === 'GET') {
     try {
-      const prompt = await getPrompt(analysisType, user.companyId)
-      return NextResponse.json({ prompt })
+      const result = await getPrompt(analysisType, user.companyId)
+      if (!result.success) {
+        return NextResponse.json({ error: 'Prompt not found' }, { status: 404 })
+      }
+      return NextResponse.json({ prompt: result.data })
     } catch {
       return NextResponse.json({ error: 'Prompt not found' }, { status: 404 })
     }
