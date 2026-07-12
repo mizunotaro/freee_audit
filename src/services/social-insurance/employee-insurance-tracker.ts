@@ -12,15 +12,6 @@ export interface EmployeeInsuranceStatus {
   terminationDate_processed?: Date
 }
 
-export interface InsuranceEnrollmentInput {
-  companyId: string
-  employeeId: string
-  employeeName: string
-  insuranceType: InsuranceType
-  enrollmentDate: Date
-  standardMonthlyRemuneration: number
-}
-
 export class EmployeeInsuranceTracker {
   static readonly ENROLLMENT_DEADLINES: Record<InsuranceType, number> = {
     health: 5,

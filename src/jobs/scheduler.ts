@@ -125,40 +125,6 @@ export function stopScheduler(): void {
   console.log('[Scheduler] All jobs stopped')
 }
 
-export function getJobStatus(): Array<{
-  name: string
-  schedule: string
-  timezone: string
-  running: boolean
-}> {
-  return jobs.map((job) => ({
-    name: job.name,
-    schedule: job.schedule,
-    timezone: job.timezone,
-    running: job.task !== undefined,
-  }))
-}
-
-export async function runJobManually(
-  jobName: string
-): Promise<{ success: boolean; error?: string }> {
-  const job = jobs.find((j) => j.name === jobName)
-
-  if (!job) {
-    return { success: false, error: `Job not found: ${jobName}` }
-  }
-
-  try {
-    console.log(`[Scheduler] Manually running job: ${jobName}`)
-    await job.handler()
-    return { success: true }
-  } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : String(error)
-    console.error(`[Scheduler] Manual job ${jobName} failed:`, error)
-    return { success: false, error: errorMessage }
-  }
-}
-
 if (require.main === module) {
   startScheduler()
 

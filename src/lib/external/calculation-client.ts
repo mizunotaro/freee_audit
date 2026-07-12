@@ -302,5 +302,4 @@ class CalculationServiceClient {
   }
 }
 
-export const calculationClient = new CalculationServiceClient()
 export { CalculationServiceClient }

@@ -96,9 +96,6 @@ export const BackupOptionsSchema = z.object({
   provider: z.enum(['sqlite', 'postgresql']).optional(),
 })
 
-/** `backupDatabase` への入力。 */
-export type BackupOptions = z.infer<typeof BackupOptionsSchema>
-
 /** `restoreDatabase` の入力オプション。 */
 export const RestoreOptionsSchema = z.object({
   /** バックアップファイル（`.db`）のパス。 */
@@ -108,9 +105,6 @@ export const RestoreOptionsSchema = z.object({
   /** 復元先に同名ファイルが存在する場合に上書きするか。省略時は false。 */
   overwrite: z.boolean().optional(),
 })
-
-/** `restoreDatabase` への入力。 */
-export type RestoreOptions = z.infer<typeof RestoreOptionsSchema>
 
 /** `restoreDatabase` の成功結果。 */
 export interface RestoreResult {
@@ -132,9 +126,6 @@ export const VerifyOptionsSchema = z.object({
   /** プロバイダー明示。省略時は `sourceUrl` から推論。`sqlite` 以外は failure。 */
   provider: z.enum(['sqlite', 'postgresql']).optional(),
 })
-
-/** `verifyRowCounts` への入力。 */
-export type VerifyOptions = z.infer<typeof VerifyOptionsSchema>
 
 /** モデル別の行数比較結果。 */
 export interface TableCount {

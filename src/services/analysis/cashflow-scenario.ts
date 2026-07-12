@@ -89,7 +89,6 @@ export interface CashflowScenarioOutput {
   alert: ReturnType<typeof getRunwayAlert>
 }
 
-export const DEFAULT_CASHFLOW_HORIZON_MONTHS = 12
 export const DEFAULT_ADJUSTMENTS = {
   optimistic: 0.8,
   realistic: 1,

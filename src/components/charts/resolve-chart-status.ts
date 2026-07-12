@@ -10,8 +10,6 @@ export const resolveChartStatusInputSchema = z.object({
   dataLength: z.number().int().nonnegative().default(0),
 })
 
-export type ResolveChartStatusInput = z.infer<typeof resolveChartStatusInputSchema>
-
 export function resolveChartStatus(input: unknown): Result<ChartResolution> {
   const parsed = resolveChartStatusInputSchema.safeParse(input)
   if (!parsed.success) {

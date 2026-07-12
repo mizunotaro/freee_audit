@@ -38,15 +38,6 @@ export interface ImportContext {
   jobId?: string
 }
 
-export interface ParsedFileResult {
-  headers: string[]
-  mappedHeaders: Record<string, string>
-  rows: Record<string, unknown>[]
-  totalRows: number
-  detectedLanguage: 'ja' | 'en' | 'unknown'
-  warnings: string[]
-}
-
 const CHUNK_SIZE = IMPORT_LIMITS.BATCH_SIZE
 
 export abstract class BaseImporter<T> {

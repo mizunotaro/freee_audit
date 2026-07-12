@@ -39,14 +39,6 @@ export interface EncryptedDataV2 {
   aad?: string
 }
 
-export interface KeyVersion {
-  id: string
-  algorithm: SymmetricAlgorithm
-  createdAt: Date
-  expiresAt?: Date
-  status: 'active' | 'deprecated' | 'revoked'
-}
-
 const DEFAULT_ALGORITHM: SymmetricAlgorithm = 'aes-256-gcm'
 const DEFAULT_ITERATIONS = 100000
 const DEFAULT_SALT_LENGTH = 32
