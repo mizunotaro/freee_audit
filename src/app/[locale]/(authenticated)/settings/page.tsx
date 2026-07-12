@@ -158,10 +158,22 @@ export default function SettingsPage() {
   const handleSave = async () => {
     setSaving(true)
     try {
+      // GET /api/settings never returns stored secret values (only has*-key
+      // flags), so every API key / endpoint the user hasn't just re-typed is
+      // held in state as ''. Sending those '' values both fails the route's Zod
+      // schema (empty URL / .min(1) keys -> 400) and would wipe stored secrets
+      // (the route maps '' -> null). Omit empty optionals so omitted means
+      // "leave unchanged"; only fields the user actually filled are sent.
+      const payload: Record<string, unknown> = {}
+      for (const [key, value] of Object.entries(settings)) {
+        if (value === '') continue
+        payload[key] = value
+      }
+
       const res = await fetch('/api/settings', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(settings),
+        body: JSON.stringify(payload),
       })
 
       if (res.ok) {
