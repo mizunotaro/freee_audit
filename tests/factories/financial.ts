@@ -138,35 +138,3 @@ export function createCashFlowStatement(
 
   return { ...defaults, ...overrides }
 }
-
-export function createEmptyBalanceSheet(): BalanceSheet {
-  return createBalanceSheet({
-    assets: { current: [], fixed: [], total: 0 },
-    liabilities: { current: [], fixed: [], total: 0 },
-    equity: { items: [], total: 0 },
-    totalAssets: 0,
-    totalLiabilities: 0,
-    totalEquity: 0,
-  })
-}
-
-export function createEmptyProfitLoss(): ProfitLoss {
-  return createProfitLoss({
-    revenue: [],
-    costOfSales: [],
-    grossProfit: 0,
-    grossProfitMargin: 0,
-    sgaExpenses: [],
-    operatingIncome: 0,
-    operatingMargin: 0,
-    nonOperatingIncome: [],
-    nonOperatingExpenses: [],
-    ordinaryIncome: 0,
-    extraordinaryIncome: [],
-    extraordinaryLoss: [],
-    incomeBeforeTax: 0,
-    incomeTax: 0,
-    netIncome: 0,
-    depreciation: 0,
-  })
-}

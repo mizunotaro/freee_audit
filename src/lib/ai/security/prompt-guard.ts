@@ -243,7 +243,3 @@ export function getGuardStats(): { cacheSize: number; version: string } {
 }
 
 export { VERSION, GUARD_RULES }
-
-export function clearPromptGuardCache(): void {
-  injectionCache.clear()
-}

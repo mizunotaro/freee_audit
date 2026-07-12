@@ -300,8 +300,3 @@ ${input.calculationFormulas.map((f) => `- ${f.name}: ${f.formula} = ${f.output}`
     return Math.max(0, 1 - totalDeduction)
   }
 }
-
-/**
- * Shared CalculationValidator instance.
- */
-export const calculationValidator = new CalculationValidator()
