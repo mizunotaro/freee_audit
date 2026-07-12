@@ -118,7 +118,13 @@ export function ShareholderPieChart({
       <CardContent>
         <div className="flex flex-col items-center gap-6 md:flex-row">
           <div className="relative" style={{ width: size, height: size }}>
-            <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+            <svg
+              width={size}
+              height={size}
+              viewBox={`0 0 ${size} ${size}`}
+              role="img"
+              aria-label={`株主構成の円グラフ（${data.length}区分）`}
+            >
               {paths.map((path, index) => (
                 <path
                   key={index}

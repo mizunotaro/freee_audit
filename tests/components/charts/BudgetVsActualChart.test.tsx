@@ -180,3 +180,11 @@ describe('BudgetVsActualHorizontalChart', () => {
     expect(capture.data).toBeNull()
   })
 })
+
+describe('BudgetVsActualChart — accessibility', () => {
+  it('exposes the chart as role=img with a text-alternative label', () => {
+    render(<BudgetVsActualChart data={sampleData} />)
+
+    expect(screen.getByRole('img', { name: /予算対実績チャート/ })).toBeInTheDocument()
+  })
+})

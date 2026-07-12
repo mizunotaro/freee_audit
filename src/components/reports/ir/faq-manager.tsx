@@ -133,19 +133,37 @@ export function FAQManager({
                   onDragEnd={handleDragEnd}
                   className={`rounded-md border ${isDragging ? 'opacity-50' : ''}`}
                 >
-                  <div
-                    className="flex cursor-pointer items-center gap-2 p-3 hover:bg-muted/50"
-                    onClick={() => setExpandedId(isExpanded ? null : faq.id)}
-                  >
+                  <div className="flex items-center gap-2 p-3 hover:bg-muted/50">
                     {!readOnly && (
-                      <GripVertical className="h-4 w-4 cursor-grab text-muted-foreground" />
+                      <GripVertical
+                        className="h-4 w-4 cursor-grab text-muted-foreground"
+                        aria-hidden="true"
+                      />
                     )}
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-medium">
+                    <button
+                      type="button"
+                      className="flex min-w-0 flex-1 cursor-pointer items-center gap-1 text-left"
+                      onClick={() => setExpandedId(isExpanded ? null : faq.id)}
+                      aria-expanded={isExpanded}
+                      aria-controls={`faq-panel-${faq.id}`}
+                      id={`faq-trigger-${faq.id}`}
+                    >
+                      <span className="min-w-0 flex-1 truncate text-sm font-medium">
                         {getLocalizedText(faq.question) ||
                           `${language === 'en' ? 'Question' : '質問'} ${index + 1}`}
-                      </p>
-                    </div>
+                      </span>
+                      {isExpanded ? (
+                        <ChevronUp
+                          className="h-4 w-4 shrink-0 text-muted-foreground"
+                          aria-hidden="true"
+                        />
+                      ) : (
+                        <ChevronDown
+                          className="h-4 w-4 shrink-0 text-muted-foreground"
+                          aria-hidden="true"
+                        />
+                      )}
+                    </button>
                     <div className="flex items-center gap-1">
                       {!readOnly && (
                         <>
@@ -153,36 +171,39 @@ export function FAQManager({
                             variant="ghost"
                             size="icon"
                             className="h-6 w-6"
+                            aria-label="上に移動"
                             onClick={(e) => {
                               e.stopPropagation()
                               handleMoveUp(index)
                             }}
                             disabled={index === 0}
                           >
-                            <ChevronUp className="h-3 w-3" />
+                            <ChevronUp className="h-3 w-3" aria-hidden="true" />
                           </Button>
                           <Button
                             variant="ghost"
                             size="icon"
                             className="h-6 w-6"
+                            aria-label="下に移動"
                             onClick={(e) => {
                               e.stopPropagation()
                               handleMoveDown(index)
                             }}
                             disabled={index === sortedFaqs.length - 1}
                           >
-                            <ChevronDown className="h-3 w-3" />
+                            <ChevronDown className="h-3 w-3" aria-hidden="true" />
                           </Button>
                           <Button
                             variant="ghost"
                             size="icon"
                             className="h-6 w-6 text-destructive"
+                            aria-label="削除"
                             onClick={(e) => {
                               e.stopPropagation()
                               handleDelete(faq.id)
                             }}
                           >
-                            <Trash2 className="h-3 w-3" />
+                            <Trash2 className="h-3 w-3" aria-hidden="true" />
                           </Button>
                         </>
                       )}
@@ -190,7 +211,12 @@ export function FAQManager({
                   </div>
 
                   {isExpanded && !readOnly && (
-                    <div className="space-y-4 border-t p-4 pt-0">
+                    <div
+                      className="space-y-4 border-t p-4 pt-0"
+                      id={`faq-panel-${faq.id}`}
+                      role="region"
+                      aria-labelledby={`faq-trigger-${faq.id}`}
+                    >
                       <div>
                         <label className="text-sm font-medium">
                           {language === 'en' ? 'Question (EN)' : '質問（日本語）'}
@@ -259,7 +285,12 @@ export function FAQManager({
                   )}
 
                   {isExpanded && readOnly && (
-                    <div className="border-t p-4 pt-0">
+                    <div
+                      className="border-t p-4 pt-0"
+                      id={`faq-panel-${faq.id}`}
+                      role="region"
+                      aria-labelledby={`faq-trigger-${faq.id}`}
+                    >
                       <p className="mb-2 text-sm text-muted-foreground">
                         {language === 'en' ? 'A:' : '回答:'}
                       </p>

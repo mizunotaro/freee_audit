@@ -117,7 +117,7 @@ export function IRReportList({
 
   if (isLoading) {
     return (
-      <Card>
+      <Card role="status" aria-busy="true">
         <CardHeader>
           <CardTitle>IRレポート一覧</CardTitle>
           <CardDescription>読み込み中...</CardDescription>
@@ -140,10 +140,11 @@ export function IRReportList({
             placeholder="レポートを検索..."
             value={search}
             onChange={(e) => handleSearchChange(e.target.value)}
+            aria-label="レポートを検索"
             className="max-w-sm"
           />
           <Select value={statusFilter} onValueChange={handleStatusChange}>
-            <SelectTrigger className="w-[140px]">
+            <SelectTrigger className="w-[140px]" aria-label="ステータスで絞り込み">
               <SelectValue placeholder="ステータス" />
             </SelectTrigger>
             <SelectContent>
@@ -156,7 +157,7 @@ export function IRReportList({
             </SelectContent>
           </Select>
           <Select value={languageFilter} onValueChange={handleLanguageChange}>
-            <SelectTrigger className="w-[140px]">
+            <SelectTrigger className="w-[140px]" aria-label="言語で絞り込み">
               <SelectValue placeholder="言語" />
             </SelectTrigger>
             <SelectContent>
@@ -206,8 +207,12 @@ export function IRReportList({
                     <TableCell>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon">
-                            <MoreHorizontal className="h-4 w-4" />
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            aria-label={`「${report.title.ja}」の操作メニュー`}
+                          >
+                            <MoreHorizontal className="h-4 w-4" aria-hidden="true" />
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">

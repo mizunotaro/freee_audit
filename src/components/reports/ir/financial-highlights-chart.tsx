@@ -54,9 +54,9 @@ export function FinancialHighlightsChart({
   }
 
   const getTrendIcon = (change: number) => {
-    if (change > 5) return <TrendingUp className="h-4 w-4 text-green-500" />
-    if (change < -5) return <TrendingDown className="h-4 w-4 text-red-500" />
-    return <Minus className="h-4 w-4 text-gray-400" />
+    if (change > 5) return <TrendingUp className="h-4 w-4 text-green-500" aria-hidden="true" />
+    if (change < -5) return <TrendingDown className="h-4 w-4 text-red-500" aria-hidden="true" />
+    return <Minus className="h-4 w-4 text-gray-400" aria-hidden="true" />
   }
 
   const emptyMessage = language === 'en' ? 'No data available' : 'データがありません'
@@ -106,6 +106,8 @@ export function FinancialHighlightsChart({
                         height: barHeight,
                         backgroundColor: COLORS.revenue,
                       }}
+                      role="img"
+                      aria-label={`${highlight.fiscalYear}の売上`}
                     />
                   </div>
                   <span className="mt-2 text-sm font-medium">{highlight.fiscalYear}</span>

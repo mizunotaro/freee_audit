@@ -130,6 +130,7 @@ describe('IRReportEditor', () => {
 
       const backButton = container.querySelector('svg.lucide-arrow-left')?.closest('button')
       expect(backButton).toBeInTheDocument()
+      expect(backButton).toHaveAttribute('aria-label', '戻る')
       fireEvent.click(backButton as HTMLElement)
       expect(onBack).toHaveBeenCalledTimes(1)
 
@@ -259,6 +260,20 @@ describe('IRReportEditor', () => {
 
       spy.mockRestore()
     })
+
+    it('surfaces a role=alert banner when onSave rejects', async () => {
+      const onSave = vi.fn().mockRejectedValue(new Error('boom'))
+      const spy = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+      render(<IRReportEditor report={makeReport()} onSave={onSave} />)
+
+      await userEvent.click(screen.getByRole('button', { name: '保存' }))
+
+      await waitFor(() => expect(spy).toHaveBeenCalledWith('Save failed:', expect.any(Error)))
+      expect(screen.getByRole('alert')).toHaveTextContent('保存に失敗しました')
+
+      spy.mockRestore()
+    })
   })
 
   describe('publish', () => {
@@ -296,6 +311,20 @@ describe('IRReportEditor', () => {
       await userEvent.click(screen.getByRole('button', { name: '公開' }))
 
       await waitFor(() => expect(spy).toHaveBeenCalledWith('Publish failed:', expect.any(Error)))
+
+      spy.mockRestore()
+    })
+
+    it('surfaces a role=alert banner when onPublish rejects', async () => {
+      const onPublish = vi.fn().mockRejectedValue(new Error('publish failed'))
+      const spy = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+      render(<IRReportEditor report={makeReport({ status: 'approved' })} onPublish={onPublish} />)
+
+      await userEvent.click(screen.getByRole('button', { name: '公開' }))
+
+      await waitFor(() => expect(spy).toHaveBeenCalledWith('Publish failed:', expect.any(Error)))
+      expect(screen.getByRole('alert')).toHaveTextContent('公開に失敗しました')
 
       spy.mockRestore()
     })
