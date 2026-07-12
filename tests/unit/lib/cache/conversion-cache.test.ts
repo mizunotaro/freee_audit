@@ -81,9 +81,10 @@ describe('ConversionCache', () => {
     })
 
     it('still serves a mapping just before its TTL elapses', () => {
-      cache.setMapping('1000', 'coa-1', makeMapping())
+      const mapping = makeMapping()
+      cache.setMapping('1000', 'coa-1', mapping)
       vi.advanceTimersByTime(300000)
-      expect(cache.getMapping('1000', 'coa-1')).not.toBeNull()
+      expect(cache.getMapping('1000', 'coa-1')).toEqual(mapping)
     })
   })
 

@@ -29,8 +29,10 @@ describe('import/types — exported contracts', () => {
 
   it('provides ja + en descriptions for every import type', () => {
     for (const type of IMPORT_TYPES) {
-      expect(IMPORT_TYPE_DESCRIPTIONS[type].ja).toBeTruthy()
-      expect(IMPORT_TYPE_DESCRIPTIONS[type].en).toBeTruthy()
+      expect(typeof IMPORT_TYPE_DESCRIPTIONS[type].ja).toBe('string')
+      expect(IMPORT_TYPE_DESCRIPTIONS[type].ja.length).toBeGreaterThan(0)
+      expect(typeof IMPORT_TYPE_DESCRIPTIONS[type].en).toBe('string')
+      expect(IMPORT_TYPE_DESCRIPTIONS[type].en.length).toBeGreaterThan(0)
     }
   })
 

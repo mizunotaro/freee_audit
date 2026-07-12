@@ -97,9 +97,22 @@ describe('ir/ir-report-service (localStorage)', () => {
 
   describe('saveReport', () => {
     it('persists the report so getReport can read it back', async () => {
-      await saveReport(createBaseReport())
+      const report = createBaseReport()
+      await saveReport(report)
 
-      expect(await getReport('report-1')).not.toBeNull()
+      const roundTripped = await getReport('report-1')
+      expect(roundTripped).not.toBeNull()
+      expect(roundTripped).toMatchObject({
+        id: report.id,
+        companyId: report.companyId,
+        title: report.title,
+        fiscalYear: report.fiscalYear,
+        status: report.status,
+        language: report.language,
+        sections: report.sections,
+        financialHighlights: report.financialHighlights,
+      })
+      expect(roundTripped?.metadata.version).toBe(report.metadata.version + 1)
     })
 
     it('bumps the version and refreshes updatedAt on save', async () => {
@@ -153,7 +166,17 @@ describe('ir/ir-report-service (localStorage)', () => {
         createdBy: 'user-1',
       })
 
-      expect(await getReport(report.id)).not.toBeNull()
+      const stored = await getReport(report.id)
+      expect(stored).not.toBeNull()
+      expect(stored).toMatchObject({
+        id: report.id,
+        companyId: report.companyId,
+        title: report.title,
+        fiscalYear: report.fiscalYear,
+        status: 'draft',
+        language: report.language,
+        sections: [],
+      })
     })
   })
 

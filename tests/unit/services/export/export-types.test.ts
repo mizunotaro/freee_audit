@@ -55,8 +55,10 @@ describe('export format lookup consistency', () => {
 
   it('MIME_TYPES and FILE_EXTENSIONS cover every ExportFormat', () => {
     for (const format of formats) {
-      expect(MIME_TYPES[format]).toBeTruthy()
-      expect(FILE_EXTENSIONS[format]).toBeTruthy()
+      expect(typeof MIME_TYPES[format]).toBe('string')
+      expect(MIME_TYPES[format]).toMatch('/')
+      expect(typeof FILE_EXTENSIONS[format]).toBe('string')
+      expect(FILE_EXTENSIONS[format]).toMatch(/^\./)
     }
   })
 
