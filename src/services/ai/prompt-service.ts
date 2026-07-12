@@ -1,4 +1,12 @@
 import { prisma } from '@/lib/db'
+import {
+  type Result,
+  type AppError,
+  success,
+  failure,
+  createAppError,
+  ERROR_CODES,
+} from '@/types/result'
 
 export type AnalysisType =
   | 'FINANCIAL_ANALYSIS'
@@ -335,13 +343,13 @@ JSON形式で回答してください：
 export async function getPrompt(
   analysisType: AnalysisType,
   companyId?: string
-): Promise<AnalysisPromptDetail> {
+): Promise<Result<AnalysisPromptDetail, AppError>> {
   if (companyId) {
     const customPrompt = await prisma.analysisPrompt.findFirst({
       where: { companyId, analysisType, isActive: true },
     })
     if (customPrompt) {
-      return {
+      return success({
         id: customPrompt.id,
         companyId: customPrompt.companyId,
         analysisType: customPrompt.analysisType as AnalysisType,
@@ -354,22 +362,26 @@ export async function getPrompt(
         isDefault: customPrompt.isDefault,
         version: customPrompt.version,
         parentPromptId: customPrompt.parentPromptId,
-      }
+      })
     }
   }
 
   const defaultPrompt = DEFAULT_PROMPTS[analysisType]
   if (!defaultPrompt) {
-    throw new Error(`Unknown analysis type: ${analysisType}`)
+    return failure(
+      createAppError(ERROR_CODES.BUSINESS_LOGIC_ERROR, `Unknown analysis type: ${analysisType}`, {
+        details: { analysisType },
+      })
+    )
   }
 
-  return {
+  return success({
     id: 'default',
     companyId: null,
     ...defaultPrompt,
     version: 1,
     parentPromptId: null,
-  }
+  })
 }
 
 export async function getPromptsByType(

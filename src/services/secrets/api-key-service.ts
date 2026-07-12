@@ -2,6 +2,14 @@ import { getSecretsManager } from '@/lib/secrets'
 import { decrypt } from '@/lib/crypto'
 import { encryptForCache, decryptFromCache } from '@/lib/crypto/encryption-v2'
 import { prisma } from '@/lib/db'
+import {
+  type Result,
+  type AppError,
+  success,
+  failure,
+  createAppError,
+  ERROR_CODES,
+} from '@/types/result'
 import type { AIProviderType } from '@/lib/ai/config/types'
 import { secureLogger } from '@/lib/utils/secure-logger'
 
@@ -365,10 +373,16 @@ export async function requireAPIKey(
     companyId?: string
     preferSecretManager?: boolean
   }
-): Promise<string> {
+): Promise<Result<string, AppError>> {
   const key = await getAPIKey(provider, options)
   if (!key) {
-    throw new Error(`${provider} API key is required but not configured`)
+    return failure(
+      createAppError(
+        ERROR_CODES.VALIDATION_ERROR,
+        `${provider} API key is required but not configured`,
+        { details: { provider } }
+      )
+    )
   }
-  return key
+  return success(key)
 }
