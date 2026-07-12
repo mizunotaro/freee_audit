@@ -35,7 +35,3 @@ async function sendSuccessNotification(count: number): Promise<void> {
 async function sendFailureNotification(error: string): Promise<void> {
   console.error(`[ExchangeRateJob] Notification: Fetch failed - ${error}`)
 }
-
-export function startExchangeRateFetchJob(): void {
-  console.log('[ExchangeRateJob] Job module loaded - use scheduler.ts to schedule')
-}

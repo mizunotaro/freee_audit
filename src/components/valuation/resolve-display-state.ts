@@ -10,8 +10,6 @@ export const resolveDisplayStateInputSchema = z.object({
   hasData: z.boolean().default(false),
 })
 
-export type ResolveDisplayStateInput = z.infer<typeof resolveDisplayStateInputSchema>
-
 export function resolveDisplayState(input: unknown): Result<DisplayState> {
   const parsed = resolveDisplayStateInputSchema.safeParse(input)
   if (!parsed.success) {

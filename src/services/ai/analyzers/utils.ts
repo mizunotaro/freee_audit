@@ -1,5 +1,5 @@
 import type { BalanceSheet, ProfitLoss } from '@/types'
-import type { TrendDirection, LogContext, LogEntry } from './types'
+import type { TrendDirection, LogContext } from './types'
 
 export function isSafeNumber(value: unknown): value is number {
   return typeof value === 'number' && isFinite(value) && !isNaN(value)
@@ -486,42 +486,6 @@ export interface Logger {
   info(message: string, context?: Partial<LogContext>): void
   warn(message: string, context?: Partial<LogContext>): void
   error(message: string, context?: Partial<LogContext>): void
-}
-
-/**
- * コンソールロガー
- *
- * @remarks
- * JSON形式で構造化ログを出力
- */
-export class ConsoleLogger implements Logger {
-  constructor(private baseContext: LogContext) {}
-
-  debug(message: string, context?: Partial<LogContext>): void {
-    this.log('debug', message, context)
-  }
-
-  info(message: string, context?: Partial<LogContext>): void {
-    this.log('info', message, context)
-  }
-
-  warn(message: string, context?: Partial<LogContext>): void {
-    this.log('warn', message, context)
-  }
-
-  error(message: string, context?: Partial<LogContext>): void {
-    this.log('error', message, context)
-  }
-
-  private log(level: LogEntry['level'], message: string, context?: Partial<LogContext>): void {
-    const entry: LogEntry = {
-      timestamp: new Date().toISOString(),
-      level,
-      message,
-      context: { ...this.baseContext, ...context },
-    }
-    console.log(JSON.stringify(entry))
-  }
 }
 
 /**

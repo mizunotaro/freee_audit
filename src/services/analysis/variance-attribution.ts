@@ -93,7 +93,6 @@ export const VarianceAttributionInputSchema = z.object({
   options: VarianceAttributionOptionsSchema,
 })
 
-export type VarianceAttributionInput = z.infer<typeof VarianceAttributionInputSchema>
 export type VarianceBudgetItem = z.infer<typeof VarianceBudgetItemSchema>
 export type VarianceActualItem = z.infer<typeof VarianceActualItemSchema>
 export type VarianceJournalItem = z.infer<typeof VarianceJournalItemSchema>

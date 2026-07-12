@@ -21,8 +21,6 @@ export const managerialMetricsInputSchema = z.object({
   fixedCosts: z.number().min(0),
 })
 
-export type ManagerialMetricsInput = z.infer<typeof managerialMetricsInputSchema>
-
 /**
  * 限界利益・損益分岐点売上高・安全余裕率を計算する。
  *
@@ -81,8 +79,6 @@ export const varianceBridgeInputSchema = z.object({
   endLabel: z.string().default('営業利益（実績）'),
   stages: z.array(stageItemSchema).min(1),
 })
-
-export type VarianceBridgeInput = z.infer<typeof varianceBridgeInputSchema>
 
 const STAGE_NAMES = {
   revenue: '売上高',

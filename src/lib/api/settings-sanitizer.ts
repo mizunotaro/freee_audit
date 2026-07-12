@@ -32,8 +32,6 @@ export const SENSITIVE_FIELDS = [
   'freeeClientSecret',
 ] as const
 
-export type SensitiveFieldName = (typeof SENSITIVE_FIELDS)[number]
-
 export function sanitizeSettings(settings: Settings | null): SafeSettings {
   if (!settings) {
     return {

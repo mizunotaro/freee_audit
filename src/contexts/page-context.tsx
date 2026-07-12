@@ -136,26 +136,3 @@ export function inferPageTypeFromPath(path: string): PageType {
   if (path.includes('/investor')) return 'investor'
   return 'other'
 }
-
-export function getPageTypeLabel(pageType: PageType, language: 'ja' | 'en' = 'ja'): string {
-  const labels: Record<PageType, { ja: string; en: string }> = {
-    dashboard: { ja: 'ダッシュボード', en: 'Dashboard' },
-    audit: { ja: '監査', en: 'Audit' },
-    reports: { ja: 'レポート', en: 'Reports' },
-    analysis: { ja: '分析', en: 'Analysis' },
-    kpi: { ja: 'KPI', en: 'KPI' },
-    cashflow: { ja: 'キャッシュフロー', en: 'Cash Flow' },
-    budget: { ja: '予算', en: 'Budget' },
-    settings: { ja: '設定', en: 'Settings' },
-    chat: { ja: 'チャット', en: 'Chat' },
-    'journal-proposal': { ja: '仕訳提案', en: 'Journal Proposal' },
-    conversion: { ja: '変換', en: 'Conversion' },
-    tax: { ja: '税務', en: 'Tax' },
-    'social-insurance': { ja: '社会保険', en: 'Social Insurance' },
-    'deferred-accrual': { ja: '前受・未払', en: 'Deferred/Accrual' },
-    board: { ja: '取締役会', en: 'Board' },
-    investor: { ja: '投資家', en: 'Investor' },
-    other: { ja: 'その他', en: 'Other' },
-  }
-  return labels[pageType]?.[language] ?? labels.other[language]
-}

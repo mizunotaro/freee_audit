@@ -192,28 +192,3 @@ export function createMockPrisma(): MockPrismaClient {
     $connect: vi.fn(),
   } as unknown as MockPrismaClient
 }
-
-export function resetMockPrisma(mockPrisma: MockPrismaClient): void {
-  for (const key of Object.keys(mockPrisma)) {
-    if (key.startsWith('$')) continue
-    const model = mockPrisma[key as keyof MockPrismaClient]
-    if (model && typeof model === 'object') {
-      for (const method of Object.keys(model)) {
-        const fn = (model as Record<string, unknown>)[method]
-        if (typeof fn === 'function' && 'mockClear' in fn) {
-          ;(fn as ReturnType<typeof vi.fn>).mockClear()
-        }
-      }
-    }
-  }
-}
-
-export async function setupTestDatabase(): Promise<void> {
-  process.env.DATABASE_URL = 'file:./test.db'
-  process.env.JWT_SECRET = 'test-jwt-secret-for-testing'
-  process.env.ENCRYPTION_KEY = '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef'
-  process.env.CSRF_SECRET = 'test-csrf-secret-for-testing-320'
-  process.env.AUDIT_HASH_SECRET = 'test-audit-hash-secret-for-testing-min-32-chars'
-}
-
-export async function cleanupTestDatabase(): Promise<void> {}

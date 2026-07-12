@@ -85,7 +85,6 @@ export const MultiScenarioEngineInputSchema = ScenarioEngineInputSchema.omit({
 
 // ── Types (derived from schemas) ─────────────────────────────────────────────
 
-export type OneOff = z.infer<typeof OneOffSchema>
 export type ScenarioAssumptions = z.infer<typeof ScenarioAssumptionsSchema>
 export type ScenarioEngineInput = z.infer<typeof ScenarioEngineInputSchema>
 export type MultiScenarioEngineInput = z.infer<typeof MultiScenarioEngineInputSchema>

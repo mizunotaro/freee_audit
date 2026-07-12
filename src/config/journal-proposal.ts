@@ -49,5 +49,3 @@ export const JOURNAL_PROPOSAL_CONFIG = {
     userContext: 'Upload from UI',
   },
 } as const
-
-export type JournalProposalConfig = typeof JOURNAL_PROPOSAL_CONFIG
