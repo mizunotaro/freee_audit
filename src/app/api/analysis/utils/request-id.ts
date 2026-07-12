@@ -1,4 +1,4 @@
-import { randomBytes } from 'crypto'
+import crypto from 'crypto'
 
 /**
  * 一意のリクエストIDを生成
@@ -8,7 +8,7 @@ import { randomBytes } from 'crypto'
  */
 export function generateRequestId(prefix: string = 'req'): string {
   const timestamp = Date.now().toString(36)
-  const random = randomBytes(4).toString('hex')
+  const random = crypto.randomBytes(4).toString('hex')
   return `${prefix}-${timestamp}-${random}`
 }
 
@@ -19,7 +19,7 @@ export function generateRequestId(prefix: string = 'req'): string {
  */
 export function generateTraceId(): string {
   const timestamp = Date.now().toString(36)
-  const random = randomBytes(8).toString('hex')
+  const random = crypto.randomBytes(8).toString('hex')
   return `trace-${timestamp}-${random}`
 }
 
@@ -29,6 +29,6 @@ export function generateTraceId(): string {
  * @returns フォーマットされたスパンID
  */
 export function generateSpanId(): string {
-  const random = randomBytes(4).toString('hex')
+  const random = crypto.randomBytes(4).toString('hex')
   return `span-${random}`
 }
