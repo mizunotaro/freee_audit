@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { roundToDecimal } from '@/lib/utils'
 import type { Journal } from '@/types'
 import {
   success,
@@ -210,14 +211,6 @@ function dayDiff(aDay: string, bDay: string): number {
   return Math.round((b - a) / 86_400_000)
 }
 
-function round2(value: number): number {
-  return Math.round(value * 100) / 100
-}
-
-function round4(value: number): number {
-  return Math.round(value * 10000) / 10000
-}
-
 function normalizeDescription(description: string): string {
   return description.trim().replace(/\s+/g, ' ')
 }
@@ -271,7 +264,7 @@ export function findDuplicateJournals(
       formatDay(entry.entryDate),
       entry.debitAccount,
       entry.creditAccount,
-      opts.includeTaxAmount ? String(round2(entry.taxAmount)) : '',
+      opts.includeTaxAmount ? String(roundToDecimal(entry.taxAmount, 2)) : '',
       opts.includeDescription ? normalizeDescription(entry.description) : '',
     ].join('')
     const bucket = buckets.get(key) ?? []
@@ -289,8 +282,8 @@ export function findDuplicateJournals(
         formatDay(representative.entryDate),
         representative.debitAccount,
         representative.creditAccount,
-        String(round2(representative.amount)),
-        opts.includeTaxAmount ? `tax=${round2(representative.taxAmount)}` : '',
+        String(roundToDecimal(representative.amount, 2)),
+        opts.includeTaxAmount ? `tax=${roundToDecimal(representative.taxAmount, 2)}` : '',
         opts.includeDescription ? `desc=${normalizeDescription(representative.description)}` : '',
       ]
         .filter((part) => part !== '')
@@ -300,10 +293,10 @@ export function findDuplicateJournals(
         count: cluster.length,
         journalIds: cluster.map((entry) => entry.id),
         entryDate: formatDay(representative.entryDate),
-        amount: round2(representative.amount),
+        amount: roundToDecimal(representative.amount, 2),
         debitAccount: representative.debitAccount,
         creditAccount: representative.creditAccount,
-        taxAmount: opts.includeTaxAmount ? round2(representative.taxAmount) : undefined,
+        taxAmount: opts.includeTaxAmount ? roundToDecimal(representative.taxAmount, 2) : undefined,
         description: opts.includeDescription ? representative.description : undefined,
       })
     }
@@ -529,7 +522,7 @@ export function computeMissingCounterpartyStats(
 
   const missingRatio =
     totalEntriesOnCounterpartyAccounts > 0
-      ? round4(totalMissing / totalEntriesOnCounterpartyAccounts)
+      ? roundToDecimal(totalMissing / totalEntriesOnCounterpartyAccounts, 4)
       : 0
 
   return success({

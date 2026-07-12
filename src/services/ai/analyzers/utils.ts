@@ -1,5 +1,10 @@
 import type { BalanceSheet, ProfitLoss } from '@/types'
 import type { TrendDirection, LogContext, LogEntry } from './types'
+import {
+  parseSafeNumber,
+  safeDivide as safeDivideResult,
+  clampNumber,
+} from '@/lib/utils/safe-numbers'
 
 export function isSafeNumber(value: unknown): value is number {
   return typeof value === 'number' && isFinite(value) && !isNaN(value)
@@ -16,27 +21,12 @@ export function toSafeNumber(
 ): number {
   const { min = -Infinity, max = Infinity, allowNegative = true } = options
 
-  let result: number
-
-  if (typeof value === 'number') {
-    if (!isFinite(value) || isNaN(value)) {
-      return fallback
-    }
-    result = value
-  } else if (typeof value === 'string') {
-    const normalized = value
-      .replace(/[,，]/g, '')
-      .replace(/[０-９]/g, (s) => String.fromCharCode(s.charCodeAt(0) - 0xfee0))
-    const parsed = parseFloat(normalized)
-    if (!isFinite(parsed) || isNaN(parsed)) {
-      return fallback
-    }
-    result = parsed
-  } else if (value === null || value === undefined) {
-    return fallback
-  } else {
+  const parsed = parseSafeNumber(value)
+  if (!parsed.success) {
     return fallback
   }
+
+  const result = parsed.data
 
   if (!allowNegative && result < 0) {
     return fallback
@@ -68,21 +58,8 @@ export function safeDivide(
     percentage = fallbackOrOptions.percentage ?? false
   }
 
-  if (!isSafeNumber(numerator) || !isSafeNumber(denominator)) {
-    return fallback
-  }
-
-  if (Math.abs(denominator) <= epsilon) {
-    return fallback
-  }
-
-  const result = numerator / denominator
-
-  if (!isSafeNumber(result)) {
-    return fallback
-  }
-
-  return percentage ? result * 100 : result
+  const result = safeDivideResult(numerator, denominator, { epsilon, percentage })
+  return result.success ? result.data : fallback
 }
 
 export function calculateSafeGrowthRate(current: number, previous: number): number | null {
@@ -115,8 +92,8 @@ export function approximatelyEqual(a: number, b: number, epsilon: number = 0.01)
 }
 
 export function clamp(value: number, min: number, max: number): number {
-  if (!isSafeNumber(value)) return min
-  return Math.max(min, Math.min(max, value))
+  const result = clampNumber(value, min, max)
+  return result.success ? result.data : min
 }
 
 export function checkTimeout(startTime: number, timeoutMs: number): void {
