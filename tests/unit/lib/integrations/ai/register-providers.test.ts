@@ -1,4 +1,5 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
+import type { SecureLogger } from '@/lib/utils/secure-logger'
 
 const mockRegister = vi.fn()
 
@@ -77,34 +78,35 @@ describe('register-providers', () => {
   let registerProviders: () => void
   let isProvidersRegistered: () => boolean
   let resetProviderRegistration: () => void
-  let importCallCount: number
+  let secureLoggerInstance: SecureLogger
 
   beforeEach(async () => {
     vi.resetModules()
     mockRegister.mockClear()
 
+    secureLoggerInstance = (await import('@/lib/utils/secure-logger')).getSecureLogger()
     const mod = await import('@/lib/integrations/ai/register-providers')
     registerProviders = mod.registerProviders
     isProvidersRegistered = mod.isProvidersRegistered
     resetProviderRegistration = mod.resetProviderRegistration
 
-    importCallCount = mockRegister.mock.calls.length
     resetProviderRegistration()
     mockRegister.mockClear()
   })
 
   describe('registerProviders', () => {
     it('should register all providers', () => {
-      const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
+      const infoSpy = vi.spyOn(secureLoggerInstance, 'info').mockImplementation(() => {})
 
       registerProviders()
 
       expect(mockRegister).toHaveBeenCalledTimes(4)
-      expect(consoleLogSpy).toHaveBeenCalledWith(
-        '[AI] Providers registered: openai, claude, gemini, openrouter'
+      expect(infoSpy).toHaveBeenCalledWith(
+        'Providers registered',
+        expect.objectContaining({ component: 'AIProviderRegistry' })
       )
 
-      consoleLogSpy.mockRestore()
+      infoSpy.mockRestore()
     })
 
     it('should register providers with correct metadata', () => {
@@ -133,15 +135,15 @@ describe('register-providers', () => {
     })
 
     it('should not register twice', () => {
-      const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
+      const infoSpy = vi.spyOn(secureLoggerInstance, 'info').mockImplementation(() => {})
 
       registerProviders()
       registerProviders()
 
       expect(mockRegister).toHaveBeenCalledTimes(4)
-      expect(consoleLogSpy).toHaveBeenCalledTimes(1)
+      expect(infoSpy).toHaveBeenCalledTimes(1)
 
-      consoleLogSpy.mockRestore()
+      infoSpy.mockRestore()
     })
   })
 

@@ -10,6 +10,7 @@ import {
 import { DocumentAnalysisResult, EntryValidationResult, ValidationIssue } from '@/types/audit'
 import { API_TIMEOUTS } from '@/lib/utils/timeout'
 import { getDefaultModel } from '@/lib/ai/config/model-config'
+import { secureLogger } from '@/lib/utils/secure-logger'
 
 export interface OpenRouterProviderConfig {
   apiKey: string
@@ -257,11 +258,14 @@ export class OpenRouterProvider extends BaseAIProvider {
             retryDelay = Math.min(retryDelay, MAX_RETRY_DELAY_MS)
           }
 
-          console.warn(
-            `[OpenRouterProvider] ${operationName} attempt ${attempt + 1} failed, retrying in ${retryDelay}ms:`,
-            errorInfo.message,
-            errorInfo.providerName ? `(provider: ${errorInfo.providerName})` : ''
-          )
+          secureLogger.warn('OpenRouter operation failed, retrying', {
+            component: 'OpenRouterProvider',
+            operation: operationName,
+            attempt: attempt + 1,
+            retryDelayMs: retryDelay,
+            provider: errorInfo.providerName,
+            error: errorInfo.message,
+          })
 
           await delay(retryDelay)
         }

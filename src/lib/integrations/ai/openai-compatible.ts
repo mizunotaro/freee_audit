@@ -9,6 +9,7 @@ import {
 } from './provider'
 import { DocumentAnalysisResult, EntryValidationResult, ValidationIssue } from '@/types/audit'
 import { API_TIMEOUTS } from '@/lib/utils/timeout'
+import { secureLogger } from '@/lib/utils/secure-logger'
 import type { OpenAICompatibleProviderType } from '@/lib/ai/config/types'
 
 export interface OpenAICompatibleProviderConfig {
@@ -145,10 +146,13 @@ export class OpenAICompatibleProvider extends BaseAIProvider {
             retryDelay = Math.min(retryDelay, MAX_RETRY_DELAY_MS)
           }
 
-          console.warn(
-            `[${this.name}Provider] ${operationName} attempt ${attempt + 1} failed, retrying in ${retryDelay}ms:`,
-            errorInfo.message
-          )
+          secureLogger.warn('OpenAI-compatible operation failed, retrying', {
+            component: `${this.name}Provider`,
+            operation: operationName,
+            attempt: attempt + 1,
+            retryDelayMs: retryDelay,
+            error: errorInfo.message,
+          })
 
           await delay(retryDelay)
         }

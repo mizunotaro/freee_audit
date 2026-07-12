@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { FallbackAIProvider, createFallbackProvider } from '@/lib/integrations/ai/fallback-provider'
+import { createFallbackProvider } from '@/lib/integrations/ai/fallback-provider'
+import { getSecureLogger } from '@/lib/utils/secure-logger'
 import {
   AIProvider,
   AIProviderType,
@@ -24,7 +25,7 @@ const createMockProvider = (
   return {
     name,
     analyzeDocument: vi.fn(
-      async (request: DocumentAnalysisRequest): Promise<DocumentAnalysisResult> => {
+      async (_request: DocumentAnalysisRequest): Promise<DocumentAnalysisResult> => {
         if (delay > 0) {
           await new Promise((resolve) => setTimeout(resolve, delay))
         }
@@ -44,7 +45,7 @@ const createMockProvider = (
       }
     ),
     validateEntry: vi.fn(
-      async (request: EntryValidationRequest): Promise<EntryValidationResult> => {
+      async (_request: EntryValidationRequest): Promise<EntryValidationResult> => {
         if (delay > 0) {
           await new Promise((resolve) => setTimeout(resolve, delay))
         }
@@ -58,7 +59,7 @@ const createMockProvider = (
         }
       }
     ),
-    generate: vi.fn(async (options: GenerateOptions): Promise<GenerateResult> => {
+    generate: vi.fn(async (_options: GenerateOptions): Promise<GenerateResult> => {
       if (delay > 0) {
         await new Promise((resolve) => setTimeout(resolve, delay))
       }
@@ -149,7 +150,7 @@ describe('FallbackAIProvider', () => {
     it('should fallback to second provider when first fails', async () => {
       const failedProvider = createMockProvider('openai', true)
       const successProvider = createMockProvider('gemini', false)
-      const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+      const warnSpy = vi.spyOn(getSecureLogger(), 'warn').mockImplementation(() => {})
 
       const fallback = createFallbackProvider({
         providers: [
@@ -167,12 +168,17 @@ describe('FallbackAIProvider', () => {
       expect(result.description).toBe('Analyzed by gemini')
       expect(failedProvider.analyzeDocument).toHaveBeenCalledTimes(1)
       expect(successProvider.analyzeDocument).toHaveBeenCalledTimes(1)
-      expect(consoleWarnSpy).toHaveBeenCalledWith(
-        '[AI] openai analyzeDocument failed:',
-        'openai analyzeDocument failed'
+      expect(warnSpy).toHaveBeenCalledWith(
+        'Provider operation failed',
+        expect.objectContaining({
+          component: 'FallbackAIProvider',
+          provider: 'openai',
+          operation: 'analyzeDocument',
+          error: 'openai analyzeDocument failed',
+        })
       )
 
-      consoleWarnSpy.mockRestore()
+      warnSpy.mockRestore()
     })
 
     it('should try all providers in order', async () => {

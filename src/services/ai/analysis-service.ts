@@ -1,4 +1,5 @@
 import type { BalanceSheet, ProfitLoss, CashFlowStatement, FinancialKPIs } from '@/types'
+import { secureLogger } from '@/lib/utils/secure-logger'
 
 type AIProvider = 'openai' | 'gemini' | 'claude' | 'azure' | 'aws' | 'gcp'
 
@@ -67,7 +68,11 @@ export async function analyzeFinancialData(
         return generateMockAnalysis(bs, pl, cf, kpis)
     }
   } catch (error) {
-    console.error('LLM analysis failed:', error)
+    secureLogger.error('LLM analysis failed', {
+      component: 'AnalysisService',
+      provider: config.provider,
+      error,
+    })
     return generateMockAnalysis(bs, pl, cf, kpis)
   }
 }
@@ -237,7 +242,10 @@ function parseAnalysisResponse(responseText: string): AnalysisResult {
       return JSON.parse(jsonMatch[0])
     }
   } catch (e) {
-    console.error('Failed to parse LLM response as JSON:', e)
+    secureLogger.error('Failed to parse LLM response as JSON', {
+      component: 'AnalysisService',
+      error: e,
+    })
   }
 
   return {
@@ -396,7 +404,10 @@ JSON形式で回答:
       }
     }
   } catch (error) {
-    console.error('Journal analysis failed:', error)
+    secureLogger.error('Journal analysis failed', {
+      component: 'AnalysisService',
+      error,
+    })
   }
 
   return generateMockJournalAnalysis(entry, receiptData)
