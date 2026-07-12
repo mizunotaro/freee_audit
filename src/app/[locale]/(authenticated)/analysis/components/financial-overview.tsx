@@ -9,13 +9,24 @@ interface FinancialOverviewProps {
   readonly isLoading?: boolean
 }
 
+const DIRECTION_LABELS: Record<string, string> = {
+  improving: '改善',
+  declining: '悪化',
+  stable: '安定',
+}
+
 export const FinancialOverview = memo(function FinancialOverview({
   data,
   isLoading = false,
 }: FinancialOverviewProps) {
   if (isLoading) {
     return (
-      <div className="animate-pulse rounded-lg border bg-card p-6">
+      <div
+        role="status"
+        aria-busy="true"
+        aria-label="主要財務指標を読み込み中"
+        className="animate-pulse rounded-lg border bg-card p-6"
+      >
         <div className="mb-4 h-6 w-32 rounded bg-muted" />
         <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
           {Array.from({ length: 4 }).map((_, i) => (
@@ -71,30 +82,37 @@ export const FinancialOverview = memo(function FinancialOverview({
       <h3 className="mb-4 text-sm font-medium text-muted-foreground">主要財務指標</h3>
 
       <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-        {keyMetrics.map((metric, index) => (
-          <div
-            key={index}
-            className={cn('rounded-lg border-l-4 p-4', getStatusColor(metric.status))}
-          >
-            <p className="truncate text-xs text-muted-foreground">{metric.name}</p>
-            <div className="mt-1 flex items-baseline gap-1">
-              <span className="text-xl font-bold">
-                {formatValue(metric.value, metric.format, metric.unit)}
-              </span>
-              {metric.trend && (
-                <span
-                  className={cn(
-                    'text-sm',
-                    metric.trend === 'improving' && 'text-green-500',
-                    metric.trend === 'declining' && 'text-red-500'
-                  )}
-                >
-                  {getTrendIcon(metric.trend)}
-                </span>
-              )}
-            </div>
+        {keyMetrics.length === 0 ? (
+          <div role="status" className="col-span-full py-8 text-center text-muted-foreground">
+            <p className="text-sm">表示する主要財務指標はありません</p>
           </div>
-        ))}
+        ) : (
+          keyMetrics.map((metric, index) => (
+            <div
+              key={index}
+              className={cn('rounded-lg border-l-4 p-4', getStatusColor(metric.status))}
+            >
+              <p className="truncate text-xs text-muted-foreground">{metric.name}</p>
+              <div className="mt-1 flex items-baseline gap-1">
+                <span className="text-xl font-bold">
+                  {formatValue(metric.value, metric.format, metric.unit)}
+                </span>
+                {metric.trend && (
+                  <span
+                    className={cn(
+                      'text-sm',
+                      metric.trend === 'improving' && 'text-green-500',
+                      metric.trend === 'declining' && 'text-red-500'
+                    )}
+                  >
+                    <span aria-hidden="true">{getTrendIcon(metric.trend)}</span>
+                    <span className="sr-only">{DIRECTION_LABELS[metric.trend] ?? ''}</span>
+                  </span>
+                )}
+              </div>
+            </div>
+          ))
+        )}
       </div>
 
       {data?.executiveSummary && (

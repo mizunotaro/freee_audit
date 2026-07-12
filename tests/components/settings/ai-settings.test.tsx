@@ -166,6 +166,10 @@ describe('AiSettings', () => {
     await waitFor(() => expect(container.querySelector('.animate-pulse')).toBeInTheDocument())
     expect(screen.queryByRole('heading', { name: 'AI API設定' })).toBeNull()
 
+    const loadingRegion = screen.getByRole('status')
+    expect(loadingRegion).toHaveAttribute('aria-busy', 'true')
+    expect(loadingRegion).toHaveAttribute('aria-label', 'AI API設定を読み込み中')
+
     resolveLoad(okResponse({ config: { provider: 'openai', model: 'gpt-4' } }))
 
     await waitFor(() =>

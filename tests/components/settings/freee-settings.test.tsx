@@ -133,6 +133,10 @@ describe('FreeeSettings', () => {
     expect(container.querySelector('.animate-pulse')).toBeInTheDocument()
     expect(screen.queryByRole('button')).toBeNull()
 
+    const region = screen.getByRole('status')
+    expect(region).toHaveAttribute('aria-busy', 'true')
+    expect(region).toHaveAttribute('aria-label', 'freee連携設定を読み込み中')
+
     resolveFetch(okResponse({ companies: [] }))
   })
 
