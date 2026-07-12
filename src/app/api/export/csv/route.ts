@@ -4,12 +4,12 @@ import {
   createExcelExportService,
   ExportRequest,
   DEFAULT_EXPORT_OPTIONS,
-  ReportType,
   BalanceSheetData,
   ProfitLossData,
   CashFlowData,
   MonthlyReportData,
 } from '@/services/export'
+import { exportQuerySchema } from '../schemas'
 
 async function getAuthUser(request: NextRequest) {
   const token = request.cookies.get('session')?.value
@@ -25,24 +25,23 @@ export async function GET(request: NextRequest) {
     }
 
     const { searchParams } = new URL(request.url)
-
-    const reportType = searchParams.get('reportType') as ReportType
-    const fiscalYear = parseInt(searchParams.get('fiscalYear') || '0')
-    const month = searchParams.get('month') ? parseInt(searchParams.get('month')!) : undefined
-    const language = (searchParams.get('language') || 'ja') as 'ja' | 'en'
-
-    if (!reportType || !fiscalYear) {
+    const query = exportQuerySchema.safeParse(Object.fromEntries(searchParams))
+    if (!query.success) {
       return NextResponse.json(
-        { error: 'Missing required parameters: reportType, fiscalYear' },
+        { error: 'Invalid query parameters', details: query.error.flatten() },
         { status: 400 }
       )
     }
+
+    const { reportType, fiscalYear, month } = query.data
+    const language = query.data.language ?? 'ja'
+    const currency = query.data.currency ?? 'JPY'
 
     const options = {
       ...DEFAULT_EXPORT_OPTIONS,
       format: 'csv' as const,
       language,
-      currency: (searchParams.get('currency') || 'JPY') as 'JPY' | 'USD',
+      currency,
       includeCharts: false,
     }
 

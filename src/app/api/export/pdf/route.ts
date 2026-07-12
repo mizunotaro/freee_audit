@@ -10,6 +10,7 @@ import {
   CashFlowData,
   MonthlyReportData,
 } from '@/services/export'
+import { exportBodySchema } from '../schemas'
 
 async function getAuthUser(request: NextRequest) {
   const token = request.cookies.get('session')?.value
@@ -24,20 +25,21 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const body: ExportRequest = await request.json()
-
-    if (!body.reportType || !body.fiscalYear) {
+    const parsed = exportBodySchema.safeParse(await request.json())
+    if (!parsed.success) {
       return NextResponse.json(
-        { error: 'Missing required fields: reportType, fiscalYear' },
+        { error: 'Invalid request body', details: parsed.error.flatten() },
         { status: 400 }
       )
     }
 
+    const { reportType, fiscalYear, month, quarter, options: bodyOptions } = parsed.data
     const options = {
       ...DEFAULT_EXPORT_OPTIONS,
-      ...body.options,
+      ...bodyOptions,
       format: 'pdf' as const,
     }
+    const body: ExportRequest = { reportType, fiscalYear, month, quarter, options }
 
     const mockData = getMockReportData(body)
     const exportServiceResult = createExportService('pdf')

@@ -128,7 +128,39 @@ describe('POST /api/board/meetings', () => {
 
     expect(response.status).toBe(400)
     const body = await response.json()
-    expect(body.error).toMatch(/meetingDate and meetingType are required/)
+    expect(body.error).toBe('Invalid request body')
+    expect(boardMocks.createBoardMeeting).not.toHaveBeenCalled()
+  })
+
+  it('returns 400 when meetingType is not a known enum value', async () => {
+    const { validateSession } = await import('@/lib/auth')
+    vi.mocked(validateSession).mockResolvedValue(user)
+
+    const response = await postMeeting(
+      buildRequest('http://localhost/api/board/meetings', 'POST', 'session=valid-token', {
+        meetingDate: '2024-04-01',
+        meetingType: 'board',
+      })
+    )
+
+    expect(response.status).toBe(400)
+    const body = await response.json()
+    expect(body.error).toBe('Invalid request body')
+    expect(boardMocks.createBoardMeeting).not.toHaveBeenCalled()
+  })
+
+  it('returns 400 when meetingDate is not a valid date', async () => {
+    const { validateSession } = await import('@/lib/auth')
+    vi.mocked(validateSession).mockResolvedValue(user)
+
+    const response = await postMeeting(
+      buildRequest('http://localhost/api/board/meetings', 'POST', 'session=valid-token', {
+        meetingDate: 'not-a-date',
+        meetingType: 'regular',
+      })
+    )
+
+    expect(response.status).toBe(400)
     expect(boardMocks.createBoardMeeting).not.toHaveBeenCalled()
   })
 

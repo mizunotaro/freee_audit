@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { validateSession } from '@/lib/auth'
-import { resetToDefault, type AnalysisType } from '@/services/ai/prompt-service'
+import { resetToDefault } from '@/services/ai/prompt-service'
 import { logRouteAudit } from '@/lib/route-audit'
+import { analysisTypeSchema } from '../../schemas'
 
 async function handler(request: NextRequest, { params }: { params: Promise<{ type: string }> }) {
   const token = request.headers.get('authorization')?.replace('Bearer ', '')
@@ -16,7 +17,14 @@ async function handler(request: NextRequest, { params }: { params: Promise<{ typ
   }
 
   const { type } = await params
-  const analysisType = type as AnalysisType
+  const typeResult = analysisTypeSchema.safeParse(type)
+  if (!typeResult.success) {
+    return NextResponse.json(
+      { error: 'Invalid analysis type', details: typeResult.error.flatten() },
+      { status: 400 }
+    )
+  }
+  const analysisType = typeResult.data
 
   if (request.method === 'POST') {
     try {

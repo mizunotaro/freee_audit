@@ -1,7 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
 import { validateSession } from '@/lib/auth'
 import { BoardMeetingService } from '@/services/board/board-meeting-service'
 import { logRouteAudit } from '@/lib/route-audit'
+
+const createMeetingSchema = z.object({
+  meetingDate: z.coerce.date(),
+  meetingType: z.enum(['regular', 'extraordinary']),
+  minutes: z.string().nullish(),
+})
 
 async function getAuthUser(request: NextRequest) {
   const token = request.cookies.get('session')?.value
@@ -31,21 +38,20 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const body = await request.json()
-    const { meetingDate, meetingType, minutes } = body
-
-    if (!meetingDate || !meetingType) {
+    const parsed = createMeetingSchema.safeParse(await request.json())
+    if (!parsed.success) {
       return NextResponse.json(
-        { error: 'meetingDate and meetingType are required' },
+        { error: 'Invalid request body', details: parsed.error.flatten() },
         { status: 400 }
       )
     }
+    const { meetingDate, meetingType, minutes } = parsed.data
 
     const meeting = await BoardMeetingService.createBoardMeeting({
       companyId: user.companyId,
       meetingDate: new Date(meetingDate),
       meetingType,
-      minutes,
+      minutes: minutes ?? undefined,
     })
 
     await logRouteAudit({

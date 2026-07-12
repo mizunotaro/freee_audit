@@ -112,7 +112,31 @@ describe('GET /api/export/csv', () => {
 
     expect(response.status).toBe(400)
     const body = await response.json()
-    expect(body).toEqual({ error: 'Missing required parameters: reportType, fiscalYear' })
+    expect(body.error).toBe('Invalid query parameters')
+    expect(exportMocks.exportCSV).not.toHaveBeenCalled()
+  })
+
+  it('returns 400 when reportType is not a known enum value', async () => {
+    vi.mocked(validateSession).mockResolvedValue(authenticatedUser)
+
+    const response = await csvGET(
+      buildGet('reportType=bogus&fiscalYear=2024', 'session=valid-token')
+    )
+
+    expect(response.status).toBe(400)
+    const body = await response.json()
+    expect(body.error).toBe('Invalid query parameters')
+    expect(exportMocks.exportCSV).not.toHaveBeenCalled()
+  })
+
+  it('returns 400 when fiscalYear is not a valid integer', async () => {
+    vi.mocked(validateSession).mockResolvedValue(authenticatedUser)
+
+    const response = await csvGET(
+      buildGet('reportType=balance_sheet&fiscalYear=abc', 'session=valid-token')
+    )
+
+    expect(response.status).toBe(400)
     expect(exportMocks.exportCSV).not.toHaveBeenCalled()
   })
 
@@ -176,7 +200,39 @@ describe('POST /api/export/excel', () => {
 
     expect(response.status).toBe(400)
     const body = await response.json()
-    expect(body).toEqual({ error: 'Missing required fields: reportType, fiscalYear' })
+    expect(body.error).toBe('Invalid request body')
+    expect(exportMocks.excelExport).not.toHaveBeenCalled()
+  })
+
+  it('returns 400 when reportType is not a known enum value', async () => {
+    vi.mocked(validateSession).mockResolvedValue(authenticatedUser)
+
+    const response = await excelPOST(
+      buildPost(
+        'http://localhost/api/export/excel',
+        { reportType: 'bogus', fiscalYear: 2024 },
+        'session=valid-token'
+      )
+    )
+
+    expect(response.status).toBe(400)
+    const body = await response.json()
+    expect(body.error).toBe('Invalid request body')
+    expect(exportMocks.excelExport).not.toHaveBeenCalled()
+  })
+
+  it('returns 400 when fiscalYear is out of range', async () => {
+    vi.mocked(validateSession).mockResolvedValue(authenticatedUser)
+
+    const response = await excelPOST(
+      buildPost(
+        'http://localhost/api/export/excel',
+        { reportType: 'profit_loss', fiscalYear: 1800 },
+        'session=valid-token'
+      )
+    )
+
+    expect(response.status).toBe(400)
     expect(exportMocks.excelExport).not.toHaveBeenCalled()
   })
 
@@ -239,6 +295,19 @@ describe('POST /api/export/excel', () => {
 })
 
 describe('POST /api/export/pdf', () => {
+  it('returns 400 when required fields are missing', async () => {
+    vi.mocked(validateSession).mockResolvedValue(authenticatedUser)
+
+    const response = await pdfPOST(
+      buildPost('http://localhost/api/export/pdf', { fiscalYear: 2024 }, 'session=valid-token')
+    )
+
+    expect(response.status).toBe(400)
+    const body = await response.json()
+    expect(body.error).toBe('Invalid request body')
+    expect(exportMocks.pdfExport).not.toHaveBeenCalled()
+  })
+
   it('returns 400 when the export service cannot be created', async () => {
     vi.mocked(validateSession).mockResolvedValue(authenticatedUser)
     exportMocks.createExportService.mockReturnValue({
@@ -290,6 +359,23 @@ describe('POST /api/export/pdf', () => {
 })
 
 describe('POST /api/export/pptx', () => {
+  it('returns 400 when required fields are missing', async () => {
+    vi.mocked(validateSession).mockResolvedValue(authenticatedUser)
+
+    const response = await pptxPOST(
+      buildPost(
+        'http://localhost/api/export/pptx',
+        { reportType: 'balance_sheet' },
+        'session=valid-token'
+      )
+    )
+
+    expect(response.status).toBe(400)
+    const body = await response.json()
+    expect(body.error).toBe('Invalid request body')
+    expect(exportMocks.pptxExport).not.toHaveBeenCalled()
+  })
+
   it('returns 400 when the export service cannot be created', async () => {
     vi.mocked(validateSession).mockResolvedValue(authenticatedUser)
     exportMocks.createExportService.mockReturnValue({
