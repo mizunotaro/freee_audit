@@ -1,6 +1,17 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+import type { ReactNode } from 'react'
 import { render, fireEvent, waitFor, screen } from '@testing-library/react'
+import { NextIntlClientProvider } from 'next-intl'
 import { JournalImport } from '@/components/import/JournalImport'
+import jaMessages from '../../../messages/ja.json'
+
+function renderWithI18n(ui: ReactNode) {
+  return render(
+    <NextIntlClientProvider locale="ja" messages={jaMessages}>
+      {ui}
+    </NextIntlClientProvider>
+  )
+}
 
 function jsonRes(body: unknown, ok = true): Response {
   return { ok, status: ok ? 200 : 400, json: async () => body } as unknown as Response
@@ -23,7 +34,7 @@ function selectFile(container: HTMLElement, file: File) {
 
 describe('JournalImport — static rendering', () => {
   it('renders the heading and the CSV format reference table', () => {
-    const { getByText } = render(<JournalImport />)
+    const { getByText } = renderWithI18n(<JournalImport />)
     expect(getByText('仕訳データインポート')).toBeInTheDocument()
     expect(getByText('ヘッダー名')).toBeInTheDocument()
   })
@@ -31,14 +42,14 @@ describe('JournalImport — static rendering', () => {
 
 describe('JournalImport — file selection validation', () => {
   it('rejects a non-CSV file', () => {
-    const { container, getByText } = render(<JournalImport />)
+    const { container, getByText } = renderWithI18n(<JournalImport />)
     selectFile(container, new File(['x'], 'data.txt', { type: 'text/plain' }))
 
     expect(getByText('CSVファイルを選択してください')).toBeInTheDocument()
   })
 
   it('accepts a valid CSV and shows the size in KB', () => {
-    const { container, getByText, queryByText } = render(<JournalImport />)
+    const { container, getByText, queryByText } = renderWithI18n(<JournalImport />)
     selectFile(container, csvFile('journals.csv'))
 
     expect(queryByText('CSVファイルを選択してください')).toBeNull()
@@ -47,7 +58,7 @@ describe('JournalImport — file selection validation', () => {
   })
 
   it('rejects a file larger than 10MB', () => {
-    const { container, getByText } = render(<JournalImport />)
+    const { container, getByText } = renderWithI18n(<JournalImport />)
     selectFile(container, oversizedCsv())
 
     expect(getByText('ファイルサイズは10MB以下にしてください')).toBeInTheDocument()
@@ -66,7 +77,7 @@ describe('JournalImport — upload flow', () => {
         jsonRes({ success: true, imported: 5, skipped: 1, errors: [], totalRows: 6 })
       )
 
-    const { container, getByText, queryByText } = render(<JournalImport />)
+    const { container, getByText, queryByText } = renderWithI18n(<JournalImport />)
     selectFile(container, csvFile('journals.csv'))
 
     fireEvent.click(screen.getByRole('button', { name: 'インポート実行' }))
@@ -88,7 +99,7 @@ describe('JournalImport — upload flow', () => {
         jsonRes({ success: false, imported: 0, skipped: 0, errors, totalRows: 12 })
       )
 
-    const { container, getByText, queryByText } = render(<JournalImport />)
+    const { container, getByText, queryByText } = renderWithI18n(<JournalImport />)
     selectFile(container, csvFile('journals.csv'))
 
     fireEvent.click(screen.getByRole('button', { name: 'インポート実行' }))
@@ -105,7 +116,7 @@ describe('JournalImport — upload flow', () => {
   it('surfaces the API error message on a failed response', async () => {
     global.fetch = vi.fn().mockResolvedValue(jsonRes({ error: 'インポート失敗テスト' }, false))
 
-    const { container, getByText } = render(<JournalImport />)
+    const { container, getByText } = renderWithI18n(<JournalImport />)
     selectFile(container, csvFile('journals.csv'))
 
     fireEvent.click(screen.getByRole('button', { name: 'インポート実行' }))
@@ -118,7 +129,7 @@ describe('JournalImport — upload flow', () => {
 
 describe('JournalImport — accessibility', () => {
   it('announces validation errors inside a role=alert region and labels the dismiss control', () => {
-    const { container } = render(<JournalImport />)
+    const { container } = renderWithI18n(<JournalImport />)
     selectFile(container, new File(['x'], 'data.txt', { type: 'text/plain' }))
 
     expect(screen.getByRole('alert')).toHaveTextContent(/CSVファイルを選択してください/)
@@ -132,7 +143,7 @@ describe('JournalImport — accessibility', () => {
         jsonRes({ success: true, imported: 5, skipped: 1, errors: [], totalRows: 6 })
       )
 
-    const { container } = render(<JournalImport />)
+    const { container } = renderWithI18n(<JournalImport />)
     selectFile(container, csvFile('journals.csv'))
 
     fireEvent.click(screen.getByRole('button', { name: 'インポート実行' }))

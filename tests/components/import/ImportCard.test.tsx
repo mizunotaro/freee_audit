@@ -1,7 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+import type { ReactNode } from 'react'
 import { render, fireEvent, waitFor, screen } from '@testing-library/react'
+import { NextIntlClientProvider } from 'next-intl'
 import { ImportCard } from '@/components/import/ImportCard'
 import type { ImportPreviewData } from '@/components/import/types'
+import jaMessages from '../../../messages/ja.json'
 
 const ACCEPTED = 'サポートされていないファイル形式です。対応形式: csv, xlsx, xls, xlsm'
 const TOO_LARGE = 'ファイルサイズは10MB以下にしてください'
@@ -25,9 +28,17 @@ function selectFile(container: HTMLElement, file: File) {
   fireEvent.change(input, { target: { files: [file] } })
 }
 
+function renderWithI18n(ui: ReactNode) {
+  return render(
+    <NextIntlClientProvider locale="ja" messages={jaMessages}>
+      {ui}
+    </NextIntlClientProvider>
+  )
+}
+
 describe('ImportCard — type label / description', () => {
   it('renders the localized type label and description', () => {
-    const { getByText } = render(
+    const { getByText } = renderWithI18n(
       <ImportCard type="journal" apiEndpoint="/api/import/journals" companyId="c1" />
     )
     expect(getByText('仕訳データインポート')).toBeInTheDocument()
@@ -43,7 +54,7 @@ describe('ImportCard — file validation', () => {
   })
 
   it('rejects an unsupported extension and reports the error', () => {
-    const { container, getByText } = render(
+    const { container, getByText } = renderWithI18n(
       <ImportCard
         type="journal"
         apiEndpoint="/api/import/journals"
@@ -58,7 +69,7 @@ describe('ImportCard — file validation', () => {
   })
 
   it('accepts a .csv extension case-insensitively', () => {
-    const { container, queryByText, getByText } = render(
+    const { container, queryByText, getByText } = renderWithI18n(
       <ImportCard
         type="journal"
         apiEndpoint="/api/import/journals"
@@ -75,7 +86,7 @@ describe('ImportCard — file validation', () => {
   })
 
   it('rejects an oversized file (>10MB)', () => {
-    const { container, getByText } = render(
+    const { container, getByText } = renderWithI18n(
       <ImportCard
         type="journal"
         apiEndpoint="/api/import/journals"
@@ -90,7 +101,7 @@ describe('ImportCard — file validation', () => {
   })
 
   it('clears the error when a valid file is chosen after an invalid one', () => {
-    const { container, queryByText } = render(
+    const { container, queryByText } = renderWithI18n(
       <ImportCard
         type="journal"
         apiEndpoint="/api/import/journals"
@@ -125,7 +136,7 @@ describe('ImportCard — preview flow', () => {
   it('moves to the preview step on a successful preview request', async () => {
     global.fetch = vi.fn().mockResolvedValue(jsonRes({ preview }))
 
-    const { container } = render(
+    const { container } = renderWithI18n(
       <ImportCard type="journal" apiEndpoint="/api/import/journals" companyId="c1" />
     )
     selectFile(container, csvFile())
@@ -145,7 +156,7 @@ describe('ImportCard — preview flow', () => {
     global.fetch = vi.fn().mockResolvedValue(jsonRes({ error: 'プレビュー取得失敗' }, false))
     const onError = vi.fn()
 
-    const { container, getByText } = render(
+    const { container, getByText } = renderWithI18n(
       <ImportCard
         type="journal"
         apiEndpoint="/api/import/journals"
@@ -166,7 +177,7 @@ describe('ImportCard — preview flow', () => {
 
 describe('ImportCard — accessibility', () => {
   it('exposes the dropzone as a focusable button named after the import type', () => {
-    render(<ImportCard type="journal" apiEndpoint="/api/import/journals" companyId="c1" />)
+    renderWithI18n(<ImportCard type="journal" apiEndpoint="/api/import/journals" companyId="c1" />)
     const dropzone = screen.getByRole('button', { name: '仕訳データファイルを選択' })
     expect(dropzone).toHaveAttribute('tabindex', '0')
     dropzone.focus()
@@ -174,7 +185,7 @@ describe('ImportCard — accessibility', () => {
   })
 
   it('activates the file picker via Enter and Space keyboard events', () => {
-    const { container } = render(
+    const { container } = renderWithI18n(
       <ImportCard type="journal" apiEndpoint="/api/import/journals" companyId="c1" />
     )
     const input = container.querySelector('input[type="file"]') as HTMLInputElement
@@ -189,7 +200,7 @@ describe('ImportCard — accessibility', () => {
   })
 
   it('labels the icon-only clear button once a file is selected', () => {
-    const { container } = render(
+    const { container } = renderWithI18n(
       <ImportCard type="journal" apiEndpoint="/api/import/journals" companyId="c1" />
     )
     selectFile(container, csvFile())
@@ -197,7 +208,7 @@ describe('ImportCard — accessibility', () => {
   })
 
   it('labels the icon-only error dismiss button when validation fails', () => {
-    const { container } = render(
+    const { container } = renderWithI18n(
       <ImportCard type="journal" apiEndpoint="/api/import/journals" companyId="c1" />
     )
     selectFile(container, new File(['x'], 'data.txt'))

@@ -1,6 +1,7 @@
 'use client'
 
 import { useMemo } from 'react'
+import { useTranslations } from 'next-intl'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import {
@@ -31,28 +32,38 @@ interface ImportResultProps {
 const MAX_DISPLAY_ERRORS = 20
 
 function StatusBadge({ status }: { status: ImportResultData['status'] }) {
+  const t = useTranslations('import')
   const config = {
-    completed: { label: '完了', variant: 'default' as const, icon: CheckCircle2 },
-    partial: { label: '一部成功', variant: 'secondary' as const, icon: AlertTriangle },
-    failed: { label: '失敗', variant: 'destructive' as const, icon: XCircle },
-    pending: { label: '待機中', variant: 'outline' as const, icon: Clock },
-    parsing: { label: '解析中', variant: 'outline' as const, icon: FileSpreadsheet },
-    validating: { label: '検証中', variant: 'outline' as const, icon: FileSpreadsheet },
-    previewing: { label: 'プレビュー中', variant: 'outline' as const, icon: FileSpreadsheet },
-    importing: { label: 'インポート中', variant: 'outline' as const, icon: FileSpreadsheet },
+    completed: { labelKey: 'statusCompleted', variant: 'default' as const, icon: CheckCircle2 },
+    partial: { labelKey: 'statusPartial', variant: 'secondary' as const, icon: AlertTriangle },
+    failed: { labelKey: 'statusFailed', variant: 'destructive' as const, icon: XCircle },
+    pending: { labelKey: 'statusPending', variant: 'outline' as const, icon: Clock },
+    parsing: { labelKey: 'statusParsing', variant: 'outline' as const, icon: FileSpreadsheet },
+    validating: {
+      labelKey: 'statusValidating',
+      variant: 'outline' as const,
+      icon: FileSpreadsheet,
+    },
+    previewing: {
+      labelKey: 'statusPreviewing',
+      variant: 'outline' as const,
+      icon: FileSpreadsheet,
+    },
+    importing: { labelKey: 'statusImporting', variant: 'outline' as const, icon: FileSpreadsheet },
   }
 
-  const { label, variant, icon: Icon } = config[status] || config.pending
+  const { labelKey, variant, icon: Icon } = config[status] || config.pending
 
   return (
     <Badge variant={variant} className="gap-1">
       <Icon className="h-3 w-3" />
-      {label}
+      {t(labelKey)}
     </Badge>
   )
 }
 
 function ErrorTable({ errors }: { errors: ImportErrorUI[] }) {
+  const t = useTranslations('import')
   if (errors.length === 0) return null
 
   const displayErrors = errors.slice(0, MAX_DISPLAY_ERRORS)
@@ -61,19 +72,19 @@ function ErrorTable({ errors }: { errors: ImportErrorUI[] }) {
   return (
     <div className="mt-4">
       <div className="mb-2 flex items-center justify-between">
-        <h4 className="text-sm font-medium">エラー詳細</h4>
+        <h4 className="text-sm font-medium">{t('errorDetailsTitle')}</h4>
         <span className="text-xs text-muted-foreground">
-          {errors.length}件中 {displayErrors.length}件を表示
+          {t('showingErrorsOf', { total: errors.length, shown: displayErrors.length })}
         </span>
       </div>
       <ScrollArea className="h-[200px] rounded-md border">
         <Table>
           <TableHeader className="sticky top-0 bg-background">
             <TableRow>
-              <TableHead className="w-16">行</TableHead>
-              <TableHead className="w-24">フィールド</TableHead>
-              <TableHead>メッセージ</TableHead>
-              <TableHead className="w-24">値</TableHead>
+              <TableHead className="w-16">{t('colRow')}</TableHead>
+              <TableHead className="w-24">{t('colField')}</TableHead>
+              <TableHead>{t('colMessage')}</TableHead>
+              <TableHead className="w-24">{t('colValue')}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -92,7 +103,7 @@ function ErrorTable({ errors }: { errors: ImportErrorUI[] }) {
       </ScrollArea>
       {remaining > 0 && (
         <p className="mt-2 text-center text-xs text-muted-foreground">
-          ...他 {remaining}件のエラー
+          {t('moreErrors', { count: remaining })}
         </p>
       )}
     </div>
@@ -100,6 +111,7 @@ function ErrorTable({ errors }: { errors: ImportErrorUI[] }) {
 }
 
 export function ImportResult({ result }: ImportResultProps) {
+  const t = useTranslations('import')
   const { status, imported, skipped, failed, errors, warnings, totalRows, validRows, durationMs } =
     result
 
@@ -120,11 +132,11 @@ export function ImportResult({ result }: ImportResultProps) {
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
           <div>
-            <CardTitle className="text-lg">インポート結果</CardTitle>
+            <CardTitle className="text-lg">{t('resultTitle')}</CardTitle>
             <CardDescription>
-              {isComplete && 'インポートが正常に完了しました'}
-              {isPartial && '一部のデータをインポートしました'}
-              {isFailed && 'インポートに失敗しました'}
+              {isComplete && t('descCompleted')}
+              {isPartial && t('descPartial')}
+              {isFailed && t('descFailed')}
             </CardDescription>
           </div>
           <StatusBadge status={status} />
@@ -135,28 +147,28 @@ export function ImportResult({ result }: ImportResultProps) {
           <div className="rounded-lg border p-3">
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <FileSpreadsheet className="h-4 w-4" />
-              総件数
+              {t('statTotal')}
             </div>
             <p className="mt-1 text-2xl font-bold">{totalRows}</p>
           </div>
           <div className="rounded-lg border p-3">
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <CheckCircle2 className="h-4 w-4 text-green-500" />
-              成功
+              {t('statImported')}
             </div>
             <p className="mt-1 text-2xl font-bold text-green-600">{imported}</p>
           </div>
           <div className="rounded-lg border p-3">
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <SkipForward className="h-4 w-4 text-yellow-500" />
-              スキップ
+              {t('statSkipped')}
             </div>
             <p className="mt-1 text-2xl font-bold text-yellow-600">{skipped}</p>
           </div>
           <div className="rounded-lg border p-3">
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <XCircle className="h-4 w-4 text-red-500" />
-              失敗
+              {t('statFailed')}
             </div>
             <p className="mt-1 text-2xl font-bold text-red-600">{failed}</p>
           </div>
@@ -164,9 +176,9 @@ export function ImportResult({ result }: ImportResultProps) {
 
         <div className="space-y-2">
           <div className="flex items-center justify-between text-sm">
-            <span>処理進捗</span>
+            <span>{t('progressLabel')}</span>
             <span className="text-muted-foreground">
-              {validRows}/{totalRows} 有効行
+              {t('validRows', { valid: validRows, total: totalRows })}
             </span>
           </div>
           <div
@@ -175,27 +187,27 @@ export function ImportResult({ result }: ImportResultProps) {
             aria-valuenow={validRows}
             aria-valuemin={0}
             aria-valuemax={totalRows}
-            aria-label="インポート処理の進捗"
+            aria-label={t('progressAria')}
           >
             {stats.successRate > 0 && (
               <div
                 className="bg-green-500"
                 style={{ width: `${stats.successRate}%` }}
-                title={`成功: ${imported}`}
+                title={t('tooltipSuccess', { count: imported })}
               />
             )}
             {stats.skipRate > 0 && (
               <div
                 className="bg-yellow-500"
                 style={{ width: `${stats.skipRate}%` }}
-                title={`スキップ: ${skipped}`}
+                title={t('tooltipSkip', { count: skipped })}
               />
             )}
             {stats.failRate > 0 && (
               <div
                 className="bg-red-500"
                 style={{ width: `${stats.failRate}%` }}
-                title={`失敗: ${failed}`}
+                title={t('tooltipFailed', { count: failed })}
               />
             )}
           </div>
@@ -203,39 +215,39 @@ export function ImportResult({ result }: ImportResultProps) {
 
         {durationMs !== undefined && (
           <p className="text-right text-xs text-muted-foreground">
-            処理時間:{' '}
-            {durationMs < 1000 ? `${durationMs}ms` : `${(durationMs / 1000).toFixed(2)}秒`}
+            {t('durationLabel')}
+            {durationMs < 1000
+              ? t('durationMs', { ms: durationMs })
+              : t('durationSeconds', { s: (durationMs / 1000).toFixed(2) })}
           </p>
         )}
 
         {isFailed && errors.length > 0 && (
           <Alert variant="destructive">
             <AlertTriangle className="h-4 w-4" />
-            <AlertTitle>インポートエラー</AlertTitle>
-            <AlertDescription>
-              データのインポート中にエラーが発生しました。エラー内容を確認してください。
-            </AlertDescription>
+            <AlertTitle>{t('failedAlertTitle')}</AlertTitle>
+            <AlertDescription>{t('failedAlertDesc')}</AlertDescription>
           </Alert>
         )}
 
         {isPartial && (
           <Alert>
             <AlertTriangle className="h-4 w-4" />
-            <AlertTitle>部分的な成功</AlertTitle>
-            <AlertDescription>
-              一部のデータは正常にインポートされましたが、{failed}件のエラーがありました。
-            </AlertDescription>
+            <AlertTitle>{t('partialAlertTitle')}</AlertTitle>
+            <AlertDescription>{t('partialAlertDesc', { count: failed })}</AlertDescription>
           </Alert>
         )}
 
         {warnings.length > 0 && (
           <div className="rounded-lg border border-yellow-200 bg-yellow-50 p-3">
-            <h4 className="mb-2 text-sm font-medium text-yellow-800">警告 ({warnings.length}件)</h4>
+            <h4 className="mb-2 text-sm font-medium text-yellow-800">
+              {t('warningsTitle', { count: warnings.length })}
+            </h4>
             <ul className="space-y-1 text-xs text-yellow-700">
               {warnings.slice(0, 5).map((w, idx) => (
                 <li key={idx}>{w}</li>
               ))}
-              {warnings.length > 5 && <li>...他 {warnings.length - 5}件</li>}
+              {warnings.length > 5 && <li>{t('moreCount', { count: warnings.length - 5 })}</li>}
             </ul>
           </div>
         )}
