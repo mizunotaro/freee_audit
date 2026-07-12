@@ -1,4 +1,5 @@
 import { BaseSecretProvider, type AzureKeyVaultConfig, type SecretValue } from '../types'
+import { secureLogger } from '@/lib/utils/secure-logger'
 
 interface AzureKeyVaultClient {
   getSecret(
@@ -59,7 +60,10 @@ export class AzureKeyVaultProvider extends BaseSecretProvider {
         },
       }
     } catch (error) {
-      console.error('Failed to initialize Azure Key Vault client:', error)
+      secureLogger.error('Failed to initialize Azure Key Vault client', {
+        component: 'AzureKeyVaultProvider',
+        error,
+      })
       throw new Error(
         'Azure Key Vault client initialization failed. Install @azure/keyvault-secrets and @azure/identity packages.'
       )
@@ -102,7 +106,11 @@ export class AzureKeyVaultProvider extends BaseSecretProvider {
       if ((error as { statusCode?: number }).statusCode === 404) {
         return null
       }
-      console.error(`Failed to get secret ${name} from Azure Key Vault:`, error)
+      secureLogger.error('Failed to get secret from Azure Key Vault', {
+        component: 'AzureKeyVaultProvider',
+        name,
+        error,
+      })
       throw error
     }
   }
@@ -119,7 +127,10 @@ export class AzureKeyVaultProvider extends BaseSecretProvider {
 
       return names
     } catch (error) {
-      console.error('Failed to list secrets from Azure Key Vault:', error)
+      secureLogger.error('Failed to list secrets from Azure Key Vault', {
+        component: 'AzureKeyVaultProvider',
+        error,
+      })
       throw error
     }
   }

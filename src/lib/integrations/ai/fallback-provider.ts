@@ -9,6 +9,7 @@ import {
 import { DocumentAnalysisResult, EntryValidationResult } from '@/types/audit'
 import { CircuitBreaker, CircuitState } from './circuit-breaker'
 import { DataResidency, filterProvidersBySecurity } from './provider-registry'
+import { secureLogger } from '@/lib/utils/secure-logger'
 
 export type { DataResidency }
 
@@ -214,7 +215,10 @@ export class FallbackAIProvider implements AIProvider {
       for (const { provider, name } of sortedProviders) {
         const circuitBreaker = this.circuitBreakers.get(name)
         if (circuitBreaker && !circuitBreaker.canExecute()) {
-          console.warn(`[AI] ${name} circuit breaker is open, skipping`)
+          secureLogger.warn('Provider circuit breaker is open, skipping', {
+            component: 'FallbackAIProvider',
+            provider: name,
+          })
           continue
         }
 
@@ -226,9 +230,13 @@ export class FallbackAIProvider implements AIProvider {
           this.recordSuccess(name, latency)
           if (circuitBreaker) circuitBreaker.recordSuccess()
 
-          console.log(
-            `[AI] ${operationName} success with ${name}${retry > 0 ? ` (retry ${retry})` : ''} (${latency}ms)`
-          )
+          secureLogger.info('Operation succeeded with provider', {
+            component: 'FallbackAIProvider',
+            operation: operationName,
+            provider: name,
+            attempt: retry,
+            latencyMs: latency,
+          })
           this.currentProviderIndex = this.providers.findIndex((p) => p.name === name)
           return result
         } catch (error) {
@@ -236,10 +244,13 @@ export class FallbackAIProvider implements AIProvider {
           this.recordFailure(name)
           if (circuitBreaker) circuitBreaker.recordFailure()
 
-          console.warn(
-            `[AI] ${name} ${operationName} failed${retry > 0 ? ` (retry ${retry})` : ''}:`,
-            err.message
-          )
+          secureLogger.warn('Provider operation failed', {
+            component: 'FallbackAIProvider',
+            provider: name,
+            operation: operationName,
+            attempt: retry,
+            error: err.message,
+          })
           errors.push({ provider: name, error: err })
           continue
         }
@@ -275,7 +286,12 @@ export class FallbackAIProvider implements AIProvider {
         const circuitBreaker = this.circuitBreakers.get(name)
         if (circuitBreaker) circuitBreaker.recordSuccess()
 
-        console.log(`[AI] ${operationName} success with ${name} (${latency}ms)`)
+        secureLogger.info('Operation succeeded with provider', {
+          component: 'FallbackAIProvider',
+          operation: operationName,
+          provider: name,
+          latencyMs: latency,
+        })
         return { result, name }
       } catch (error) {
         const err = error instanceof Error ? error : new Error(String(error))
@@ -283,7 +299,12 @@ export class FallbackAIProvider implements AIProvider {
         const circuitBreaker = this.circuitBreakers.get(name)
         if (circuitBreaker) circuitBreaker.recordFailure()
 
-        console.warn(`[AI] ${name} ${operationName} failed:`, err.message)
+        secureLogger.warn('Provider operation failed', {
+          component: 'FallbackAIProvider',
+          provider: name,
+          operation: operationName,
+          error: err.message,
+        })
         errors.push({ provider: name, error: err })
         return null
       }

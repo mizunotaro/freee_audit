@@ -1,4 +1,5 @@
 import { BaseSecretProvider, type GCPSecretConfig, type SecretValue } from '../types'
+import { secureLogger } from '@/lib/utils/secure-logger'
 
 interface GCPClient {
   accessSecretVersion(request: { name: string }): Promise<
@@ -43,7 +44,10 @@ export class GCPSecretManagerProvider extends BaseSecretProvider {
 
       return new SecretManagerServiceClient(clientOptions)
     } catch (error) {
-      console.error('Failed to initialize GCP Secret Manager client:', error)
+      secureLogger.error('Failed to initialize GCP Secret Manager client', {
+        component: 'GCPSecretManagerProvider',
+        error,
+      })
       throw new Error(
         'GCP Secret Manager client initialization failed. Install @google-cloud/secret-manager package.'
       )
@@ -87,7 +91,11 @@ export class GCPSecretManagerProvider extends BaseSecretProvider {
       if ((error as { code?: number }).code === 5) {
         return null
       }
-      console.error(`Failed to get secret ${name} from GCP:`, error)
+      secureLogger.error('Failed to get secret from GCP', {
+        component: 'GCPSecretManagerProvider',
+        name,
+        error,
+      })
       throw error
     }
   }
@@ -107,7 +115,10 @@ export class GCPSecretManagerProvider extends BaseSecretProvider {
 
       return names
     } catch (error) {
-      console.error('Failed to list secrets from GCP:', error)
+      secureLogger.error('Failed to list secrets from GCP', {
+        component: 'GCPSecretManagerProvider',
+        error,
+      })
       throw error
     }
   }

@@ -10,6 +10,7 @@ import {
 import { DocumentAnalysisResult, EntryValidationResult, ValidationIssue } from '@/types/audit'
 import { API_TIMEOUTS } from '@/lib/utils/timeout'
 import { getDefaultModel } from '@/lib/ai/config/model-config'
+import { secureLogger } from '@/lib/utils/secure-logger'
 
 export interface OpenRouterOptions {
   referer?: string
@@ -143,10 +144,13 @@ export class OpenAIProvider extends BaseAIProvider {
             retryDelay = Math.min(retryDelay, MAX_RETRY_DELAY_MS)
           }
 
-          console.warn(
-            `[OpenAIProvider] ${operationName} attempt ${attempt + 1} failed, retrying in ${retryDelay}ms:`,
-            errorInfo.message
-          )
+          secureLogger.warn('OpenAI operation failed, retrying', {
+            component: 'OpenAIProvider',
+            operation: operationName,
+            attempt: attempt + 1,
+            retryDelayMs: retryDelay,
+            error: errorInfo.message,
+          })
 
           await delay(retryDelay)
         }

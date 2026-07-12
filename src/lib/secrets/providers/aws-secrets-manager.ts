@@ -1,4 +1,5 @@
 import { BaseSecretProvider, type AWSSecretConfig, type SecretValue } from '../types'
+import { secureLogger } from '@/lib/utils/secure-logger'
 
 interface AWSSecretsClient {
   getSecretValue(params: { SecretId: string; VersionStage?: string }): Promise<{
@@ -73,7 +74,10 @@ export class AWSSecretsManagerProvider extends BaseSecretProvider {
         },
       }
     } catch (error) {
-      console.error('Failed to initialize AWS Secrets Manager client:', error)
+      secureLogger.error('Failed to initialize AWS Secrets Manager client', {
+        component: 'AWSSecretsManagerProvider',
+        error,
+      })
       throw new Error(
         'AWS Secrets Manager client initialization failed. Install @aws-sdk/client-secrets-manager package.'
       )
@@ -121,7 +125,11 @@ export class AWSSecretsManagerProvider extends BaseSecretProvider {
       if ((error as { name?: string }).name === 'ResourceNotFoundException') {
         return null
       }
-      console.error(`Failed to get secret ${name} from AWS:`, error)
+      secureLogger.error('Failed to get secret from AWS', {
+        component: 'AWSSecretsManagerProvider',
+        name,
+        error,
+      })
       throw error
     }
   }
@@ -134,7 +142,10 @@ export class AWSSecretsManagerProvider extends BaseSecretProvider {
       const response = await client.listSecrets({ MaxResults: 100, Filters: filters })
       return response.SecretList.map((s) => s.Name).filter(Boolean)
     } catch (error) {
-      console.error('Failed to list secrets from AWS:', error)
+      secureLogger.error('Failed to list secrets from AWS', {
+        component: 'AWSSecretsManagerProvider',
+        error,
+      })
       throw error
     }
   }

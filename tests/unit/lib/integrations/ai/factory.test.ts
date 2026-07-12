@@ -1,8 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import {
-  createAIProviderFromEnv,
-  createFallbackProviderFromEnv,
-  getAvailableProviders,
   createAIProviderFromConfig,
   createAIProviderWithConfig,
   getAIService,
@@ -10,6 +7,7 @@ import {
   createAIProvider,
 } from '@/lib/integrations/ai/factory'
 import type { AIConfig } from '@/lib/integrations/ai/factory'
+import type { SecureLogger } from '@/lib/utils/secure-logger'
 
 vi.mock('openai', () => ({
   default: class MockOpenAI {
@@ -46,10 +44,12 @@ vi.mock('@google/generative-ai', () => ({
 
 describe('AI Factory - Fallback Integration', () => {
   const originalEnv = { ...process.env }
+  let secureLoggerInstance: SecureLogger
 
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.resetModules()
     vi.clearAllMocks()
+    secureLoggerInstance = (await import('@/lib/utils/secure-logger')).getSecureLogger()
   })
 
   afterEach(() => {
@@ -62,16 +62,22 @@ describe('AI Factory - Fallback Integration', () => {
       process.env.OPENAI_API_KEY = 'test-openai-key'
       process.env.GEMINI_API_KEY = 'test-gemini-key'
 
-      const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
+      const infoSpy = vi.spyOn(secureLoggerInstance, 'info').mockImplementation(() => {})
 
       const { createAIProviderFromEnv: createFromEnv } =
         await import('@/lib/integrations/ai/factory')
       const provider = createFromEnv()
 
       expect(provider).not.toBeNull()
-      expect(consoleLogSpy).toHaveBeenCalledWith('[AI] Fallback provider chain: openai -> gemini')
+      expect(infoSpy).toHaveBeenCalledWith(
+        'Fallback provider chain built',
+        expect.objectContaining({
+          component: 'AIProviderFactory',
+          chain: ['openai', 'gemini'],
+        })
+      )
 
-      consoleLogSpy.mockRestore()
+      infoSpy.mockRestore()
     })
 
     it('should skip providers without API keys', async () => {
@@ -80,19 +86,25 @@ describe('AI Factory - Fallback Integration', () => {
       process.env.GEMINI_API_KEY = undefined
       process.env.ANTHROPIC_API_KEY = 'test-claude-key'
 
-      const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
-      const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
+      const warnSpy = vi.spyOn(secureLoggerInstance, 'warn').mockImplementation(() => {})
+      const infoSpy = vi.spyOn(secureLoggerInstance, 'info').mockImplementation(() => {})
 
       const { createAIProviderFromEnv: createFromEnv } =
         await import('@/lib/integrations/ai/factory')
       const provider = createFromEnv()
 
       expect(provider).not.toBeNull()
-      expect(consoleWarnSpy).toHaveBeenCalledWith('[AI] Missing API key for gemini, skipping')
-      expect(consoleLogSpy).toHaveBeenCalledWith('[AI] Fallback provider chain: openai -> claude')
+      expect(warnSpy).toHaveBeenCalledWith(
+        'Missing API key for provider, skipping',
+        expect.objectContaining({ component: 'AIProviderFactory', provider: 'gemini' })
+      )
+      expect(infoSpy).toHaveBeenCalledWith(
+        'Fallback provider chain built',
+        expect.objectContaining({ component: 'AIProviderFactory', chain: ['openai', 'claude'] })
+      )
 
-      consoleWarnSpy.mockRestore()
-      consoleLogSpy.mockRestore()
+      warnSpy.mockRestore()
+      infoSpy.mockRestore()
     })
 
     it('should return null when no providers have API keys', async () => {
@@ -100,34 +112,38 @@ describe('AI Factory - Fallback Integration', () => {
       process.env.OPENAI_API_KEY = undefined
       process.env.GEMINI_API_KEY = undefined
 
-      const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+      const warnSpy = vi.spyOn(secureLoggerInstance, 'warn').mockImplementation(() => {})
 
       const { createAIProviderFromEnv: createFromEnv } =
         await import('@/lib/integrations/ai/factory')
       const provider = createFromEnv()
 
       expect(provider).toBeNull()
-      expect(consoleWarnSpy).toHaveBeenCalledWith('[AI] No providers available with valid API keys')
+      expect(warnSpy).toHaveBeenCalledWith(
+        'No providers available with valid API keys',
+        expect.objectContaining({ component: 'AIProviderFactory' })
+      )
 
-      consoleWarnSpy.mockRestore()
+      warnSpy.mockRestore()
     })
 
     it('should ignore invalid provider names', async () => {
       process.env.AI_PROVIDERS = 'invalid,openai,unknown'
       process.env.OPENAI_API_KEY = 'test-openai-key'
 
-      const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
-      const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
+      const infoSpy = vi.spyOn(secureLoggerInstance, 'info').mockImplementation(() => {})
 
       const { createAIProviderFromEnv: createFromEnv } =
         await import('@/lib/integrations/ai/factory')
       const provider = createFromEnv()
 
       expect(provider).not.toBeNull()
-      expect(consoleLogSpy).toHaveBeenCalledWith('[AI] Fallback provider chain: openai')
+      expect(infoSpy).toHaveBeenCalledWith(
+        'Fallback provider chain built',
+        expect.objectContaining({ component: 'AIProviderFactory', chain: ['openai'] })
+      )
 
-      consoleWarnSpy.mockRestore()
-      consoleLogSpy.mockRestore()
+      infoSpy.mockRestore()
     })
 
     it('should use AI_TIMEOUT and AI_RETRIES from environment', async () => {
@@ -148,18 +164,19 @@ describe('AI Factory - Fallback Integration', () => {
     it('should return null when no valid providers specified', async () => {
       process.env.AI_PROVIDERS = 'invalid,unknown'
 
-      const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+      const warnSpy = vi.spyOn(secureLoggerInstance, 'warn').mockImplementation(() => {})
 
       const { createFallbackProviderFromEnv: createFallback } =
         await import('@/lib/integrations/ai/factory')
       const provider = createFallback('invalid,unknown')
 
       expect(provider).toBeNull()
-      expect(consoleWarnSpy).toHaveBeenCalledWith(
-        '[AI] No valid providers specified in AI_PROVIDERS'
+      expect(warnSpy).toHaveBeenCalledWith(
+        'No valid providers specified in AI_PROVIDERS',
+        expect.objectContaining({ component: 'AIProviderFactory' })
       )
 
-      consoleWarnSpy.mockRestore()
+      warnSpy.mockRestore()
     })
 
     it('should handle empty provider string', async () => {
@@ -175,32 +192,38 @@ describe('AI Factory - Fallback Integration', () => {
       process.env.OPENAI_API_KEY = 'test-openai-key'
       process.env.GEMINI_API_KEY = 'test-gemini-key'
 
-      const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
+      const infoSpy = vi.spyOn(secureLoggerInstance, 'info').mockImplementation(() => {})
 
       const { createFallbackProviderFromEnv: createFallback } =
         await import('@/lib/integrations/ai/factory')
       const provider = createFallback(' openai , gemini ')
 
       expect(provider).not.toBeNull()
-      expect(consoleLogSpy).toHaveBeenCalledWith('[AI] Fallback provider chain: openai -> gemini')
+      expect(infoSpy).toHaveBeenCalledWith(
+        'Fallback provider chain built',
+        expect.objectContaining({ component: 'AIProviderFactory', chain: ['openai', 'gemini'] })
+      )
 
-      consoleLogSpy.mockRestore()
+      infoSpy.mockRestore()
     })
 
     it('should respect case-insensitive provider names', async () => {
       process.env.OPENAI_API_KEY = 'test-openai-key'
       process.env.GEMINI_API_KEY = 'test-gemini-key'
 
-      const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
+      const infoSpy = vi.spyOn(secureLoggerInstance, 'info').mockImplementation(() => {})
 
       const { createFallbackProviderFromEnv: createFallback } =
         await import('@/lib/integrations/ai/factory')
       const provider = createFallback('OpenAI,GEMINI')
 
       expect(provider).not.toBeNull()
-      expect(consoleLogSpy).toHaveBeenCalledWith('[AI] Fallback provider chain: openai -> gemini')
+      expect(infoSpy).toHaveBeenCalledWith(
+        'Fallback provider chain built',
+        expect.objectContaining({ component: 'AIProviderFactory', chain: ['openai', 'gemini'] })
+      )
 
-      consoleLogSpy.mockRestore()
+      infoSpy.mockRestore()
     })
   })
 
@@ -235,16 +258,19 @@ describe('AI Factory - Fallback Integration', () => {
       process.env.AI_MOCK_MODE = 'true'
       process.env.AI_PROVIDERS = 'openai,gemini'
 
-      const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
+      const infoSpy = vi.spyOn(secureLoggerInstance, 'info').mockImplementation(() => {})
 
       const { createAIProviderFromEnv: createFromEnv } =
         await import('@/lib/integrations/ai/factory')
       const provider = createFromEnv()
 
       expect(provider).not.toBeNull()
-      expect(consoleLogSpy).toHaveBeenCalledWith('[AI] Running in mock mode')
+      expect(infoSpy).toHaveBeenCalledWith(
+        'AI provider running in mock mode',
+        expect.objectContaining({ component: 'AIProviderFactory' })
+      )
 
-      consoleLogSpy.mockRestore()
+      infoSpy.mockRestore()
     })
   })
 
@@ -316,14 +342,18 @@ describe('AI Factory - Fallback Integration', () => {
 
     it('should return mock provider when AI_MOCK_MODE is true', async () => {
       process.env.AI_MOCK_MODE = 'true'
-      const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
+      const { createAIProviderFromConfig } = await import('@/lib/integrations/ai/factory')
+      const infoSpy = vi.spyOn(secureLoggerInstance, 'info').mockImplementation(() => {})
 
       const provider = await createAIProviderFromConfig('openai')
 
       expect(provider).not.toBeNull()
-      expect(consoleLogSpy).toHaveBeenCalledWith('[AI] Running in mock mode')
+      expect(infoSpy).toHaveBeenCalledWith(
+        'AI provider running in mock mode',
+        expect.objectContaining({ component: 'AIProviderFactory' })
+      )
 
-      consoleLogSpy.mockRestore()
+      infoSpy.mockRestore()
     })
   })
 
@@ -341,7 +371,8 @@ describe('AI Factory - Fallback Integration', () => {
 
     it('should return mock provider and config when AI_MOCK_MODE is true', async () => {
       process.env.AI_MOCK_MODE = 'true'
-      const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
+      const { createAIProviderWithConfig } = await import('@/lib/integrations/ai/factory')
+      const infoSpy = vi.spyOn(secureLoggerInstance, 'info').mockImplementation(() => {})
 
       const result = await createAIProviderWithConfig('openai')
 
@@ -349,9 +380,12 @@ describe('AI Factory - Fallback Integration', () => {
       expect(result?.provider).toBeDefined()
       expect(result?.config).toBeDefined()
       expect(result?.config.provider).toBe('openai')
-      expect(consoleLogSpy).toHaveBeenCalledWith('[AI] Running in mock mode')
+      expect(infoSpy).toHaveBeenCalledWith(
+        'AI provider running in mock mode',
+        expect.objectContaining({ component: 'AIProviderFactory' })
+      )
 
-      consoleLogSpy.mockRestore()
+      infoSpy.mockRestore()
     })
   })
 

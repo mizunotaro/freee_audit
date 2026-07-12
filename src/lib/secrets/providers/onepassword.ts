@@ -1,4 +1,5 @@
 import { BaseSecretProvider, type OnePasswordConfig, type SecretValue } from '../types'
+import { secureLogger } from '@/lib/utils/secure-logger'
 
 interface OnePasswordItem {
   id: string
@@ -132,7 +133,11 @@ export class OnePasswordProvider extends BaseSecretProvider {
       if ((error as Error).message.includes('not found')) {
         return null
       }
-      console.error(`Failed to get secret ${name} from 1Password:`, error)
+      secureLogger.error('Failed to get secret from 1Password', {
+        component: 'OnePasswordProvider',
+        name,
+        error,
+      })
       throw error
     }
   }
@@ -150,7 +155,10 @@ export class OnePasswordProvider extends BaseSecretProvider {
 
       return names
     } catch (error) {
-      console.error('Failed to list secrets from 1Password:', error)
+      secureLogger.error('Failed to list secrets from 1Password', {
+        component: 'OnePasswordProvider',
+        error,
+      })
       throw error
     }
   }

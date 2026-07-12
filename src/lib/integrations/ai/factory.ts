@@ -14,6 +14,7 @@ import { providerRegistry } from '@/lib/ai/providers/registry'
 import { getModelConfigService } from '@/lib/ai/config/model-config'
 import { apiKeyService } from '@/services/secrets/api-key-service'
 import { OPENAI_COMPATIBLE_CONFIGS } from '@/lib/ai/config/defaults'
+import { secureLogger } from '@/lib/utils/secure-logger'
 import type { ResolvedConfig, OpenAICompatibleProviderType } from '@/lib/ai/config/types'
 import './register-providers'
 
@@ -91,7 +92,7 @@ export function createAIProvider(config: AIConfig): AIProvider {
 
 export function createAIProviderFromEnv(provider?: AIProviderType): AIProvider | null {
   if (process.env.AI_MOCK_MODE === 'true') {
-    console.log('[AI] Running in mock mode')
+    secureLogger.info('AI provider running in mock mode', { component: 'AIProviderFactory' })
     return createMockAIProvider({
       provider: provider || 'openai',
       apiKey: 'mock-api-key',
@@ -108,7 +109,11 @@ export function createAIProviderFromEnv(provider?: AIProviderType): AIProvider |
 
   const apiKey = process.env[envConfig.keyEnv]
   if (!apiKey) {
-    console.warn(`Missing API key for provider ${providerType}: ${envConfig.keyEnv}`)
+    secureLogger.warn('Missing API key for provider', {
+      component: 'AIProviderFactory',
+      provider: providerType,
+      keyEnv: envConfig.keyEnv,
+    })
     return null
   }
 
@@ -142,7 +147,9 @@ export function createFallbackProviderFromEnv(providersEnv: string): FallbackAIP
     .filter((p) => validProviders.includes(p))
 
   if (providerNames.length === 0) {
-    console.warn('[AI] No valid providers specified in AI_PROVIDERS')
+    secureLogger.warn('No valid providers specified in AI_PROVIDERS', {
+      component: 'AIProviderFactory',
+    })
     return null
   }
 
@@ -153,7 +160,10 @@ export function createFallbackProviderFromEnv(providersEnv: string): FallbackAIP
     const apiKey = process.env[envConfig.keyEnv]
 
     if (!apiKey) {
-      console.warn(`[AI] Missing API key for ${providerName}, skipping`)
+      secureLogger.warn('Missing API key for provider, skipping', {
+        component: 'AIProviderFactory',
+        provider: providerName,
+      })
       continue
     }
 
@@ -169,15 +179,23 @@ export function createFallbackProviderFromEnv(providersEnv: string): FallbackAIP
       provider: createAIProvider(config),
       name: providerName,
     })
-    console.log(`[AI] Provider ${providerName} added to fallback chain`)
+    secureLogger.info('Provider added to fallback chain', {
+      component: 'AIProviderFactory',
+      provider: providerName,
+    })
   }
 
   if (providers.length === 0) {
-    console.warn('[AI] No providers available with valid API keys')
+    secureLogger.warn('No providers available with valid API keys', {
+      component: 'AIProviderFactory',
+    })
     return null
   }
 
-  console.log(`[AI] Fallback provider chain: ${providers.map((p) => p.name).join(' -> ')}`)
+  secureLogger.info('Fallback provider chain built', {
+    component: 'AIProviderFactory',
+    chain: providers.map((p) => p.name),
+  })
 
   return createFallbackProvider({
     providers,
@@ -203,7 +221,7 @@ export async function createAIProviderFromConfig(
   options?: { userId?: string; companyId?: string }
 ): Promise<AIProvider | null> {
   if (process.env.AI_MOCK_MODE === 'true') {
-    console.log('[AI] Running in mock mode')
+    secureLogger.info('AI provider running in mock mode', { component: 'AIProviderFactory' })
     return createMockAIProvider({
       provider: provider || 'openai',
       apiKey: 'mock-api-key',
@@ -214,7 +232,10 @@ export async function createAIProviderFromConfig(
 
   const keyConfig = await apiKeyService.getAPIKey(providerType, options)
   if (!keyConfig) {
-    console.warn(`[AI] No API key found for provider ${providerType}`)
+    secureLogger.warn('No API key found for provider', {
+      component: 'AIProviderFactory',
+      provider: providerType,
+    })
     return null
   }
 
@@ -237,7 +258,7 @@ export async function createAIProviderWithConfig(
   options?: { userId?: string; companyId?: string }
 ): Promise<{ provider: AIProvider; config: ResolvedConfig } | null> {
   if (process.env.AI_MOCK_MODE === 'true') {
-    console.log('[AI] Running in mock mode')
+    secureLogger.info('AI provider running in mock mode', { component: 'AIProviderFactory' })
     const mockProvider = createMockAIProvider({
       provider,
       apiKey: 'mock-api-key',
@@ -256,7 +277,10 @@ export async function createAIProviderWithConfig(
 
   const keyConfig = await apiKeyService.getAPIKey(provider, options)
   if (!keyConfig) {
-    console.warn(`[AI] No API key found for provider ${provider}`)
+    secureLogger.warn('No API key found for provider', {
+      component: 'AIProviderFactory',
+      provider,
+    })
     return null
   }
 

@@ -15,6 +15,7 @@ import { ClaudeProvider } from './claude'
 import { GeminiProvider } from './gemini'
 import { OpenRouterProvider, OpenRouterProviderConfig } from './openrouter'
 import type { AIConfig } from './provider'
+import { secureLogger } from '@/lib/utils/secure-logger'
 
 const OPENAI_METADATA: ProviderMetadata = {
   name: 'openai',
@@ -446,7 +447,10 @@ export function registerProviders(): void {
   providerRegistry.register(OPENROUTER_METADATA, openrouterFactory, getProviderModels('openrouter'))
 
   registered = true
-  console.log('[AI] Providers registered: openai, claude, gemini, openrouter')
+  secureLogger.info('Providers registered', {
+    component: 'AIProviderRegistry',
+    providers: ['openai', 'claude', 'gemini', 'openrouter'],
+  })
 }
 
 export function isProvidersRegistered(): boolean {

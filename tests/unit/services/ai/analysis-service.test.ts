@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { analyzeFinancialData, analyzeJournalEntry } from '@/services/ai/analysis-service'
 import type { BalanceSheet, ProfitLoss, CashFlowStatement, FinancialKPIs } from '@/types'
+import { getSecureLogger } from '@/lib/utils/secure-logger'
 
 vi.mock('@/integrations/freee/client', () => ({
   freeeClient: {
@@ -488,6 +489,31 @@ describe('AIAnalysisService', () => {
       })
 
       expect(result).toBeDefined()
+    })
+  })
+
+  describe('structured logging', () => {
+    it('should log via secureLogger when LLM analysis fails and fall back to mock', async () => {
+      const originalMockMode = process.env.AI_MOCK_MODE
+      delete process.env.AI_MOCK_MODE
+      const errorSpy = vi.spyOn(getSecureLogger(), 'error').mockImplementation(() => {})
+      const fetchSpy = vi.spyOn(global, 'fetch').mockRejectedValue(new Error('Network down'))
+
+      const result = await analyzeFinancialData(mockBS, mockPL, mockCF, mockKPIs, {
+        provider: 'openai',
+        apiKey: 'test-key',
+      })
+
+      expect(result).toBeDefined()
+      expect(result.summary).toBeDefined()
+      expect(errorSpy).toHaveBeenCalledWith(
+        'LLM analysis failed',
+        expect.objectContaining({ component: 'AnalysisService', provider: 'openai' })
+      )
+
+      fetchSpy.mockRestore()
+      errorSpy.mockRestore()
+      process.env.AI_MOCK_MODE = originalMockMode
     })
   })
 })

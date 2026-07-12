@@ -14,6 +14,7 @@ import { GCPSecretManagerProvider } from './providers/gcp-secret-manager'
 import { AWSSecretsManagerProvider } from './providers/aws-secrets-manager'
 import { AzureKeyVaultProvider } from './providers/azure-keyvault'
 import { OnePasswordProvider } from './providers/onepassword'
+import { secureLogger } from '@/lib/utils/secure-logger'
 
 export * from './types'
 
@@ -232,7 +233,11 @@ export class LocalSecretProvider extends BaseSecretProvider {
         }
       }
     } catch (error) {
-      console.error('Failed to load local secrets:', error)
+      secureLogger.error('Failed to load local secrets', {
+        component: 'LocalSecretProvider',
+        path: secretsPath,
+        error,
+      })
     }
   }
 
