@@ -98,6 +98,7 @@ export function IRReportEditor({
   const [isSaving, setIsSaving] = React.useState(false)
   const [lastSaved, setLastSaved] = React.useState<Date | null>(null)
   const [hasUnsavedChanges, setHasUnsavedChanges] = React.useState(false)
+  const [actionError, setActionError] = React.useState<string | null>(null)
   const saveTimeoutRef = React.useRef<NodeJS.Timeout | null>(null)
 
   const sections =
@@ -130,7 +131,10 @@ export function IRReportEditor({
   const handleSave = async (isAutoSave = false) => {
     if (isAutoSave && !hasUnsavedChanges) return
 
-    if (!isAutoSave) setIsSaving(true)
+    if (!isAutoSave) {
+      setIsSaving(true)
+      setActionError(null)
+    }
 
     try {
       await onSave?.(report)
@@ -138,16 +142,19 @@ export function IRReportEditor({
       setHasUnsavedChanges(false)
     } catch (error) {
       console.error('Save failed:', error)
+      if (!isAutoSave) setActionError('保存に失敗しました')
     } finally {
       if (!isAutoSave) setIsSaving(false)
     }
   }
 
   const handlePublish = async () => {
+    setActionError(null)
     try {
       await onPublish?.(report)
     } catch (error) {
       console.error('Publish failed:', error)
+      setActionError('公開に失敗しました')
     }
   }
 
@@ -166,8 +173,8 @@ export function IRReportEditor({
       <div className="flex items-center justify-between border-b p-4">
         <div className="flex items-center gap-4">
           {onBack && (
-            <Button variant="ghost" size="icon" onClick={onBack}>
-              <ArrowLeft className="h-4 w-4" />
+            <Button variant="ghost" size="icon" onClick={onBack} aria-label="戻る">
+              <ArrowLeft className="h-4 w-4" aria-hidden="true" />
             </Button>
           )}
           <div>
@@ -213,6 +220,12 @@ export function IRReportEditor({
           )}
         </div>
       </div>
+
+      {actionError && (
+        <div role="alert" className="border-b bg-destructive/10 px-4 py-2 text-sm text-destructive">
+          {actionError}
+        </div>
+      )}
 
       <Tabs
         value={activeTab}

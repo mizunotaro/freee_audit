@@ -85,44 +85,48 @@ export function RunwayScenarioChart({
   }
 
   const points = buildPoints(runway as RunwayData, currentCash)
+  const scenarios = (runway as RunwayData).scenarios
+  const summary = `楽観 ${scenarios.optimistic.runwayMonths}ヶ月, 現実 ${scenarios.realistic.runwayMonths}ヶ月, 悲観 ${scenarios.pessimistic.runwayMonths}ヶ月`
 
   return (
-    <ResponsiveContainer width="100%" height={height}>
-      <ComposedChart data={points} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
-        <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-        <XAxis dataKey="month" tick={{ fontSize: 11 }} stroke="#6b7280" />
-        <YAxis
-          tickFormatter={(value) => `¥${(value / 1000000).toFixed(0)}M`}
-          tick={{ fontSize: 12 }}
-          stroke="#6b7280"
-        />
-        <Tooltip
-          formatter={(value, name) => {
-            if (Array.isArray(value)) {
-              return [
-                `${formatCurrency(Number(value[0]))} – ${formatCurrency(Number(value[1]))}`,
-                name,
-              ]
-            }
-            return [formatCurrency(Number(value)), name]
-          }}
-          contentStyle={{
-            backgroundColor: 'white',
-            border: '1px solid #e5e7eb',
-            borderRadius: '8px',
-          }}
-        />
-        <Legend />
-        <ReferenceLine y={0} stroke="#ef4444" strokeDasharray="4 4" />
-        <Area dataKey="band" name="予測レンジ" stroke="#93c5fd" fill="#dbeafe" strokeWidth={0} />
-        <Line
-          dataKey="realistic"
-          name="現実シナリオ"
-          stroke="#3b82f6"
-          strokeWidth={2}
-          dot={false}
-        />
-      </ComposedChart>
-    </ResponsiveContainer>
+    <div role="img" aria-label={`ランウェイシナリオ予測: ${summary}`}>
+      <ResponsiveContainer width="100%" height={height}>
+        <ComposedChart data={points} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+          <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+          <XAxis dataKey="month" tick={{ fontSize: 11 }} stroke="#6b7280" />
+          <YAxis
+            tickFormatter={(value) => `¥${(value / 1000000).toFixed(0)}M`}
+            tick={{ fontSize: 12 }}
+            stroke="#6b7280"
+          />
+          <Tooltip
+            formatter={(value, name) => {
+              if (Array.isArray(value)) {
+                return [
+                  `${formatCurrency(Number(value[0]))} – ${formatCurrency(Number(value[1]))}`,
+                  name,
+                ]
+              }
+              return [formatCurrency(Number(value)), name]
+            }}
+            contentStyle={{
+              backgroundColor: 'white',
+              border: '1px solid #e5e7eb',
+              borderRadius: '8px',
+            }}
+          />
+          <Legend />
+          <ReferenceLine y={0} stroke="#ef4444" strokeDasharray="4 4" />
+          <Area dataKey="band" name="予測レンジ" stroke="#93c5fd" fill="#dbeafe" strokeWidth={0} />
+          <Line
+            dataKey="realistic"
+            name="現実シナリオ"
+            stroke="#3b82f6"
+            strokeWidth={2}
+            dot={false}
+          />
+        </ComposedChart>
+      </ResponsiveContainer>
+    </div>
   )
 }

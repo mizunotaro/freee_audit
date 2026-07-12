@@ -90,3 +90,29 @@ describe('IRReportList', () => {
     }
   })
 })
+
+describe('IRReportList — accessibility', () => {
+  it('announces the loading state via role=status', () => {
+    render(<IRReportList reports={[]} isLoading />)
+
+    const status = screen.getByRole('status')
+    expect(status).toHaveAttribute('aria-busy', 'true')
+    expect(status).toHaveTextContent(/読み込み中/)
+  })
+
+  it('labels the search input', () => {
+    render(<IRReportList reports={[mockReport]} />)
+
+    expect(screen.getByRole('textbox', { name: 'レポートを検索' })).toBeInTheDocument()
+  })
+
+  it('labels the filter selects and the per-row action menu trigger', () => {
+    const { container } = render(<IRReportList reports={[mockReport]} />)
+
+    expect(container.querySelector('[aria-label="ステータスで絞り込み"]')).not.toBeNull()
+    expect(container.querySelector('[aria-label="言語で絞り込み"]')).not.toBeNull()
+    expect(
+      screen.getByRole('button', { name: `「${mockReport.title.ja}」の操作メニュー` })
+    ).toBeInTheDocument()
+  })
+})

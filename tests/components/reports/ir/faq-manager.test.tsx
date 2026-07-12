@@ -24,7 +24,7 @@ function getRow(text: string): HTMLElement {
 }
 
 function getRowButtons(text: string): HTMLElement[] {
-  return Array.from(getRow(text).querySelectorAll('button'))
+  return Array.from(getRow(text).querySelectorAll('button:not([aria-expanded])'))
 }
 
 describe('FAQManager', () => {
@@ -105,7 +105,7 @@ describe('FAQManager', () => {
 
       const { container } = render(<FAQManager faqs={[faq]} onChange={mockOnChange} readOnly />)
 
-      expect(container.querySelector('button')).toBeNull()
+      expect(container.querySelector('button:not([aria-expanded])')).toBeNull()
     })
 
     it('reveals the answer when a row is expanded', () => {
@@ -379,6 +379,54 @@ describe('FAQManager', () => {
       expect(screen.getByPlaceholderText('Enter question in English')).toBeInTheDocument()
       expect(screen.getByPlaceholderText('回答を入力')).toBeInTheDocument()
       expect(screen.getByPlaceholderText('Enter answer in English')).toBeInTheDocument()
+    })
+  })
+
+  describe('accessibility (disclosure)', () => {
+    it('renders the question header as a disclosure button wired to its panel', () => {
+      const faq = makeFAQ({ id: 'f1', question: { ja: '質問A', en: 'Q' }, order: 0 })
+      render(<FAQManager faqs={[faq]} onChange={mockOnChange} />)
+
+      const trigger = screen.getByRole('button', { name: '質問A' })
+      expect(trigger).toHaveAttribute('aria-expanded', 'false')
+      expect(trigger).toHaveAttribute('aria-controls', 'faq-panel-f1')
+      expect(trigger).toHaveAttribute('id', 'faq-trigger-f1')
+    })
+
+    it('toggles aria-expanded and reveals the labelled panel on click', () => {
+      const faq = makeFAQ({ id: 'f1', question: { ja: '質問A', en: 'Q' }, order: 0 })
+      render(<FAQManager faqs={[faq]} onChange={mockOnChange} />)
+
+      const trigger = screen.getByRole('button', { name: '質問A' })
+      expect(screen.queryByRole('region')).not.toBeInTheDocument()
+
+      fireEvent.click(trigger)
+
+      expect(trigger).toHaveAttribute('aria-expanded', 'true')
+      const panel = screen.getByRole('region')
+      expect(panel).toHaveAttribute('id', 'faq-panel-f1')
+      expect(panel).toHaveAttribute('aria-labelledby', 'faq-trigger-f1')
+    })
+
+    it('gives the icon-only action buttons accessible names', () => {
+      const faq = makeFAQ({ id: 'f1', question: { ja: '質問A', en: 'Q' }, order: 0 })
+      render(<FAQManager faqs={[faq]} onChange={mockOnChange} />)
+
+      const [up, down, del] = getRowButtons('質問A')
+      expect(up).toHaveAttribute('aria-label', '上に移動')
+      expect(down).toHaveAttribute('aria-label', '下に移動')
+      expect(del).toHaveAttribute('aria-label', '削除')
+    })
+
+    it('keeps the disclosure button but drops action buttons in read-only mode', () => {
+      const faq = makeFAQ({ id: 'f1', question: { ja: '質問A', en: 'Q' }, order: 0 })
+      render(<FAQManager faqs={[faq]} onChange={mockOnChange} readOnly />)
+
+      expect(screen.getByRole('button', { name: '質問A' })).toHaveAttribute(
+        'aria-expanded',
+        'false'
+      )
+      expect(screen.queryByRole('button', { name: '削除' })).not.toBeInTheDocument()
     })
   })
 })

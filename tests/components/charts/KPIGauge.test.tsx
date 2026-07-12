@@ -206,3 +206,44 @@ describe('KPICard', () => {
     expect(container.textContent).toContain('前期比')
   })
 })
+
+describe('KPIGauge — accessibility', () => {
+  beforeEach(reset)
+
+  it('gives the gauge a role=img text alternative', () => {
+    const { getByRole } = render(<KPIGauge value={80} target={100} label="ROE" />)
+
+    expect(getByRole('img', { name: 'ROEのゲージ' })).toBeInTheDocument()
+  })
+
+  it('gives the ring a role=img text alternative', () => {
+    const { getByRole } = render(<KPIRing value={50} max={100} label="完了" />)
+
+    expect(getByRole('img', { name: '完了のリング' })).toBeInTheDocument()
+  })
+
+  it('exposes the bar as a progressbar capped at 100', () => {
+    const { getByRole } = render(<KPIBar label="成長率" value={200} target={100} />)
+
+    const bar = getByRole('progressbar', { name: '成長率' })
+    expect(bar).toHaveAttribute('aria-valuenow', '100')
+    expect(bar).toHaveAttribute('aria-valuemin', '0')
+    expect(bar).toHaveAttribute('aria-valuemax', '100')
+  })
+
+  it('announces an upward trend via an sr-only label', () => {
+    const { container } = render(
+      <KPICard title="利益" value={150} previousValue={100} trend="up" />
+    )
+
+    expect(container.querySelector('.sr-only')).toHaveTextContent('上昇')
+  })
+
+  it('announces a downward trend via an sr-only label', () => {
+    const { container } = render(
+      <KPICard title="費用" value={80} previousValue={100} trend="down" />
+    )
+
+    expect(container.querySelector('.sr-only')).toHaveTextContent('下降')
+  })
+})

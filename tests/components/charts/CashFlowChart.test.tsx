@@ -212,3 +212,17 @@ describe('CashFlowWaterfallChart', () => {
     expect(capture.data).toBeNull()
   })
 })
+
+describe('CashFlowChart — accessibility', () => {
+  it('exposes the composed chart as role=img with a text-alternative label', () => {
+    render(<CashFlowChart data={sampleCashFlow} />)
+
+    expect(screen.getByRole('img', { name: /キャッシュフローチャート/ })).toBeInTheDocument()
+  })
+
+  it('exposes the waterfall chart as role=img with a text-alternative label', () => {
+    render(<CashFlowWaterfallChart data={waterfallData} />)
+
+    expect(screen.getByRole('img', { name: /ウォーターフォール/ })).toBeInTheDocument()
+  })
+})

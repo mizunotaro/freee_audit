@@ -150,3 +150,11 @@ describe('VarianceBridgeChart', () => {
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   })
 })
+
+describe('VarianceBridgeChart — accessibility', () => {
+  it('exposes the chart as role=img with a text-alternative label', () => {
+    render(<VarianceBridgeChart bridge={sampleBridge} />)
+
+    expect(screen.getByRole('img', { name: /差異ブリッジチャート/ })).toBeInTheDocument()
+  })
+})

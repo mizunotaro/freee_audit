@@ -132,3 +132,11 @@ describe('MonthlyTrendChart', () => {
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   })
 })
+
+describe('MonthlyTrendChart — accessibility', () => {
+  it('exposes the chart as role=img with a text-alternative label', () => {
+    render(<MonthlyTrendChart data={sampleTrend} />)
+
+    expect(screen.getByRole('img', { name: /月次トレンドチャート/ })).toBeInTheDocument()
+  })
+})

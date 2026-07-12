@@ -183,7 +183,11 @@ export function IRSectionEditor({
             </div>
           )}
         </div>
-        {aiState.error && <p className="mt-2 text-sm text-destructive">{aiState.error}</p>}
+        {aiState.error && (
+          <p className="mt-2 text-sm text-destructive" role="alert">
+            {aiState.error}
+          </p>
+        )}
       </CardHeader>
       <CardContent>
         {showPreview ? (
@@ -212,7 +216,7 @@ export function IRSectionEditor({
           />
         )}
         {aiState.isGenerating && (
-          <div className="mt-4 space-y-2">
+          <div className="mt-4 space-y-2" role="status" aria-busy="true" aria-label="AI生成中">
             <Skeleton className="h-4 w-full" />
             <Skeleton className="h-4 w-3/4" />
             <Skeleton className="h-4 w-1/2" />

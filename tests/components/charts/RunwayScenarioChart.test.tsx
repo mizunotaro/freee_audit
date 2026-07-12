@@ -141,3 +141,11 @@ describe('RunwayScenarioChart', () => {
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   })
 })
+
+describe('RunwayScenarioChart — accessibility', () => {
+  it('exposes the chart as role=img with a text-alternative label', () => {
+    render(<RunwayScenarioChart runway={sampleRunway} currentCash={CURRENT_CASH} />)
+
+    expect(screen.getByRole('img', { name: /ランウェイシナリオ予測/ })).toBeInTheDocument()
+  })
+})

@@ -79,4 +79,10 @@ describe('FinancialHighlightsChart', () => {
 
     expect(screen.getByText('Financial Highlights')).toBeInTheDocument()
   })
+
+  it('exposes each revenue bar as role=img with a text-alternative label', () => {
+    render(<FinancialHighlightsChart highlights={mockHighlights} />)
+
+    expect(screen.getByRole('img', { name: '2024の売上' })).toBeInTheDocument()
+  })
 })

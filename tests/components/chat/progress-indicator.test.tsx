@@ -101,4 +101,14 @@ describe('chat/progress-indicator — ProgressIndicator', () => {
     expect(bar).toHaveAttribute('aria-valuemax', '100')
     expect(bar).toHaveAttribute('aria-label', '分析中')
   })
+
+  it('announces the processing region via role=status (aria-live)', () => {
+    const { getByRole } = render(
+      <ProgressIndicator progress={progressState('analyzing')} showPersonaAnimation={false} />
+    )
+
+    const status = getByRole('status')
+    expect(status).toHaveAttribute('aria-live', 'polite')
+    expect(status).toHaveAttribute('aria-label', '分析中')
+  })
 })

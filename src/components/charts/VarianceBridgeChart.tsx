@@ -109,32 +109,41 @@ export function VarianceBridgeChart({
   }
 
   const rows = buildRows(bridge as VarianceBridge)
+  const bridgeData = bridge as VarianceBridge
+  const summary = `${bridgeData.startLabel}: ${formatCurrency(bridgeData.start)} → ${bridgeData.endLabel}: ${formatCurrency(bridgeData.end)}`
 
   return (
-    <ResponsiveContainer width="100%" height={height}>
-      <BarChart data={rows} layout="vertical" margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
-        <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" horizontal={false} vertical={true} />
-        <XAxis
-          type="number"
-          tickFormatter={(value) => `¥${(value / 1000000).toFixed(0)}M`}
-          tick={{ fontSize: 12 }}
-          stroke="#6b7280"
-        />
-        <YAxis
-          type="category"
-          dataKey="name"
-          tick={{ fontSize: 11 }}
-          stroke="#6b7280"
-          width={110}
-        />
-        <Tooltip content={<BridgeTooltip />} />
-        <Bar dataKey="base" stackId="bridge" fill="transparent" />
-        <Bar dataKey="value" stackId="bridge" radius={[0, 4, 4, 0]}>
-          {rows.map((row, index) => (
-            <Cell key={`cell-${index}`} fill={colorFor(row.kind)} />
-          ))}
-        </Bar>
-      </BarChart>
-    </ResponsiveContainer>
+    <div role="img" aria-label={`差異ブリッジチャート: ${summary}`}>
+      <ResponsiveContainer width="100%" height={height}>
+        <BarChart data={rows} layout="vertical" margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+          <CartesianGrid
+            strokeDasharray="3 3"
+            stroke="#e5e7eb"
+            horizontal={false}
+            vertical={true}
+          />
+          <XAxis
+            type="number"
+            tickFormatter={(value) => `¥${(value / 1000000).toFixed(0)}M`}
+            tick={{ fontSize: 12 }}
+            stroke="#6b7280"
+          />
+          <YAxis
+            type="category"
+            dataKey="name"
+            tick={{ fontSize: 11 }}
+            stroke="#6b7280"
+            width={110}
+          />
+          <Tooltip content={<BridgeTooltip />} />
+          <Bar dataKey="base" stackId="bridge" fill="transparent" />
+          <Bar dataKey="value" stackId="bridge" radius={[0, 4, 4, 0]}>
+            {rows.map((row, index) => (
+              <Cell key={`cell-${index}`} fill={colorFor(row.kind)} />
+            ))}
+          </Bar>
+        </BarChart>
+      </ResponsiveContainer>
+    </div>
   )
 }

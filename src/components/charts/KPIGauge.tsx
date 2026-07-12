@@ -29,7 +29,11 @@ export function KPIGauge({ value, target, label, unit = '%', size = 200 }: KPIGa
 
   return (
     <div className="flex flex-col items-center">
-      <div style={{ width: size, height: size / 2 + 20 }}>
+      <div
+        style={{ width: size, height: size / 2 + 20 }}
+        role="img"
+        aria-label={`${label}のゲージ`}
+      >
         <ResponsiveContainer width="100%" height="100%">
           <PieChart>
             <Pie
@@ -92,7 +96,7 @@ export function KPIRing({ value, max, label, color = '#3b82f6', size = 120 }: KP
 
   return (
     <div className="flex flex-col items-center">
-      <div style={{ width: size, height: size }}>
+      <div style={{ width: size, height: size }} role="img" aria-label={`${label}のリング`}>
         <ResponsiveContainer width="100%" height="100%">
           <PieChart>
             <Pie
@@ -150,7 +154,14 @@ export function KPIBar({ label, value, target, unit = '%', showValue = true }: K
           </span>
         )}
       </div>
-      <div className="h-2.5 w-full rounded-full bg-gray-200">
+      <div
+        className="h-2.5 w-full rounded-full bg-gray-200"
+        role="progressbar"
+        aria-valuenow={Math.min(Math.round(percentage), 100)}
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-label={label}
+      >
         <div
           className={`h-2.5 rounded-full ${getStatusColor(percentage)}`}
           style={{ width: `${Math.min(percentage, 100)}%` }}
@@ -196,6 +207,12 @@ export function KPICard({
     return ''
   }
 
+  const getTrendWord = () => {
+    if (trend === 'up') return '上昇'
+    if (trend === 'down') return '下降'
+    return ''
+  }
+
   const calculateChange = () => {
     if (previousValue === undefined || typeof value !== 'number') return null
     const change = ((value - previousValue) / Math.abs(previousValue)) * 100
@@ -214,7 +231,9 @@ export function KPICard({
         </span>
         {change !== null && (
           <span className={`ml-2 text-sm ${getTrendColor()}`}>
-            {getTrendIcon()} {Math.abs(change).toFixed(1)}%
+            {getTrendIcon()}
+            {getTrendWord() && <span className="sr-only">{getTrendWord()}</span>}{' '}
+            {Math.abs(change).toFixed(1)}%
           </span>
         )}
       </div>

@@ -57,4 +57,10 @@ describe('ShareholderPieChart', () => {
     expect(screen.getByRole('status')).toBeInTheDocument()
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   })
+
+  it('exposes the pie svg as role=img with a text-alternative label', () => {
+    render(<ShareholderPieChart data={mockData} />)
+
+    expect(screen.getByRole('img', { name: /株主構成の円グラフ/ })).toBeInTheDocument()
+  })
 })

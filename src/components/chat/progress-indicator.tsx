@@ -79,7 +79,12 @@ export function ProgressIndicator({
   const progressPercent = calculateProgress(stage, elapsedMs)
 
   return (
-    <div className="space-y-3 rounded-lg bg-muted/50 p-4">
+    <div
+      className="space-y-3 rounded-lg bg-muted/50 p-4"
+      role="status"
+      aria-live="polite"
+      aria-label={stageInfo.label}
+    >
       {showPersonaAnimation && <PersonaAnimation />}
 
       <div className="space-y-1 text-center">
