@@ -1,6 +1,7 @@
 'use client'
 
 import { useMemo } from 'react'
+import { useTranslations } from 'next-intl'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import {
@@ -23,7 +24,8 @@ interface ImportPreviewProps {
 
 const MAX_DISPLAY_ERRORS = 5
 
-function ErrorList({ errors, label }: { errors: ImportErrorUI[]; label: string }) {
+function ErrorList({ errors }: { errors: ImportErrorUI[] }) {
+  const t = useTranslations('import')
   if (errors.length === 0) return null
 
   const displayErrors = errors.slice(0, MAX_DISPLAY_ERRORS)
@@ -32,24 +34,27 @@ function ErrorList({ errors, label }: { errors: ImportErrorUI[]; label: string }
   return (
     <div className="mt-3 space-y-1">
       <p className="text-sm font-medium text-destructive">
-        {label} ({errors.length}件)
+        {t('errorListCount', { label: t('errorLabel'), count: errors.length })}
       </p>
       <ul className="space-y-1 text-xs text-muted-foreground">
         {displayErrors.map((err, idx) => (
           <li key={idx} className="flex items-start gap-2">
             <span className="shrink-0 rounded bg-destructive/10 px-1 text-destructive">
-              行{err.row}
+              {t('rowPrefix', { row: err.row })}
             </span>
             <span>{err.message}</span>
           </li>
         ))}
-        {remaining > 0 && <li className="text-muted-foreground">...他 {remaining}件</li>}
+        {remaining > 0 && (
+          <li className="text-muted-foreground">{t('moreCount', { count: remaining })}</li>
+        )}
       </ul>
     </div>
   )
 }
 
 export function ImportPreview({ preview, maxPreviewRows = 10 }: ImportPreviewProps) {
+  const t = useTranslations('import')
   const { headers, rows, totalRows, detectedLanguage, warnings, sampleErrors } = preview
 
   const displayRows = useMemo(() => rows.slice(0, maxPreviewRows), [rows, maxPreviewRows])
@@ -59,24 +64,27 @@ export function ImportPreview({ preview, maxPreviewRows = 10 }: ImportPreviewPro
   const hasErrors = errorCount > 0
   const hasWarnings = warningCount > 0
 
+  const languageLabel =
+    detectedLanguage === 'ja'
+      ? t('langJa')
+      : detectedLanguage === 'en'
+        ? t('langEn')
+        : t('langUnknown')
+
   return (
     <Card>
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
           <div>
-            <CardTitle className="text-lg">プレビュー</CardTitle>
-            <CardDescription>アップロードされたファイルの内容を確認してください</CardDescription>
+            <CardTitle className="text-lg">{t('previewTitle')}</CardTitle>
+            <CardDescription>{t('previewDescription')}</CardDescription>
           </div>
           <div className="flex items-center gap-2">
             <Badge variant="outline" className="gap-1">
               <Languages className="h-3 w-3" />
-              {detectedLanguage === 'ja'
-                ? '日本語'
-                : detectedLanguage === 'en'
-                  ? 'English'
-                  : '不明'}
+              {languageLabel}
             </Badge>
-            <Badge variant="secondary">{totalRows}行</Badge>
+            <Badge variant="secondary">{t('rowCount', { count: totalRows })}</Badge>
           </div>
         </div>
       </CardHeader>
@@ -84,13 +92,10 @@ export function ImportPreview({ preview, maxPreviewRows = 10 }: ImportPreviewPro
         {hasErrors && (
           <Alert variant="destructive">
             <AlertTriangle className="h-4 w-4" />
-            <AlertTitle>データにエラーがあります</AlertTitle>
+            <AlertTitle>{t('hasErrorsTitle')}</AlertTitle>
             <AlertDescription>
-              インポート前にエラーを修正するか、エラー行をスキップして続行してください。
-              <ErrorList
-                errors={sampleErrors.filter((e) => e.severity === 'error')}
-                label="エラー"
-              />
+              {t('hasErrorsDesc')}
+              <ErrorList errors={sampleErrors.filter((e) => e.severity === 'error')} />
             </AlertDescription>
           </Alert>
         )}
@@ -98,15 +103,15 @@ export function ImportPreview({ preview, maxPreviewRows = 10 }: ImportPreviewPro
         {hasWarnings && !hasErrors && (
           <Alert>
             <Info className="h-4 w-4" />
-            <AlertTitle>警告があります</AlertTitle>
+            <AlertTitle>{t('hasWarningsTitle')}</AlertTitle>
             <AlertDescription>
-              データに警告があります。内容を確認してください。
+              {t('hasWarningsDesc')}
               {warnings.length > 0 && (
                 <ul className="mt-2 space-y-1 text-xs">
                   {warnings.slice(0, 3).map((w, idx) => (
                     <li key={idx}>{w}</li>
                   ))}
-                  {warnings.length > 3 && <li>...他 {warnings.length - 3}件</li>}
+                  {warnings.length > 3 && <li>{t('moreCount', { count: warnings.length - 3 })}</li>}
                 </ul>
               )}
             </AlertDescription>
@@ -116,10 +121,8 @@ export function ImportPreview({ preview, maxPreviewRows = 10 }: ImportPreviewPro
         {!hasErrors && !hasWarnings && (
           <Alert className="border-green-200 bg-green-50 text-green-800">
             <CheckCircle2 className="h-4 w-4 text-green-600" />
-            <AlertTitle>データは正常です</AlertTitle>
-            <AlertDescription>
-              サンプルデータに問題は見つかりませんでした。インポートを続行できます。
-            </AlertDescription>
+            <AlertTitle>{t('dataValidTitle')}</AlertTitle>
+            <AlertDescription>{t('dataValidDesc')}</AlertDescription>
           </Alert>
         )}
 
@@ -176,7 +179,7 @@ export function ImportPreview({ preview, maxPreviewRows = 10 }: ImportPreviewPro
 
         {totalRows > maxPreviewRows && (
           <p className="text-center text-sm text-muted-foreground">
-            最初の{maxPreviewRows}行を表示中（全{totalRows}行）
+            {t('showingFirst', { shown: maxPreviewRows, total: totalRows })}
           </p>
         )}
       </CardContent>

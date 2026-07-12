@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useCallback, useRef } from 'react'
+import { useTranslations } from 'next-intl'
 
 interface ImportResult {
   success: boolean
@@ -11,6 +12,7 @@ interface ImportResult {
 }
 
 export function JournalImport() {
+  const t = useTranslations('import')
   const [file, setFile] = useState<File | null>(null)
   const [uploading, setUploading] = useState(false)
   const [result, setResult] = useState<ImportResult | null>(null)
@@ -23,11 +25,11 @@ export function JournalImport() {
     const selectedFile = e.target.files?.[0]
     if (selectedFile) {
       if (!selectedFile.name.toLowerCase().endsWith('.csv')) {
-        setError('CSVファイルを選択してください')
+        setError(t('csvRequired'))
         return
       }
       if (selectedFile.size > 10 * 1024 * 1024) {
-        setError('ファイルサイズは10MB以下にしてください')
+        setError(t('errFileTooLarge', { max: 10 }))
         return
       }
       setFile(selectedFile)
@@ -36,19 +38,22 @@ export function JournalImport() {
     }
   }
 
-  const handleDrop = useCallback((e: React.DragEvent) => {
-    e.preventDefault()
-    const droppedFile = e.dataTransfer.files[0]
-    if (droppedFile) {
-      if (!droppedFile.name.toLowerCase().endsWith('.csv')) {
-        setError('CSVファイルを選択してください')
-        return
+  const handleDrop = useCallback(
+    (e: React.DragEvent) => {
+      e.preventDefault()
+      const droppedFile = e.dataTransfer.files[0]
+      if (droppedFile) {
+        if (!droppedFile.name.toLowerCase().endsWith('.csv')) {
+          setError(t('csvRequired'))
+          return
+        }
+        setFile(droppedFile)
+        setError(null)
+        setResult(null)
       }
-      setFile(droppedFile)
-      setError(null)
-      setResult(null)
-    }
-  }, [])
+    },
+    [t]
+  )
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault()
@@ -83,10 +88,10 @@ export function JournalImport() {
           }
         }
       } else {
-        setError(data.error || 'インポートに失敗しました')
+        setError(data.error || t('errImportFailed'))
       }
     } catch {
-      setError('通信エラーが発生しました')
+      setError(t('networkError'))
     }
   }
 
@@ -105,14 +110,11 @@ export function JournalImport() {
 
   return (
     <div className="p-6">
-      <h2 className="mb-6 text-2xl font-bold">仕訳データインポート</h2>
+      <h2 className="mb-6 text-2xl font-bold">{t('jiTitle')}</h2>
 
       <div className="mb-6 rounded-lg border border-blue-200 bg-blue-50 p-4">
-        <h3 className="mb-2 font-semibold text-blue-800">スターター・スタンダードプランの方へ</h3>
-        <p className="text-sm text-blue-700">
-          API接続ができない場合や、freeeからエクスポートした仕訳データがある場合は、
-          この機能を使ってCSVファイルをアップロードすることで監査システムをご利用いただけます。
-        </p>
+        <h3 className="mb-2 font-semibold text-blue-800">{t('jiPlanNoticeTitle')}</h3>
+        <p className="text-sm text-blue-700">{t('jiPlanNoticeBody')}</p>
       </div>
 
       {error && (
@@ -124,7 +126,7 @@ export function JournalImport() {
           <button
             type="button"
             onClick={() => setError(null)}
-            aria-label="エラーを閉じる"
+            aria-label={t('btnCloseErrorAria')}
             className="ml-2 text-red-500 hover:text-red-700"
           >
             ×
@@ -134,31 +136,37 @@ export function JournalImport() {
 
       {result && (
         <div role="status" className="mb-4 rounded-lg border border-green-200 bg-green-50 p-4">
-          <h4 className="mb-2 font-semibold text-green-800">インポート結果</h4>
+          <h4 className="mb-2 font-semibold text-green-800">{t('resultTitle')}</h4>
           <div className="grid grid-cols-3 gap-4 text-sm">
             <div>
-              <span className="text-gray-600">処理件数:</span>
-              <span className="ml-2 font-medium">{result.totalRows || 0}件</span>
+              <span className="text-gray-600">{t('jiProcessedLabel')}</span>
+              <span className="ml-2 font-medium">{t('count', { n: result.totalRows || 0 })}</span>
             </div>
             <div>
-              <span className="text-gray-600">インポート成功:</span>
-              <span className="ml-2 font-medium text-green-600">{result.imported}件</span>
+              <span className="text-gray-600">{t('jiImportedLabel')}</span>
+              <span className="ml-2 font-medium text-green-600">
+                {t('count', { n: result.imported })}
+              </span>
             </div>
             <div>
-              <span className="text-gray-600">スキップ:</span>
-              <span className="ml-2 font-medium text-yellow-600">{result.skipped}件</span>
+              <span className="text-gray-600">{t('jiSkippedLabel')}</span>
+              <span className="ml-2 font-medium text-yellow-600">
+                {t('count', { n: result.skipped })}
+              </span>
             </div>
           </div>
           {result.errors.length > 0 && (
             <div className="mt-3">
-              <p className="text-sm font-medium text-red-600">エラー ({result.errors.length}件):</p>
+              <p className="text-sm font-medium text-red-600">
+                {t('errorsLabel', { count: result.errors.length })}
+              </p>
               <ul className="mt-1 max-h-32 overflow-auto text-xs text-red-500">
                 {result.errors.slice(0, 10).map((err, idx) => (
-                  <li key={idx}>
-                    行{err.row}: {err.message}
-                  </li>
+                  <li key={idx}>{t('rowError', { row: err.row, message: err.message })}</li>
                 ))}
-                {result.errors.length > 10 && <li>...他 {result.errors.length - 10}件</li>}
+                {result.errors.length > 10 && (
+                  <li>{t('moreCount', { count: result.errors.length - 10 })}</li>
+                )}
               </ul>
             </div>
           )}
@@ -167,7 +175,7 @@ export function JournalImport() {
             onClick={() => setResult(null)}
             className="mt-2 text-sm text-green-600 hover:text-green-700"
           >
-            閉じる
+            {t('jiCloseBtn')}
           </button>
         </div>
       )}
@@ -195,17 +203,15 @@ export function JournalImport() {
             </div>
           ) : (
             <div>
-              <p className="mb-2 text-lg font-medium text-gray-600">
-                CSVファイルをドラッグ＆ドロップ
-              </p>
-              <p className="text-sm text-gray-500">または クリックしてファイルを選択</p>
+              <p className="mb-2 text-lg font-medium text-gray-600">{t('jiDropHint')}</p>
+              <p className="text-sm text-gray-500">{t('clickToSelect')}</p>
             </div>
           )}
         </label>
       </div>
 
       <div className="mb-6 rounded-lg bg-gray-50 p-4">
-        <h4 className="mb-3 font-medium">インポートオプション</h4>
+        <h4 className="mb-3 font-medium">{t('optionsTitle')}</h4>
         <div className="space-y-2">
           <label className="flex items-center">
             <input
@@ -214,7 +220,7 @@ export function JournalImport() {
               onChange={(e) => setSkipDuplicates(e.target.checked)}
               className="mr-2"
             />
-            <span className="text-sm">重複データをスキップする</span>
+            <span className="text-sm">{t('jiSkipDuplicatesOption')}</span>
           </label>
           <label className="flex items-center">
             <input
@@ -223,7 +229,7 @@ export function JournalImport() {
               onChange={(e) => setUpdateExisting(e.target.checked)}
               className="mr-2"
             />
-            <span className="text-sm">既存データを更新する</span>
+            <span className="text-sm">{t('jiUpdateExistingOption')}</span>
           </label>
         </div>
       </div>
@@ -235,7 +241,7 @@ export function JournalImport() {
           disabled={!file || uploading}
           className="rounded bg-blue-500 px-6 py-2 text-white hover:bg-blue-600 disabled:opacity-50"
         >
-          {uploading ? 'インポート中...' : 'インポート実行'}
+          {uploading ? t('importing') : t('btnRunImport')}
         </button>
         {file && (
           <button
@@ -243,7 +249,7 @@ export function JournalImport() {
             onClick={handleClear}
             className="rounded border border-gray-300 px-4 py-2 text-gray-600 hover:bg-gray-100"
           >
-            クリア
+            {t('jiClearBtn')}
           </button>
         )}
         <button
@@ -251,7 +257,7 @@ export function JournalImport() {
           onClick={handleDownloadTemplate}
           className="rounded border border-gray-300 px-4 py-2 text-gray-600 hover:bg-gray-100"
         >
-          テンプレートダウンロード
+          {t('jiTemplateBtn')}
         </button>
       </div>
 

@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useCallback, useRef, useReducer } from 'react'
+import { useTranslations, useLocale } from 'next-intl'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
@@ -77,29 +78,34 @@ interface ImportCardProps {
 const REQUEST_TIMEOUT_MS = 120000
 
 export function ImportCard({ type, apiEndpoint, companyId, onComplete, onError }: ImportCardProps) {
+  const t = useTranslations('import')
+  const locale = useLocale() as 'ja' | 'en'
   const [state, dispatch] = useReducer(importReducer, initialImportState)
   const [options, setOptions] = useState<ImportOptions>(DEFAULT_UI_IMPORT_OPTIONS)
   const [isUploading, setIsUploading] = useState(false)
   const [uploadProgress, setUploadProgress] = useState(0)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  const typeLabel = IMPORT_TYPE_LABELS[type]
-  const typeDescription = IMPORT_TYPE_DESCRIPTIONS[type]
+  const typeLabel = IMPORT_TYPE_LABELS[type][locale]
+  const typeDescription = IMPORT_TYPE_DESCRIPTIONS[type][locale]
 
-  const validateFile = useCallback((file: File): string | null => {
-    const extension = file.name.toLowerCase().split('.').pop()
+  const validateFile = useCallback(
+    (file: File): string | null => {
+      const extension = file.name.toLowerCase().split('.').pop()
 
-    if (!extension || !ACCEPTED_EXTENSIONS.includes(extension)) {
-      return `サポートされていないファイル形式です。対応形式: ${ACCEPTED_EXTENSIONS.join(', ')}`
-    }
+      if (!extension || !ACCEPTED_EXTENSIONS.includes(extension)) {
+        return t('errUnsupportedFormat', { formats: ACCEPTED_EXTENSIONS.join(', ') })
+      }
 
-    const maxSizeBytes = MAX_FILE_SIZE_MB * 1024 * 1024
-    if (file.size > maxSizeBytes) {
-      return `ファイルサイズは${MAX_FILE_SIZE_MB}MB以下にしてください`
-    }
+      const maxSizeBytes = MAX_FILE_SIZE_MB * 1024 * 1024
+      if (file.size > maxSizeBytes) {
+        return t('errFileTooLarge', { max: MAX_FILE_SIZE_MB })
+      }
 
-    return null
-  }, [])
+      return null
+    },
+    [t]
+  )
 
   const handleFileSelect = useCallback(
     (file: File) => {
@@ -172,17 +178,17 @@ export function ImportCard({ type, apiEndpoint, companyId, onComplete, onError }
       const data = await response.json()
 
       if (!response.ok) {
-        throw new Error(data.error || 'プレビューの取得に失敗しました')
+        throw new Error(data.error || t('errPreviewFailed'))
       }
 
       dispatch({ type: 'SET_PREVIEW', payload: data.preview as ImportPreviewData })
     } catch (error) {
       const message =
         error instanceof Error && error.name === 'AbortError'
-          ? 'リクエストがタイムアウトしました'
+          ? t('errRequestTimeout')
           : error instanceof Error
             ? error.message
-            : '不明なエラーが発生しました'
+            : t('errUnknown')
 
       dispatch({ type: 'SET_ERROR', payload: message })
       onError?.(message)
@@ -191,7 +197,7 @@ export function ImportCard({ type, apiEndpoint, companyId, onComplete, onError }
       setIsUploading(false)
       setUploadProgress(0)
     }
-  }, [state.file, apiEndpoint, companyId, onError])
+  }, [state.file, apiEndpoint, companyId, onError, t])
 
   const handleImport = useCallback(async () => {
     if (!state.file) return
@@ -222,7 +228,7 @@ export function ImportCard({ type, apiEndpoint, companyId, onComplete, onError }
       const data = await response.json()
 
       if (!response.ok) {
-        throw new Error(data.error || 'インポートに失敗しました')
+        throw new Error(data.error || t('errImportFailed'))
       }
 
       dispatch({ type: 'SET_RESULT', payload: data as ImportResultData })
@@ -230,10 +236,10 @@ export function ImportCard({ type, apiEndpoint, companyId, onComplete, onError }
     } catch (error) {
       const message =
         error instanceof Error && error.name === 'AbortError'
-          ? 'リクエストがタイムアウトしました'
+          ? t('errRequestTimeout')
           : error instanceof Error
             ? error.message
-            : '不明なエラーが発生しました'
+            : t('errUnknown')
 
       dispatch({ type: 'SET_ERROR', payload: message })
       dispatch({ type: 'SET_STEP', payload: 'preview' })
@@ -243,7 +249,7 @@ export function ImportCard({ type, apiEndpoint, companyId, onComplete, onError }
       setIsUploading(false)
       setUploadProgress(0)
     }
-  }, [state.file, options, apiEndpoint, companyId, onComplete, onError])
+  }, [state.file, options, apiEndpoint, companyId, onComplete, onError, t])
 
   const handleDownloadTemplate = useCallback(() => {
     window.location.href = `${apiEndpoint}?action=template&language=${options.language}`
@@ -264,20 +270,20 @@ export function ImportCard({ type, apiEndpoint, companyId, onComplete, onError }
   return (
     <Card>
       <CardHeader>
-        <CardTitle>{typeLabel.ja}インポート</CardTitle>
-        <CardDescription>{typeDescription.ja}</CardDescription>
+        <CardTitle>{t('cardTitle', { type: typeLabel })}</CardTitle>
+        <CardDescription>{typeDescription}</CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
         {state.error && (
           <Alert variant="destructive">
             <AlertCircle className="h-4 w-4" />
-            <AlertTitle>エラー</AlertTitle>
+            <AlertTitle>{t('errorTitle')}</AlertTitle>
             <AlertDescription className="flex items-center justify-between">
               {state.error}
               <Button
                 variant="ghost"
                 size="sm"
-                aria-label="エラーを閉じる"
+                aria-label={t('btnCloseErrorAria')}
                 onClick={() => dispatch({ type: 'SET_ERROR', payload: null })}
               >
                 <X className="h-4 w-4" />
@@ -295,7 +301,7 @@ export function ImportCard({ type, apiEndpoint, companyId, onComplete, onError }
               onKeyDown={handleDropzoneKeyDown}
               role="button"
               tabIndex={0}
-              aria-label={`${typeLabel.ja}ファイルを選択`}
+              aria-label={t('selectFileAria', { type: typeLabel })}
               className={`flex min-h-[200px] cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed transition-colors ${
                 state.file
                   ? 'border-green-300 bg-green-50'
@@ -319,23 +325,21 @@ export function ImportCard({ type, apiEndpoint, companyId, onComplete, onError }
               ) : (
                 <div className="text-center">
                   <Upload className="mx-auto mb-2 h-12 w-12 text-gray-400" />
-                  <p className="mb-1 text-lg font-medium text-gray-600">
-                    ファイルをドラッグ＆ドロップ
-                  </p>
-                  <p className="text-sm text-gray-500">または クリックしてファイルを選択</p>
+                  <p className="mb-1 text-lg font-medium text-gray-600">{t('dropHint')}</p>
+                  <p className="text-sm text-gray-500">{t('clickToSelect')}</p>
                   <p className="mt-2 text-xs text-gray-400">
-                    対応形式: CSV, Excel (.xlsx, .xls) / 最大 {MAX_FILE_SIZE_MB}MB
+                    {t('acceptedFormats', { max: MAX_FILE_SIZE_MB })}
                   </p>
                 </div>
               )}
             </div>
 
             <div className="space-y-4 rounded-lg bg-gray-50 p-4">
-              <h4 className="font-medium">インポートオプション</h4>
+              <h4 className="font-medium">{t('optionsTitle')}</h4>
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
                   <Label htmlFor="skipDuplicates" className="cursor-pointer">
-                    重複データをスキップ
+                    {t('skipDuplicates')}
                   </Label>
                   <Switch
                     id="skipDuplicates"
@@ -347,7 +351,7 @@ export function ImportCard({ type, apiEndpoint, companyId, onComplete, onError }
                 </div>
                 <div className="flex items-center justify-between">
                   <Label htmlFor="updateExisting" className="cursor-pointer">
-                    既存データを更新
+                    {t('updateExisting')}
                   </Label>
                   <Switch
                     id="updateExisting"
@@ -359,7 +363,7 @@ export function ImportCard({ type, apiEndpoint, companyId, onComplete, onError }
                 </div>
                 <div className="flex items-center justify-between">
                   <Label htmlFor="dryRun" className="cursor-pointer">
-                    ドライラン（実際には保存しない）
+                    {t('dryRun')}
                   </Label>
                   <Switch
                     id="dryRun"
@@ -381,23 +385,23 @@ export function ImportCard({ type, apiEndpoint, companyId, onComplete, onError }
                 {isUploading ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    読み込み中...
+                    {t('loading')}
                   </>
                 ) : (
                   <>
                     <Eye className="mr-2 h-4 w-4" />
-                    プレビュー
+                    {t('btnPreview')}
                   </>
                 )}
               </Button>
               <Button variant="outline" onClick={handleDownloadTemplate} disabled={isUploading}>
                 <Download className="mr-2 h-4 w-4" />
-                テンプレート
+                {t('btnTemplate')}
               </Button>
               {state.file && (
                 <Button
                   variant="ghost"
-                  aria-label="選択したファイルをクリア"
+                  aria-label={t('btnClearAria')}
                   onClick={handleClear}
                   disabled={isUploading}
                 >
@@ -415,7 +419,7 @@ export function ImportCard({ type, apiEndpoint, companyId, onComplete, onError }
             {isUploading && uploadProgress > 0 && (
               <div className="space-y-2">
                 <div className="flex items-center justify-between text-sm">
-                  <span>処理中...</span>
+                  <span>{t('processing')}</span>
                   <span>{uploadProgress}%</span>
                 </div>
                 <Progress value={uploadProgress} />
@@ -427,17 +431,17 @@ export function ImportCard({ type, apiEndpoint, companyId, onComplete, onError }
                 {isUploading ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    インポート中...
+                    {t('importing')}
                   </>
                 ) : (
                   <>
                     <Play className="mr-2 h-4 w-4" />
-                    インポート実行
+                    {t('btnRunImport')}
                   </>
                 )}
               </Button>
               <Button variant="outline" onClick={handleBackToUpload} disabled={isUploading}>
-                戻る
+                {t('btnBack')}
               </Button>
             </div>
           </>
@@ -446,8 +450,8 @@ export function ImportCard({ type, apiEndpoint, companyId, onComplete, onError }
         {state.step === 'importing' && (
           <div className="flex flex-col items-center justify-center py-12">
             <Loader2 className="mb-4 h-12 w-12 animate-spin text-primary" />
-            <p className="text-lg font-medium">インポート処理中...</p>
-            <p className="text-sm text-muted-foreground">しばらくお待ちください</p>
+            <p className="text-lg font-medium">{t('importingStatus')}</p>
+            <p className="text-sm text-muted-foreground">{t('pleaseWait')}</p>
             {uploadProgress > 0 && (
               <div className="mt-4 w-full max-w-xs">
                 <Progress value={uploadProgress} />
@@ -461,7 +465,7 @@ export function ImportCard({ type, apiEndpoint, companyId, onComplete, onError }
             <ImportResult result={state.result} />
             <div className="flex gap-3">
               <Button variant="outline" onClick={handleClear} className="flex-1">
-                新規インポート
+                {t('btnNewImport')}
               </Button>
             </div>
           </>

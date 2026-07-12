@@ -1,7 +1,27 @@
 import { describe, it, expect } from 'vitest'
+import type { ReactNode } from 'react'
 import { render, screen } from '@testing-library/react'
+import { NextIntlClientProvider } from 'next-intl'
 import { ImportResult } from '@/components/import/ImportResult'
 import type { ImportResultData, ImportErrorUI } from '@/components/import/types'
+import jaMessages from '../../../messages/ja.json'
+
+function renderWithI18n(ui: ReactNode) {
+  const utils = render(
+    <NextIntlClientProvider locale="ja" messages={jaMessages}>
+      {ui}
+    </NextIntlClientProvider>
+  )
+  return {
+    ...utils,
+    rerender: (next: ReactNode) =>
+      utils.rerender(
+        <NextIntlClientProvider locale="ja" messages={jaMessages}>
+          {next}
+        </NextIntlClientProvider>
+      ),
+  }
+}
 
 function buildError(overrides: Partial<ImportErrorUI> = {}): ImportErrorUI {
   return {
@@ -33,7 +53,7 @@ function buildResult(overrides: Partial<ImportResultData> = {}): ImportResultDat
 
 describe('ImportResult — progress rate computation', () => {
   it('renders success/skip/fail bars proportional to imported/skipped/failed over totalRows', () => {
-    const { container } = render(
+    const { container } = renderWithI18n(
       <ImportResult result={buildResult({ imported: 8, skipped: 2, failed: 0, totalRows: 10 })} />
     )
 
@@ -49,7 +69,7 @@ describe('ImportResult — progress rate computation', () => {
   })
 
   it('renders a red bar only when failed > 0', () => {
-    const { container } = render(
+    const { container } = renderWithI18n(
       <ImportResult result={buildResult({ imported: 5, skipped: 0, failed: 5, totalRows: 10 })} />
     )
 
@@ -59,7 +79,7 @@ describe('ImportResult — progress rate computation', () => {
   })
 
   it('renders no rate bars when totalRows is 0 (guards against division by zero)', () => {
-    const { container } = render(
+    const { container } = renderWithI18n(
       <ImportResult
         result={buildResult({ imported: 0, skipped: 0, failed: 0, totalRows: 0, validRows: 0 })}
       />
@@ -73,7 +93,7 @@ describe('ImportResult — progress rate computation', () => {
 
 describe('ImportResult — status mapping', () => {
   it('shows the completed description and badge label', () => {
-    const { container, getByText } = render(
+    const { container, getByText } = renderWithI18n(
       <ImportResult result={buildResult({ status: 'completed' })} />
     )
 
@@ -83,7 +103,7 @@ describe('ImportResult — status mapping', () => {
   })
 
   it('shows partial description, badge, and a partial-success alert carrying the failed count', () => {
-    const { getByText } = render(
+    const { getByText } = renderWithI18n(
       <ImportResult result={buildResult({ status: 'partial', imported: 7, failed: 3 })} />
     )
 
@@ -93,7 +113,7 @@ describe('ImportResult — status mapping', () => {
   })
 
   it('shows a destructive import-error alert only when failed status has errors', () => {
-    const { queryByText, rerender } = render(
+    const { queryByText, rerender } = renderWithI18n(
       <ImportResult result={buildResult({ status: 'failed', errors: [] })} />
     )
     expect(queryByText('インポートエラー')).toBeNull()
@@ -107,24 +127,30 @@ describe('ImportResult — status mapping', () => {
   })
 
   it('falls back to the pending badge for in-progress statuses', () => {
-    const { getByText } = render(<ImportResult result={buildResult({ status: 'importing' })} />)
+    const { getByText } = renderWithI18n(
+      <ImportResult result={buildResult({ status: 'importing' })} />
+    )
     expect(getByText('インポート中')).toBeInTheDocument()
   })
 })
 
 describe('ImportResult — duration formatting', () => {
   it('renders sub-second durations in milliseconds', () => {
-    const { getByText } = render(<ImportResult result={buildResult({ durationMs: 500 })} />)
+    const { getByText } = renderWithI18n(<ImportResult result={buildResult({ durationMs: 500 })} />)
     expect(getByText(/500ms/)).toBeInTheDocument()
   })
 
   it('renders >= 1s durations in seconds with two decimals', () => {
-    const { getByText } = render(<ImportResult result={buildResult({ durationMs: 1500 })} />)
+    const { getByText } = renderWithI18n(
+      <ImportResult result={buildResult({ durationMs: 1500 })} />
+    )
     expect(getByText(/1.50秒/)).toBeInTheDocument()
   })
 
   it('omits the processing-time line when durationMs is undefined', () => {
-    const { queryByText } = render(<ImportResult result={buildResult({ durationMs: undefined })} />)
+    const { queryByText } = renderWithI18n(
+      <ImportResult result={buildResult({ durationMs: undefined })} />
+    )
     expect(queryByText(/処理時間/)).toBeNull()
   })
 })
@@ -134,7 +160,7 @@ describe('ImportResult — error table truncation', () => {
     const errors = Array.from({ length: 25 }, (_, i) =>
       buildError({ row: i + 2, message: `err${i}` })
     )
-    const { getByText, queryByText } = render(
+    const { getByText, queryByText } = renderWithI18n(
       <ImportResult result={buildResult({ status: 'failed', errors })} />
     )
 
@@ -146,7 +172,7 @@ describe('ImportResult — error table truncation', () => {
   })
 
   it('renders a dash for missing field and value cells', () => {
-    const { getAllByText } = render(
+    const { getAllByText } = renderWithI18n(
       <ImportResult
         result={buildResult({
           status: 'failed',
@@ -162,7 +188,9 @@ describe('ImportResult — error table truncation', () => {
 describe('ImportResult — warnings truncation', () => {
   it('lists at most 5 warnings with a remaining-count footer', () => {
     const warnings = Array.from({ length: 7 }, (_, i) => `警告${i}`)
-    const { getByText, queryByText } = render(<ImportResult result={buildResult({ warnings })} />)
+    const { getByText, queryByText } = renderWithI18n(
+      <ImportResult result={buildResult({ warnings })} />
+    )
 
     expect(getByText('警告 (7件)')).toBeInTheDocument()
     expect(getByText('警告0')).toBeInTheDocument()
@@ -174,7 +202,7 @@ describe('ImportResult — warnings truncation', () => {
 
 describe('ImportResult — accessibility', () => {
   it('exposes the processing bar as a progressbar with aria values', () => {
-    const { container } = render(
+    const { container } = renderWithI18n(
       <ImportResult
         result={buildResult({ imported: 8, skipped: 2, failed: 0, totalRows: 10, validRows: 10 })}
       />

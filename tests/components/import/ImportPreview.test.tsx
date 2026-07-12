@@ -1,7 +1,27 @@
 import { describe, it, expect } from 'vitest'
+import type { ReactNode } from 'react'
 import { render } from '@testing-library/react'
+import { NextIntlClientProvider } from 'next-intl'
 import { ImportPreview } from '@/components/import/ImportPreview'
 import type { ImportPreviewData, ImportErrorUI } from '@/components/import/types'
+import jaMessages from '../../../messages/ja.json'
+
+function renderWithI18n(ui: ReactNode) {
+  const utils = render(
+    <NextIntlClientProvider locale="ja" messages={jaMessages}>
+      {ui}
+    </NextIntlClientProvider>
+  )
+  return {
+    ...utils,
+    rerender: (next: ReactNode) =>
+      utils.rerender(
+        <NextIntlClientProvider locale="ja" messages={jaMessages}>
+          {next}
+        </NextIntlClientProvider>
+      ),
+  }
+}
 
 function buildError(overrides: Partial<ImportErrorUI> = {}): ImportErrorUI {
   return {
@@ -38,7 +58,9 @@ describe('ImportPreview — row display capping', () => {
       勘定科目コード: '400',
       金額: 1000,
     }))
-    const { container } = render(<ImportPreview preview={buildPreview({ rows, totalRows: 12 })} />)
+    const { container } = renderWithI18n(
+      <ImportPreview preview={buildPreview({ rows, totalRows: 12 })} />
+    )
 
     expect(container.querySelectorAll('tbody tr').length).toBe(10)
     expect(container.textContent).toContain('最初の10行を表示中（全12行）')
@@ -50,7 +72,7 @@ describe('ImportPreview — row display capping', () => {
       勘定科目コード: '400',
       金額: 1000,
     }))
-    const { container } = render(
+    const { container } = renderWithI18n(
       <ImportPreview preview={buildPreview({ rows, totalRows: 5 })} maxPreviewRows={3} />
     )
 
@@ -59,7 +81,7 @@ describe('ImportPreview — row display capping', () => {
   })
 
   it('omits the truncation notice when rows fit within the cap', () => {
-    const { container } = render(
+    const { container } = renderWithI18n(
       <ImportPreview preview={buildPreview({ totalRows: 2 })} maxPreviewRows={10} />
     )
     expect(container.textContent).not.toContain('行を表示中')
@@ -68,7 +90,7 @@ describe('ImportPreview — row display capping', () => {
 
 describe('ImportPreview — detected-language label', () => {
   it('maps detectedLanguage to a localized label and shows the total row count', () => {
-    const { getByText, rerender } = render(
+    const { getByText, rerender } = renderWithI18n(
       <ImportPreview preview={buildPreview({ detectedLanguage: 'ja', totalRows: 42 })} />
     )
     expect(getByText('日本語')).toBeInTheDocument()
@@ -84,7 +106,7 @@ describe('ImportPreview — detected-language label', () => {
 
 describe('ImportPreview — alert state selection', () => {
   it('shows the error alert when sampleErrors contain error-severity entries', () => {
-    const { getByText, queryByText } = render(
+    const { getByText, queryByText } = renderWithI18n(
       <ImportPreview
         preview={buildPreview({ sampleErrors: [buildError({ row: 3, severity: 'error' })] })}
       />
@@ -94,7 +116,7 @@ describe('ImportPreview — alert state selection', () => {
   })
 
   it('shows the warning alert (not error) when only warning-severity entries exist', () => {
-    const { getByText, queryByText } = render(
+    const { getByText, queryByText } = renderWithI18n(
       <ImportPreview
         preview={buildPreview({
           sampleErrors: [buildError({ row: 3, severity: 'warning' })],
@@ -106,7 +128,7 @@ describe('ImportPreview — alert state selection', () => {
   })
 
   it('shows the all-clear alert when there are no errors or warnings', () => {
-    const { getByText } = render(<ImportPreview preview={buildPreview()} />)
+    const { getByText } = renderWithI18n(<ImportPreview preview={buildPreview()} />)
     expect(getByText('データは正常です')).toBeInTheDocument()
   })
 })
@@ -116,7 +138,7 @@ describe('ImportPreview — ErrorList truncation', () => {
     const sampleErrors = Array.from({ length: 7 }, (_, i) =>
       buildError({ row: i + 2, severity: 'error', message: `err${i}` })
     )
-    const { getByText, queryByText } = render(
+    const { getByText, queryByText } = renderWithI18n(
       <ImportPreview preview={buildPreview({ sampleErrors })} />
     )
 
@@ -131,7 +153,7 @@ describe('ImportPreview — ErrorList truncation', () => {
 describe('ImportPreview — warnings list truncation', () => {
   it('shows at most 3 warnings with a remaining count', () => {
     const warnings = Array.from({ length: 5 }, (_, i) => `注意${i}`)
-    const { getByText, queryByText } = render(
+    const { getByText, queryByText } = renderWithI18n(
       <ImportPreview preview={buildPreview({ warnings })} />
     )
 
@@ -144,7 +166,7 @@ describe('ImportPreview — warnings list truncation', () => {
 
 describe('ImportPreview — header mapping arrows', () => {
   it('renders a mapping arrow only when the mapped name differs from the header', () => {
-    const { getByText, queryByText } = render(
+    const { getByText, queryByText } = renderWithI18n(
       <ImportPreview
         preview={buildPreview({
           headers: ['売上', '経費'],
@@ -161,7 +183,7 @@ describe('ImportPreview — header mapping arrows', () => {
 
 describe('ImportPreview — per-row error highlighting', () => {
   it('marks a row and its offending cell when a sampleError matches the row + field', () => {
-    const { container } = render(
+    const { container } = renderWithI18n(
       <ImportPreview
         preview={buildPreview({
           headers: ['金額'],
@@ -182,7 +204,7 @@ describe('ImportPreview — per-row error highlighting', () => {
   })
 
   it('renders an empty cell for missing values', () => {
-    const { container } = render(
+    const { container } = renderWithI18n(
       <ImportPreview
         preview={buildPreview({
           headers: ['金額'],
