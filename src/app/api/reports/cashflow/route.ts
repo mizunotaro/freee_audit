@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
 import { getAuthUser } from '@/lib/api/auth-helpers'
 import { calculateCashFlow } from '@/services/cashflow/calculator'
 import {
@@ -11,6 +12,10 @@ import {
   calculateBurnRateTrend,
 } from '@/services/cashflow/runway-calculator'
 
+const cashflowQuerySchema = z.object({
+  fiscalYear: z.coerce.number().int().min(1900).max(2100).optional(),
+})
+
 export async function GET(request: NextRequest) {
   try {
     const user = await getAuthUser(request)
@@ -19,9 +24,14 @@ export async function GET(request: NextRequest) {
     }
 
     const { searchParams } = new URL(request.url)
-    const fiscalYear = parseInt(
-      searchParams.get('fiscalYear') || new Date().getFullYear().toString()
-    )
+    const query = cashflowQuerySchema.safeParse(Object.fromEntries(searchParams))
+    if (!query.success) {
+      return NextResponse.json(
+        { error: 'Invalid query parameters', details: query.error.flatten() },
+        { status: 400 }
+      )
+    }
+    const fiscalYear = query.data.fiscalYear ?? new Date().getFullYear()
     const targetCompanyId = user.companyId
 
     const cashFlows = await getYearCashFlows(targetCompanyId, fiscalYear)

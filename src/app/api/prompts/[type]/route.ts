@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { validateSession } from '@/lib/auth'
-import { getPrompt, setPrompt, type AnalysisType } from '@/services/ai/prompt-service'
+import { getPrompt, setPrompt } from '@/services/ai/prompt-service'
 import { logRouteAudit } from '@/lib/route-audit'
+import { analysisTypeSchema, promptBodySchema } from '../schemas'
 
 async function handler(request: NextRequest, { params }: { params: Promise<{ type: string }> }) {
   const token = request.headers.get('authorization')?.replace('Bearer ', '')
@@ -16,7 +17,14 @@ async function handler(request: NextRequest, { params }: { params: Promise<{ typ
   }
 
   const { type } = await params
-  const analysisType = type as AnalysisType
+  const typeResult = analysisTypeSchema.safeParse(type)
+  if (!typeResult.success) {
+    return NextResponse.json(
+      { error: 'Invalid analysis type', details: typeResult.error.flatten() },
+      { status: 400 }
+    )
+  }
+  const analysisType = typeResult.data
 
   if (request.method === 'GET') {
     try {
@@ -31,15 +39,21 @@ async function handler(request: NextRequest, { params }: { params: Promise<{ typ
   }
 
   if (request.method === 'POST') {
-    const body = await request.json()
+    const parsed = promptBodySchema.safeParse(await request.json())
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: 'Invalid request body', details: parsed.error.flatten() },
+        { status: 400 }
+      )
+    }
 
     try {
       const prompt = await setPrompt(analysisType, user.companyId, {
-        name: body.name,
-        description: body.description,
-        systemPrompt: body.systemPrompt,
-        userPromptTemplate: body.userPromptTemplate,
-        variables: body.variables,
+        name: parsed.data.name,
+        description: parsed.data.description ?? undefined,
+        systemPrompt: parsed.data.systemPrompt,
+        userPromptTemplate: parsed.data.userPromptTemplate,
+        variables: parsed.data.variables,
       })
       await logRouteAudit({
         request,
