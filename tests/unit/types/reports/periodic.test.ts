@@ -82,6 +82,22 @@ describe('periodic report types', () => {
       expect(insolvent.equity).toBeLessThan(0)
     })
 
+    it('accepts IEEE-754 extremes (Infinity / NaN / MAX_VALUE) — field type stays plain number', () => {
+      const extreme: PeriodBalanceSheet = {
+        totalAssets: Number.MAX_VALUE,
+        currentAssets: Infinity,
+        fixedAssets: -Infinity,
+        totalLiabilities: NaN,
+        currentLiabilities: Number.MIN_VALUE,
+        fixedLiabilities: Number.MAX_SAFE_INTEGER,
+        equity: -Number.MAX_VALUE,
+      }
+      expect(extreme.totalAssets).toBe(Number.MAX_VALUE)
+      expect(extreme.currentAssets).toBe(Infinity)
+      expect(Number.isNaN(extreme.totalLiabilities)).toBe(true)
+      expect(extreme.fixedLiabilities).toBe(Number.MAX_SAFE_INTEGER)
+    })
+
     it('is exactly a flat object of seven numeric fields', () => {
       expectTypeOf<PeriodBalanceSheet>().toEqualTypeOf<{
         totalAssets: number
@@ -118,6 +134,20 @@ describe('periodic report types', () => {
       expect(loss.netIncome).toBeLessThan(0)
     })
 
+    it('accepts IEEE-754 extremes across every P&L line (Infinity / NaN / MAX_VALUE)', () => {
+      const extreme: PeriodProfitLoss = {
+        revenue: Number.MAX_VALUE,
+        costOfSales: Infinity,
+        grossProfit: NaN,
+        operatingIncome: -Infinity,
+        ordinaryIncome: Number.MAX_SAFE_INTEGER,
+        netIncome: -Number.MAX_VALUE,
+      }
+      expect(extreme.revenue).toBe(Number.MAX_VALUE)
+      expect(Number.isNaN(extreme.grossProfit)).toBe(true)
+      expect(extreme.netIncome).toBe(-Number.MAX_VALUE)
+    })
+
     it('is exactly a flat object of six numeric fields', () => {
       expectTypeOf<PeriodProfitLoss>().toEqualTypeOf<{
         revenue: number
@@ -147,6 +177,18 @@ describe('periodic report types', () => {
       }
       expect(drain.operatingCF).toBeLessThan(0)
       expect(drain.freeCashFlow).toBeLessThan(0)
+    })
+
+    it('accepts IEEE-754 extremes across every cash-flow bucket (Infinity / NaN / MAX_VALUE)', () => {
+      const extreme: PeriodCashFlow = {
+        operatingCF: Infinity,
+        investingCF: -Infinity,
+        financingCF: NaN,
+        freeCashFlow: Number.MAX_VALUE,
+      }
+      expect(extreme.operatingCF).toBe(Infinity)
+      expect(Number.isNaN(extreme.financingCF)).toBe(true)
+      expect(extreme.freeCashFlow).toBe(Number.MAX_VALUE)
     })
 
     it('is exactly a flat object of four numeric fields', () => {
@@ -188,6 +230,20 @@ describe('periodic report types', () => {
       }
       expect(boundary.roe).toBe(0)
       expect(overleveraged.debtToEquity).toBeGreaterThan(1)
+    })
+
+    it('accepts IEEE-754 extremes across every ratio (Infinity / NaN / MAX_VALUE)', () => {
+      const extreme: PeriodKPIs = {
+        roe: Infinity,
+        roa: -Infinity,
+        grossMargin: NaN,
+        operatingMargin: Number.MAX_VALUE,
+        currentRatio: Number.MIN_VALUE,
+        debtToEquity: Number.MAX_SAFE_INTEGER,
+      }
+      expect(extreme.roe).toBe(Infinity)
+      expect(Number.isNaN(extreme.grossMargin)).toBe(true)
+      expect(extreme.operatingMargin).toBe(Number.MAX_VALUE)
     })
 
     it('is exactly a flat object of six numeric fields', () => {
@@ -270,6 +326,15 @@ describe('periodic report types', () => {
         },
       }
       expect(inline.label).toBe('Q1')
+    })
+
+    it('enforces required fields — a partial period is rejected at the type level', () => {
+      // Missing label + the four financial sub-objects: not assignable to PeriodData.
+      expectTypeOf<{
+        fiscalYear: number
+        startMonth: number
+        endMonth: number
+      }>().not.toMatchTypeOf<PeriodData>()
     })
 
     it('declares the nested sub-object types verbatim', () => {
@@ -395,6 +460,24 @@ describe('periodic report types', () => {
     it('declares periods as a PeriodData array and summary verbatim', () => {
       expectTypeOf<PeriodicReportData['periods']>().toEqualTypeOf<PeriodData[]>()
       expectTypeOf<PeriodicReportData['summary']>().toEqualTypeOf<PeriodicSummary>()
+    })
+  })
+
+  describe('module surface', () => {
+    it('resolves as a type-only module with no runtime exports', async () => {
+      const mod = await import('@/types/reports/periodic')
+      expect(mod).toBeDefined()
+      expect(Object.keys(mod)).toHaveLength(0)
+    })
+
+    it('exposes all seven interfaces as resolvable type contracts', () => {
+      expectTypeOf<PeriodBalanceSheet>().not.toBeAny()
+      expectTypeOf<PeriodProfitLoss>().not.toBeAny()
+      expectTypeOf<PeriodCashFlow>().not.toBeAny()
+      expectTypeOf<PeriodKPIs>().not.toBeAny()
+      expectTypeOf<PeriodData>().not.toBeAny()
+      expectTypeOf<PeriodicSummary>().not.toBeAny()
+      expectTypeOf<PeriodicReportData>().not.toBeAny()
     })
   })
 })
