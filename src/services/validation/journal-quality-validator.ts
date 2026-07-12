@@ -241,6 +241,15 @@ function clusterByAmount<T extends { amount: number }>(items: T[], tolerance: nu
   return clusters
 }
 
+/**
+ * Detects duplicate journal entries grouped by date/accounts (and optionally tax
+ * amount / description), clustering within an amount tolerance.
+ *
+ * @param journals - Journal entries to scan.
+ * @param options - Grouping toggles and tolerances (all optional, with defaults).
+ * @returns success with a DuplicateFinding (severity `warning` when groups exist),
+ *   or failure with VALIDATION_ERROR if options or journals fail schema validation.
+ */
 export function findDuplicateJournals(
   journals: Journal[],
   options: DuplicateOptions = {}
@@ -322,6 +331,14 @@ export function findDuplicateJournals(
   })
 }
 
+/**
+ * Finds gaps between consecutive journal entry dates exceeding a threshold.
+ *
+ * @param journals - Journal entries to scan.
+ * @param options - `maxGapDays` threshold (default 7).
+ * @returns success with a DateGapFinding (severity `warning` when gaps exceed the
+ *   threshold), or failure with VALIDATION_ERROR on schema failure.
+ */
 export function findDateGaps(
   journals: Journal[],
   options: DateGapOptions = {}
@@ -367,6 +384,15 @@ export function findDateGaps(
   })
 }
 
+/**
+ * Flags journal entries that are structurally unbalanced: non-finite/non-positive
+ * amounts, negative tax, or self-offsetting (debit === credit) accounts.
+ *
+ * @param journals - Journal entries to scan.
+ * @param options - Reserved options object (no tunables currently).
+ * @returns success with an UnbalancedFinding (severity `warning` when any entry is
+ *   flagged), or failure with VALIDATION_ERROR on schema failure.
+ */
 export function findUnbalancedEntries(
   journals: Journal[],
   options: UnbalancedOptions = {}
@@ -428,6 +454,16 @@ export function findUnbalancedEntries(
   })
 }
 
+/**
+ * Summarizes counterparty accounts (e.g. 売掛金/買掛金) whose journal descriptions
+ * are missing or placeholder, grouped by account with sample entries.
+ *
+ * @param journals - Journal entries to scan.
+ * @param options - Counterparty patterns, description length floor, placeholder
+ *   tokens, and max samples per account (all optional, with defaults).
+ * @returns success with a MissingCounterpartyStats (severity `warning` when any
+ *   missing counterparty is found), or failure with VALIDATION_ERROR on schema failure.
+ */
 export function computeMissingCounterpartyStats(
   journals: Journal[],
   options: MissingCounterpartyOptions = {}
@@ -506,6 +542,15 @@ export function computeMissingCounterpartyStats(
   })
 }
 
+/**
+ * Runs all journal-quality checks (duplicates, date gaps, unbalanced entries,
+ * missing counterparty) and aggregates them into a single report.
+ *
+ * @param journals - Journal entries to analyze.
+ * @param options - Per-check option overrides (all optional).
+ * @returns success with a JournalQualityReport, or failure forwarding the first
+ *   check's VALIDATION_ERROR.
+ */
 export function analyzeJournalQuality(
   journals: Journal[],
   options: JournalQualityOptions = {}
