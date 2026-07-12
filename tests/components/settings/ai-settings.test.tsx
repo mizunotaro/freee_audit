@@ -152,4 +152,175 @@ describe('AiSettings', () => {
     await waitFor(() => expect(screen.getByRole('alert')).toBeInTheDocument())
     expect(screen.getByRole('alert')).toHaveTextContent('無効なAPIキーです')
   })
+
+  it('shows the loading skeleton until the config finishes loading', async () => {
+    let resolveLoad!: (v: unknown) => void
+    fetchMock.mockReturnValueOnce(
+      new Promise((r) => {
+        resolveLoad = r
+      })
+    )
+
+    const { container } = render(<AiSettings />)
+
+    await waitFor(() => expect(container.querySelector('.animate-pulse')).toBeInTheDocument())
+    expect(screen.queryByRole('heading', { name: 'AI API設定' })).toBeNull()
+
+    resolveLoad(okResponse({ config: { provider: 'openai', model: 'gpt-4' } }))
+
+    await waitFor(() =>
+      expect(screen.getByRole('heading', { name: 'AI API設定' })).toBeInTheDocument()
+    )
+  })
+
+  it('keeps the default provider when the load response is not ok', async () => {
+    fetchMock.mockResolvedValue(errResponse({}))
+
+    render(<AiSettings />)
+
+    await waitFor(() =>
+      expect(screen.getByRole('heading', { name: 'AI API設定' })).toBeInTheDocument()
+    )
+    expect(screen.getByText('openai').closest('button')).toHaveClass('border-primary-500')
+  })
+
+  it('keeps the defaults when the load payload has no config object', async () => {
+    fetchMock.mockResolvedValue(okResponse({}))
+
+    render(<AiSettings />)
+
+    await waitFor(() => expect(screen.getByRole('combobox')).toBeInTheDocument())
+    expect(screen.getByText('openai').closest('button')).toHaveClass('border-primary-500')
+  })
+
+  it('falls back to the openai provider when the stored provider is empty', async () => {
+    fetchMock.mockResolvedValue(okResponse({ config: { provider: '', model: '' } }))
+
+    render(<AiSettings />)
+
+    await waitFor(() => expect(screen.getByRole('combobox')).toBeInTheDocument())
+    expect(screen.getByText('openai').closest('button')).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByText('gemini').closest('button')).toHaveAttribute('aria-pressed', 'false')
+  })
+
+  it('shows the generic error message when the save request throws', async () => {
+    fetchMock
+      .mockResolvedValueOnce(okResponse({ config: { provider: 'openai', model: 'gpt-4' } }))
+      .mockRejectedValueOnce(new Error('network down'))
+
+    render(<AiSettings />)
+    await waitFor(() => expect(screen.getByRole('combobox')).toBeInTheDocument())
+
+    fireEvent.change(screen.getByPlaceholderText('sk-...'), { target: { value: 'sk-x' } })
+    fireEvent.click(screen.getByRole('button', { name: '保存' }))
+
+    await waitFor(() => expect(screen.getByText('保存に失敗しました')).toBeInTheDocument())
+  })
+
+  it('falls back to the generic message when the error response has no error field', async () => {
+    fetchMock
+      .mockResolvedValueOnce(okResponse({ config: { provider: 'openai', model: 'gpt-4' } }))
+      .mockResolvedValueOnce(errResponse({}))
+
+    render(<AiSettings />)
+    await waitFor(() => expect(screen.getByRole('combobox')).toBeInTheDocument())
+
+    fireEvent.change(screen.getByPlaceholderText('sk-...'), { target: { value: 'sk-x' } })
+    fireEvent.click(screen.getByRole('button', { name: '保存' }))
+
+    await waitFor(() => expect(screen.getByText('保存に失敗しました')).toBeInTheDocument())
+  })
+
+  it('clears the error when its dismiss button is clicked', async () => {
+    fetchMock
+      .mockResolvedValueOnce(okResponse({ config: { provider: 'openai', model: 'gpt-4' } }))
+      .mockResolvedValueOnce(errResponse({ error: '無効なAPIキーです' }))
+
+    render(<AiSettings />)
+    await waitFor(() => expect(screen.getByRole('combobox')).toBeInTheDocument())
+
+    fireEvent.change(screen.getByPlaceholderText('sk-...'), { target: { value: 'sk-x' } })
+    fireEvent.click(screen.getByRole('button', { name: '保存' }))
+
+    await waitFor(() => expect(screen.getByRole('alert')).toBeInTheDocument())
+    fireEvent.click(screen.getByRole('button', { name: 'エラーを閉じる' }))
+
+    await waitFor(() => expect(screen.queryByRole('alert')).toBeNull())
+  })
+
+  it('clears the success message when its dismiss button is clicked', async () => {
+    fetchMock
+      .mockResolvedValueOnce(okResponse({ config: { provider: 'openai', model: 'gpt-4' } }))
+      .mockResolvedValueOnce(okResponse({}))
+
+    render(<AiSettings />)
+    await waitFor(() => expect(screen.getByRole('combobox')).toBeInTheDocument())
+
+    fireEvent.click(screen.getByRole('button', { name: '保存' }))
+
+    await waitFor(() => expect(screen.getByRole('status')).toBeInTheDocument())
+    fireEvent.click(screen.getByRole('button', { name: 'メッセージを閉じる' }))
+
+    await waitFor(() => expect(screen.queryByRole('status')).toBeNull())
+  })
+
+  it('disables the save button and shows the saving label while the request is in flight', async () => {
+    fetchMock.mockResolvedValueOnce(okResponse({ config: { provider: 'openai', model: 'gpt-4' } }))
+    let resolveSave!: (v: unknown) => void
+    fetchMock.mockReturnValueOnce(
+      new Promise((r) => {
+        resolveSave = r
+      })
+    )
+
+    render(<AiSettings />)
+    await waitFor(() => expect(screen.getByRole('combobox')).toBeInTheDocument())
+
+    fireEvent.click(screen.getByRole('button', { name: '保存' }))
+
+    await waitFor(() => expect(screen.getByRole('button', { name: '保存中...' })).toBeDisabled())
+
+    resolveSave(okResponse({}))
+    await waitFor(() => expect(screen.getByRole('button', { name: '保存' })).toBeEnabled())
+  })
+
+  it('switches the API key input between password and text', async () => {
+    fetchMock.mockResolvedValue(okResponse({ config: { provider: 'openai', model: 'gpt-4' } }))
+
+    render(<AiSettings />)
+    await waitFor(() => expect(screen.getByRole('combobox')).toBeInTheDocument())
+
+    const input = screen.getByPlaceholderText('sk-...')
+    expect(input).toHaveAttribute('type', 'password')
+
+    fireEvent.click(screen.getByRole('button', { name: 'APIキーを表示する' }))
+    expect(input).toHaveAttribute('type', 'text')
+
+    fireEvent.click(screen.getByRole('button', { name: 'APIキーを非表示にする' }))
+    expect(input).toHaveAttribute('type', 'password')
+  })
+
+  it('updates the selected model when a different option is chosen', async () => {
+    fetchMock.mockResolvedValue(okResponse({ config: { provider: 'openai', model: 'gpt-4' } }))
+
+    render(<AiSettings />)
+    await waitFor(() => expect(screen.getByRole('combobox')).toBeInTheDocument())
+
+    fireEvent.change(screen.getByRole('combobox'), { target: { value: 'gpt-3.5-turbo' } })
+    expect(screen.getByRole('combobox')).toHaveValue('gpt-3.5-turbo')
+  })
+
+  it('switches to gemini and lists only the gemini models', async () => {
+    fetchMock.mockResolvedValue(okResponse({ config: { provider: 'openai', model: 'gpt-4' } }))
+
+    render(<AiSettings />)
+    await waitFor(() => expect(screen.getByRole('combobox')).toBeInTheDocument())
+
+    fireEvent.click(screen.getByText('gemini'))
+
+    const combobox = screen.getByRole('combobox') as HTMLSelectElement
+    expect(combobox).toHaveValue('gemini-pro')
+    const optionValues = Array.from(combobox.options).map((o) => o.value)
+    expect(optionValues).toEqual(['gemini-pro', 'gemini-pro-vision'])
+  })
 })
