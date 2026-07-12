@@ -211,4 +211,71 @@ describe('ConversionCache', () => {
       expect(stats.targetAccountCache.keys).not.toContain('mapping:1000:coa-1')
     })
   })
+
+  describe('edge cases and fail-safe behavior', () => {
+    it('round-trips entries when key components are empty strings', () => {
+      cache.setMapping('', '', makeMapping())
+      expect(cache.getMapping('', '')).toEqual(makeMapping())
+
+      const acct = { id: 'a', code: '', name: '', nameEn: '', category: '' }
+      cache.setTargetAccount('', '', acct)
+      expect(cache.getTargetAccount('', '')).toEqual(acct)
+
+      cache.setCashFlowMapping('', '', { section: 'financing' })
+      expect(cache.getCashFlowMapping('', '')).toEqual({ section: 'financing' })
+    })
+
+    it('reports an empty snapshot via getStats on a fresh cache', () => {
+      const stats = cache.getStats()
+      expect(stats.mappingCache.size).toBe(0)
+      expect(stats.mappingCache.keys).toEqual([])
+      expect(stats.targetAccountCache.size).toBe(0)
+      expect(stats.targetAccountCache.keys).toEqual([])
+      expect(stats.cashFlowMappingCache.size).toBe(0)
+      expect(stats.cashFlowMappingCache.keys).toEqual([])
+    })
+
+    it('can be repopulated after clearAll', () => {
+      cache.setMapping('1000', 'coa-1', makeMapping({ id: 'before' }))
+      cache.clearAll()
+      cache.setMapping('1000', 'coa-1', makeMapping({ id: 'after' }))
+      expect(cache.getMapping('1000', 'coa-1')?.id).toBe('after')
+    })
+
+    it('serves a target account up to the exact TTL boundary (600000ms)', () => {
+      const acct = { id: 'a', code: '1010', name: 'n', nameEn: 'e', category: 'c' }
+      cache.setTargetAccount('coa-1', '1010', acct)
+      vi.advanceTimersByTime(600000)
+      expect(cache.getTargetAccount('coa-1', '1010')).toEqual(acct)
+    })
+
+    it('serves a cash flow mapping up to the exact TTL boundary (600000ms)', () => {
+      cache.setCashFlowMapping('co-1', '1000', { section: 'operating' })
+      vi.advanceTimersByTime(600000)
+      expect(cache.getCashFlowMapping('co-1', '1000')).toEqual({ section: 'operating' })
+    })
+
+    // Characterization: getStats().size reads the raw Map size and does not lazily
+    // evict expired entries, while keys() filters them out. After the TTL elapses
+    // without a get(), size can therefore exceed keys.length.
+    it('getStats size counts expired-but-unread entries while keys excludes them', () => {
+      cache.setMapping('1000', 'coa-1', makeMapping())
+
+      vi.advanceTimersByTime(300001)
+
+      const stats = cache.getStats()
+      expect(stats.mappingCache.size).toBe(1)
+      expect(stats.mappingCache.keys).toEqual([])
+    })
+
+    // Characterization: keys are built with ':' as a delimiter, so arguments that
+    // contain a ':' can collide. Both lookups below resolve to the same key.
+    it('collides when key components contain the ":" delimiter', () => {
+      cache.setMapping('a', 'b:c', makeMapping({ id: 'first' }))
+      cache.setMapping('a:b', 'c', makeMapping({ id: 'second' }))
+
+      expect(cache.getMapping('a', 'b:c')?.id).toBe('second')
+      expect(cache.getMapping('a:b', 'c')?.id).toBe('second')
+    })
+  })
 })
