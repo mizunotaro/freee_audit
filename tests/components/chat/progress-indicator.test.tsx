@@ -44,9 +44,13 @@ describe('chat/progress-indicator — AnimatedStatusIcon', () => {
 
   it('applies the requested size class', () => {
     const sm = render(<AnimatedStatusIcon stage="error" size="sm" />)
-    expect(sm.container.querySelector('.h-4.w-4')).not.toBeNull()
+    const smNode = sm.container.querySelector('.h-4.w-4')
+    expect(smNode).not.toBeNull()
+    expect(smNode).toHaveClass('bg-destructive')
     const lg = render(<AnimatedStatusIcon stage="complete" size="lg" />)
-    expect(lg.container.querySelector('.h-8.w-8')).not.toBeNull()
+    const lgNode = lg.container.querySelector('.h-8.w-8')
+    expect(lgNode).not.toBeNull()
+    expect(lgNode).toHaveClass('bg-green-500')
   })
 })
 

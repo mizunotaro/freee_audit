@@ -91,10 +91,16 @@ describe('benchmark/data/industry-ratios', () => {
       }
     })
 
-    it('exposes every common metric for every sector', () => {
+    it('exposes a well-formed numeric range for every common metric in every sector', () => {
       for (const sector of ALL_SECTORS) {
         for (const metricId of COMMON_METRICS) {
-          expect(INDUSTRY_BENCHMARKS[sector].ratios[metricId]).toBeDefined()
+          const range = INDUSTRY_BENCHMARKS[sector].ratios[metricId]
+          expect(range).toBeDefined()
+          expect(typeof range.min).toBe('number')
+          expect(typeof range.max).toBe('number')
+          expect(Number.isFinite(range.min)).toBe(true)
+          expect(Number.isFinite(range.max)).toBe(true)
+          expect(range.min).toBeLessThanOrEqual(range.max)
         }
       }
     })

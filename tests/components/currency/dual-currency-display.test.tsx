@@ -62,7 +62,9 @@ describe('DualCurrencyDisplay', () => {
       <DualCurrencyDisplay amount={1} currency="JPY" className="custom-class" />
     )
 
-    expect(container.querySelector('.custom-class')).not.toBeNull()
+    const nodes = container.querySelectorAll('.custom-class')
+    expect(nodes).toHaveLength(1)
+    expect(nodes[0].textContent).toContain(formatCurrency(1, 'JPY', 'ja'))
   })
 
   it('labels the converted amount as a converted equivalent for screen readers (en)', () => {
@@ -115,7 +117,9 @@ describe('DualCurrencyInline', () => {
       <DualCurrencyInline amount={1} currency="JPY" exchangeRate={1} className="inline-class" />
     )
 
-    expect(container.querySelector('.inline-class')).not.toBeNull()
+    const nodes = container.querySelectorAll('.inline-class')
+    expect(nodes).toHaveLength(1)
+    expect(nodes[0].textContent).toContain(formatDualCurrency(1, 'JPY', 1, 'ja'))
   })
 })
 
@@ -144,6 +148,8 @@ describe('ExchangeRateBadge', () => {
   it('applies the custom className', () => {
     const { container } = render(<ExchangeRateBadge rate={150} className="badge-class" />)
 
-    expect(container.querySelector('.badge-class')).not.toBeNull()
+    const nodes = container.querySelectorAll('.badge-class')
+    expect(nodes).toHaveLength(1)
+    expect(nodes[0].textContent).toContain('USD/JPY: 150.00')
   })
 })
