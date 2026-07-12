@@ -106,7 +106,7 @@ export function FreeeSettings() {
 
   if (loading) {
     return (
-      <div className="p-6">
+      <div role="status" aria-busy="true" aria-label="freee連携設定を読み込み中" className="p-6">
         <div className="animate-pulse">
           <div className="mb-4 h-8 w-1/4 rounded bg-gray-200"></div>
           <div className="h-32 rounded bg-gray-200"></div>

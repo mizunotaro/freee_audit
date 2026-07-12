@@ -39,25 +39,42 @@ export const PeriodSelector = memo(function PeriodSelector({
   }
 
   return (
-    <div ref={containerRef} className="relative">
+    <div
+      ref={containerRef}
+      className="relative"
+      onKeyDown={(e) => {
+        if (e.key === 'Escape' && isOpen) {
+          setIsOpen(false)
+        }
+      }}
+    >
       <button
         onClick={() => !disabled && setIsOpen(!isOpen)}
         disabled={disabled}
+        aria-haspopup="true"
+        aria-expanded={isOpen}
+        aria-controls="period-selector-popup"
+        aria-label={`期間を選択、現在 ${formatPeriod(value)}`}
         className={cn(
           'flex items-center gap-2 rounded-md border bg-background px-4 py-2 text-sm',
           disabled && 'cursor-not-allowed opacity-50',
           !disabled && 'hover:bg-muted'
         )}
       >
-        <Calendar className="h-4 w-4" />
+        <Calendar className="h-4 w-4" aria-hidden="true" />
         <span>{formatPeriod(value)}</span>
       </button>
 
       {isOpen && (
-        <div className="absolute right-0 top-full z-50 mt-2 min-w-[200px] rounded-lg border bg-background p-4 shadow-lg">
+        <div
+          id="period-selector-popup"
+          role="group"
+          aria-label="期間を選択"
+          className="absolute right-0 top-full z-50 mt-2 min-w-[200px] rounded-lg border bg-background p-4 shadow-lg"
+        >
           <div className="space-y-4">
             <div>
-              <label className="mb-2 block text-xs text-muted-foreground">年度</label>
+              <span className="mb-2 block text-xs text-muted-foreground">年度</span>
               <div className="grid grid-cols-3 gap-1">
                 {years.map((year) => (
                   <button
@@ -79,7 +96,7 @@ export const PeriodSelector = memo(function PeriodSelector({
             </div>
 
             <div>
-              <label className="mb-2 block text-xs text-muted-foreground">月</label>
+              <span className="mb-2 block text-xs text-muted-foreground">月</span>
               <div className="grid grid-cols-4 gap-1">
                 {months.map((month) => (
                   <button

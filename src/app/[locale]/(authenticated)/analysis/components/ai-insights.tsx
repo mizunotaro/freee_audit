@@ -26,10 +26,21 @@ const CATEGORY_NAMES: Record<string, string> = {
   growth: '成長性',
 }
 
+const DIRECTION_LABELS: Record<string, string> = {
+  improving: '改善',
+  declining: '悪化',
+  stable: '安定',
+}
+
 export const AiInsights = memo(function AiInsights({ data, isLoading = false }: AiInsightsProps) {
   if (isLoading) {
     return (
-      <div className="animate-pulse rounded-lg border bg-card p-6">
+      <div
+        role="status"
+        aria-busy="true"
+        aria-label="AI分析インサイトを読み込み中"
+        className="animate-pulse rounded-lg border bg-card p-6"
+      >
         <div className="mb-4 h-6 w-32 rounded bg-muted" />
         <div className="space-y-4">
           {Array.from({ length: 3 }).map((_, i) => (
@@ -61,42 +72,53 @@ export const AiInsights = memo(function AiInsights({ data, isLoading = false }: 
       </h3>
 
       <div className="space-y-4">
-        {analyses.map((analysis) => (
-          <div key={analysis.category} className="rounded-lg bg-muted/50 p-4">
-            <div className="mb-2 flex items-center justify-between">
-              <h4 className="flex items-center gap-2 font-medium">
-                <span>{CATEGORY_ICONS[analysis.category] ?? '📊'}</span>
-                {CATEGORY_NAMES[analysis.category] ?? analysis.category}
-              </h4>
-              <span
-                className={cn(
-                  'rounded-full px-2 py-0.5 text-xs',
-                  analysis.score >= 70 && 'bg-green-100 text-green-700',
-                  analysis.score >= 40 && analysis.score < 70 && 'bg-yellow-100 text-yellow-700',
-                  analysis.score < 40 && 'bg-red-100 text-red-700'
-                )}
-              >
-                {analysis.score}点
-              </span>
-            </div>
-
-            <p className="mb-3 text-sm text-muted-foreground">{analysis.summary}</p>
-
-            {analysis.trends.length > 0 && (
-              <div className="space-y-2">
-                {analysis.trends.slice(0, 2).map((trend, index) => (
-                  <div key={index} className="flex items-start gap-2 text-xs">
-                    {getTrendIcon(trend.direction)}
-                    <div>
-                      <span className="font-medium">{trend.metric}</span>
-                      <p className="text-muted-foreground">{trend.insight}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
+        {analyses.length === 0 ? (
+          <div role="status" className="py-8 text-center text-muted-foreground">
+            <p className="text-sm">AI分析インサイトはありません</p>
           </div>
-        ))}
+        ) : (
+          analyses.map((analysis) => (
+            <div key={analysis.category} className="rounded-lg bg-muted/50 p-4">
+              <div className="mb-2 flex items-center justify-between">
+                <h4 className="flex items-center gap-2 font-medium">
+                  <span aria-hidden="true">{CATEGORY_ICONS[analysis.category] ?? '📊'}</span>
+                  {CATEGORY_NAMES[analysis.category] ?? analysis.category}
+                </h4>
+                <span
+                  className={cn(
+                    'rounded-full px-2 py-0.5 text-xs',
+                    analysis.score >= 70 && 'bg-green-100 text-green-700',
+                    analysis.score >= 40 && analysis.score < 70 && 'bg-yellow-100 text-yellow-700',
+                    analysis.score < 40 && 'bg-red-100 text-red-700'
+                  )}
+                >
+                  {analysis.score}点
+                </span>
+              </div>
+
+              <p className="mb-3 text-sm text-muted-foreground">{analysis.summary}</p>
+
+              {analysis.trends.length > 0 && (
+                <div className="space-y-2">
+                  {analysis.trends.slice(0, 2).map((trend, index) => (
+                    <div key={index} className="flex items-start gap-2 text-xs">
+                      <span aria-hidden="true">{getTrendIcon(trend.direction)}</span>
+                      <div>
+                        <span className="font-medium">
+                          <span className="sr-only">
+                            {DIRECTION_LABELS[trend.direction] ?? ''}{' '}
+                          </span>
+                          {trend.metric}
+                        </span>
+                        <p className="text-muted-foreground">{trend.insight}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          ))
+        )}
       </div>
     </div>
   )

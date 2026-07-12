@@ -32,7 +32,12 @@ export const RecommendationsPanel = memo(function RecommendationsPanel({
 
   if (isLoading) {
     return (
-      <div className="animate-pulse rounded-lg border bg-card p-6">
+      <div
+        role="status"
+        aria-busy="true"
+        aria-label="推奨アクションを読み込み中"
+        className="animate-pulse rounded-lg border bg-card p-6"
+      >
         <div className="mb-4 h-6 w-32 rounded bg-muted" />
         <div className="space-y-3">
           {Array.from({ length: 3 }).map((_, i) => (
@@ -79,7 +84,7 @@ export const RecommendationsPanel = memo(function RecommendationsPanel({
       </div>
 
       {filteredRecommendations.length === 0 ? (
-        <div className="py-8 text-center text-muted-foreground">
+        <div role="status" className="py-8 text-center text-muted-foreground">
           <p className="text-sm">推奨事項はありません</p>
         </div>
       ) : (
@@ -101,6 +106,9 @@ export const RecommendationsPanel = memo(function RecommendationsPanel({
               >
                 <div className="flex items-start gap-3">
                   <button
+                    role="checkbox"
+                    aria-checked={isCompleted}
+                    aria-label={`${isCompleted ? '完了を取り消す' : '完了にする'}: ${rec.title}`}
                     onClick={() => toggleComplete(rec.id)}
                     className={cn(
                       'mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2',
@@ -109,7 +117,9 @@ export const RecommendationsPanel = memo(function RecommendationsPanel({
                         : 'border-gray-300 hover:border-green-500'
                     )}
                   >
-                    {isCompleted && <CheckCircle className="h-4 w-4 text-white" />}
+                    {isCompleted && (
+                      <CheckCircle className="h-4 w-4 text-white" aria-hidden="true" />
+                    )}
                   </button>
 
                   <div className="min-w-0 flex-1">

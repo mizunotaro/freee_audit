@@ -26,7 +26,12 @@ export const AlertsList = memo(function AlertsList({ alerts, isLoading = false }
 
   if (isLoading) {
     return (
-      <div className="animate-pulse rounded-lg border bg-card p-6">
+      <div
+        role="status"
+        aria-busy="true"
+        aria-label="アラートを読み込み中"
+        className="animate-pulse rounded-lg border bg-card p-6"
+      >
         <div className="mb-4 h-6 w-24 rounded bg-muted" />
         <div className="space-y-3">
           {Array.from({ length: 3 }).map((_, i) => (
@@ -62,10 +67,11 @@ export const AlertsList = memo(function AlertsList({ alerts, isLoading = false }
           <span className="rounded-full bg-muted px-2 py-0.5 text-xs">{alerts.length}件</span>
         </h3>
         <div className="flex items-center gap-2">
-          <Filter className="h-4 w-4 text-muted-foreground" />
+          <Filter className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
           <select
             value={severityFilter ?? ''}
             onChange={(e) => setSeverityFilter(e.target.value || null)}
+            aria-label="重大度で絞り込み"
             className="rounded border bg-background px-2 py-1 text-xs"
           >
             <option value="">すべて</option>
@@ -78,7 +84,7 @@ export const AlertsList = memo(function AlertsList({ alerts, isLoading = false }
       </div>
 
       {sortedAlerts.length === 0 ? (
-        <div className="py-8 text-center text-muted-foreground">
+        <div role="status" className="py-8 text-center text-muted-foreground">
           <p className="text-sm">アラートはありません</p>
         </div>
       ) : (
@@ -86,27 +92,38 @@ export const AlertsList = memo(function AlertsList({ alerts, isLoading = false }
           {sortedAlerts.map((alert) => {
             const config = SEVERITY_CONFIG[alert.severity]
             const isExpanded = expandedId === alert.id
+            const detailsId = `alert-details-${alert.id}`
 
             return (
               <div key={alert.id} className={cn('overflow-hidden rounded-lg border', config.bg)}>
                 <button
                   onClick={() => setExpandedId(isExpanded ? null : alert.id)}
+                  aria-expanded={isExpanded}
+                  aria-controls={detailsId}
                   className="flex w-full items-start gap-3 p-3 text-left"
                 >
-                  <span className="text-lg">{config.icon}</span>
+                  <span className="text-lg" aria-hidden="true">
+                    {config.icon}
+                  </span>
                   <div className="min-w-0 flex-1">
                     <p className={cn('text-sm font-medium', config.color)}>{alert.title}</p>
                     <p className="truncate text-xs text-muted-foreground">{alert.description}</p>
                   </div>
                   {isExpanded ? (
-                    <ChevronUp className="h-4 w-4 shrink-0 text-muted-foreground" />
+                    <ChevronUp
+                      className="h-4 w-4 shrink-0 text-muted-foreground"
+                      aria-hidden="true"
+                    />
                   ) : (
-                    <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />
+                    <ChevronDown
+                      className="h-4 w-4 shrink-0 text-muted-foreground"
+                      aria-hidden="true"
+                    />
                   )}
                 </button>
 
                 {isExpanded && (
-                  <div className="space-y-2 border-t px-3 pb-3 pt-0">
+                  <div id={detailsId} className="space-y-2 border-t px-3 pb-3 pt-0">
                     <div className="text-xs">
                       <span className="text-muted-foreground">現在値:</span>{' '}
                       <span className="font-medium">{alert.currentValue.toFixed(2)}</span>

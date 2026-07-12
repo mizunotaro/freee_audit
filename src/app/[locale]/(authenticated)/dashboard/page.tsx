@@ -1,7 +1,7 @@
 'use client'
 
 import { useTranslations } from 'next-intl'
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import {
@@ -87,23 +87,48 @@ export default function DashboardPage() {
   const tKpi = useTranslations('kpi')
   const [data, setData] = useState<DashboardData | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  const loadDashboard = useCallback(async () => {
+    try {
+      setIsLoading(true)
+      setError(null)
+      const response = await fetch('/api/dashboard')
+      if (!response.ok) {
+        throw new Error(`ダッシュボードデータの取得に失敗しました (${response.status})`)
+      }
+      const result = await response.json()
+      setData(result)
+    } catch (err) {
+      console.error('Failed to fetch dashboard data:', err)
+      setError('ダッシュボードデータの取得に失敗しました。再試行してください。')
+    } finally {
+      setIsLoading(false)
+    }
+  }, [])
 
   useEffect(() => {
-    async function fetchDashboardData() {
-      try {
-        const response = await fetch('/api/dashboard')
-        if (response.ok) {
-          const result = await response.json()
-          setData(result)
-        }
-      } catch (error) {
-        console.error('Failed to fetch dashboard data:', error)
-      } finally {
-        setIsLoading(false)
-      }
-    }
-    fetchDashboardData()
-  }, [])
+    loadDashboard()
+  }, [loadDashboard])
+
+  if (error) {
+    return (
+      <div
+        role="alert"
+        aria-live="assertive"
+        className="flex min-h-[400px] flex-col items-center justify-center gap-4"
+      >
+        <p className="text-destructive">ダッシュボードデータの取得に失敗しました</p>
+        <button
+          type="button"
+          onClick={loadDashboard}
+          className="rounded-md bg-primary px-4 py-2 text-primary-foreground"
+        >
+          再試行
+        </button>
+      </div>
+    )
+  }
 
   const quickActions: QuickActionProps[] = [
     {
@@ -206,7 +231,7 @@ export default function DashboardPage() {
         )}
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4" aria-busy={isLoading}>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">{tKpi('runway')}</CardTitle>

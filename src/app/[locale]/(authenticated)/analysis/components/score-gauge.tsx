@@ -40,7 +40,12 @@ export const ScoreGauge = memo(function ScoreGauge({
 }: ScoreGaugeProps) {
   if (isLoading) {
     return (
-      <div className="animate-pulse rounded-lg border bg-card p-6">
+      <div
+        role="status"
+        aria-busy="true"
+        aria-label="総合評価スコアを読み込み中"
+        className="animate-pulse rounded-lg border bg-card p-6"
+      >
         <div className="mb-4 h-8 w-24 rounded bg-muted" />
         <div className="mx-auto h-32 w-32 rounded-full bg-muted" />
         <div className="mx-auto mt-4 h-4 w-20 rounded bg-muted" />
@@ -52,13 +57,22 @@ export const ScoreGauge = memo(function ScoreGauge({
   const strokeDashoffset = circumference - (score / 100) * circumference
   const colorClass = STATUS_COLORS[status] ?? STATUS_COLORS.fair
   const bgClass = STATUS_BG_COLORS[status] ?? STATUS_BG_COLORS.fair
+  const statusLabel = STATUS_LABELS[status] ?? '普通'
 
   return (
     <div className="rounded-lg border bg-card p-6">
       <h3 className="mb-4 text-sm font-medium text-muted-foreground">総合評価スコア</h3>
 
-      <div className="relative mx-auto h-36 w-36">
-        <svg className="h-full w-full -rotate-90 transform" viewBox="0 0 120 120">
+      <div
+        role="img"
+        aria-label={`総合評価スコア ${Math.round(score)} / 100、${statusLabel}`}
+        className="relative mx-auto h-36 w-36"
+      >
+        <svg
+          className="h-full w-full -rotate-90 transform"
+          viewBox="0 0 120 120"
+          aria-hidden="true"
+        >
           <circle
             cx="60"
             cy="60"
@@ -98,7 +112,7 @@ export const ScoreGauge = memo(function ScoreGauge({
             bgClass
           )}
         >
-          {STATUS_LABELS[status] ?? '普通'}
+          {statusLabel}
         </span>
       </div>
     </div>
